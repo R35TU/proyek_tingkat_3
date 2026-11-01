@@ -1,0 +1,810 @@
+import 'package:flutter/material.dart';
+import 'package:tata_saka_app/models/contract_model.dart';
+import 'package:tata_saka_app/models/kegiatan_model.dart';
+import 'package:tata_saka_app/models/weekly_report_model.dart';
+import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/utils/indonesian_terbilang.dart';
+import 'package:flutter/services.dart';
+import '../utils/rupiah_input_formatter.dart';
+
+class FormKegiatanScreen extends StatefulWidget {
+  final ContractModel contract;
+  final Map<String, dynamic>? initialKegiatan;
+  final int? kegiatanIndex;
+
+  const FormKegiatanScreen({
+    super.key,
+    required this.contract,
+    this.initialKegiatan,
+    this.kegiatanIndex,
+  });
+
+  @override
+  State<FormKegiatanScreen> createState() => _FormKegiatanScreenState();
+}
+
+class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
+  final _formKey = GlobalKey<FormState>();
+
+  // 1. DATA POKOK KEGIATAN
+  late TextEditingController _namaKegiatanCtrl;
+  late TextEditingController _lokasiCtrl;
+  late TextEditingController _sumberDanaCtrl;
+
+  // 2. KONSULTAN PENGAWAS
+  late TextEditingController _konsultanPengawasCtrl;
+  late TextEditingController _noSpkKonsultanCtrl;
+  late TextEditingController _tglSpkKonsultanCtrl;
+  late TextEditingController _noSpmkKonsultanCtrl;
+  late TextEditingController _tglSpmkKonsultanCtrl;
+  late TextEditingController _awalPelaksanaanCtrl;
+  late TextEditingController _akhirPelaksanaanCtrl;
+  late TextEditingController _masaPelaksanaanCtrl;
+  late TextEditingController _waktuBerjalanCtrl;
+
+  // 3. PENYEDIA JASA / KONTRAKTOR PELAKSANA
+  late TextEditingController _kontraktorCtrl;
+  late TextEditingController _noSuratPesananCtrl;
+  late TextEditingController _tglSuratPesananCtrl;
+  late TextEditingController _noSpmkKontraktorCtrl;
+  late TextEditingController _tglSpmkKontraktorCtrl;
+  late TextEditingController _nilaiKontrakCtrl;
+  late TextEditingController _jangkaWaktuCtrl;
+
+  // 4. STRUKTUR ORGANISASI KEGIATAN
+  late TextEditingController _penggunaAnggaranCtrl;
+  late TextEditingController _stafTeknis1Ctrl;
+  late TextEditingController _stafTeknis2Ctrl;
+  late TextEditingController _siteEngineerKegiatanCtrl;
+  late TextEditingController _direkturPenyediaCtrl;
+
+  // 5. STRUKTUR ORGANISASI PENYEDIA JASA
+  late TextEditingController _direkturKontraktorCtrl;
+  late TextEditingController _pelaksanaLapanganCtrl;
+  late TextEditingController _petugasK3Ctrl;
+
+  bool get isEditing => widget.initialKegiatan != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final c = widget.contract;
+    final init = widget.initialKegiatan;
+
+    // Helper default duration text
+    final defaultDurasi = c.hariKalender > 0
+        ? IndonesianTerbilang.formatHariKalender(c.hariKalender)
+        : '';
+
+    // 1. Data Pokok
+    _namaKegiatanCtrl = TextEditingController(text: init?['namaKegiatan'] ?? '');
+    _lokasiCtrl = TextEditingController(text: init?['lokasi'] ?? '');
+    _sumberDanaCtrl = TextEditingController(
+      text: (init?['sumberDana']?.toString().isNotEmpty == true)
+          ? init!['sumberDana']
+          : c.sumberDana,
+    );
+
+    // 2. Konsultan Pengawas
+    _konsultanPengawasCtrl = TextEditingController(
+      text: (init?['konsultanPengawas']?.toString().isNotEmpty == true)
+          ? init!['konsultanPengawas']
+          : 'CV. TATA SAKA CONSULTANT',
+    );
+    _noSpkKonsultanCtrl = TextEditingController(
+      text: (init?['noSpkKonsultan']?.toString().isNotEmpty == true)
+          ? init!['noSpkKonsultan']
+          : c.nomorSpk,
+    );
+    _tglSpkKonsultanCtrl = TextEditingController(
+      text: (init?['tglSpkKonsultan']?.toString().isNotEmpty == true)
+          ? init!['tglSpkKonsultan']
+          : c.tglMulaiSpk,
+    );
+    _noSpmkKonsultanCtrl = TextEditingController(
+      text: (init?['noSpmkKonsultan']?.toString().isNotEmpty == true)
+          ? init!['noSpmkKonsultan']
+          : c.nomorSpmk,
+    );
+    _tglSpmkKonsultanCtrl = TextEditingController(
+      text: (init?['tglSpmkKonsultan']?.toString().isNotEmpty == true)
+          ? init!['tglSpmkKonsultan']
+          : c.tglMulaiSpmk,
+    );
+    _awalPelaksanaanCtrl = TextEditingController(
+      text: (init?['awalPelaksanaan']?.toString().isNotEmpty == true)
+          ? init!['awalPelaksanaan']
+          : c.tglMulaiSpmk,
+    );
+    _akhirPelaksanaanCtrl = TextEditingController(
+      text: (init?['akhirPelaksanaan']?.toString().isNotEmpty == true)
+          ? init!['akhirPelaksanaan']
+          : c.tglSelesaiSpmk,
+    );
+    _masaPelaksanaanCtrl = TextEditingController(
+      text: (init?['masaPelaksanaan']?.toString().isNotEmpty == true)
+          ? init!['masaPelaksanaan']
+          : defaultDurasi,
+    );
+
+    // Hitung waktu berjalan otomatis berdasarkan awal pelaksanaan
+    String initWaktuBerjalan = init?['waktuBerjalan'] ?? '';
+    if (initWaktuBerjalan.isEmpty) {
+      initWaktuBerjalan = KegiatanModel.calculateWaktuBerjalan(_awalPelaksanaanCtrl.text);
+    }
+    _waktuBerjalanCtrl = TextEditingController(text: initWaktuBerjalan);
+
+    // 3. Penyedia Jasa / Kontraktor
+    _kontraktorCtrl = TextEditingController(text: init?['kontraktor'] ?? '');
+    _noSuratPesananCtrl = TextEditingController(text: init?['noSuratPesanan'] ?? '');
+    _tglSuratPesananCtrl = TextEditingController(text: init?['tglSuratPesanan'] ?? '');
+    _noSpmkKontraktorCtrl = TextEditingController(text: init?['noSpmkKontraktor'] ?? '');
+    _tglSpmkKontraktorCtrl = TextEditingController(text: init?['tglSpmkKontraktor'] ?? '');
+    _nilaiKontrakCtrl = TextEditingController(text: RupiahUtil.formatString(init?['nilaiKontrak'] ?? ''));
+    _jangkaWaktuCtrl = TextEditingController(
+      text: (init?['jangkaWaktu']?.toString().isNotEmpty == true)
+          ? init!['jangkaWaktu']
+          : defaultDurasi,
+    );
+
+    // 4. Struktur Organisasi Kegiatan
+    _penggunaAnggaranCtrl = TextEditingController(
+      text: init?['penggunaAnggaran'] ??
+          init?['strukturOrganisasiKegiatan']?['penggunaAnggaran'] ??
+          '',
+    );
+    _stafTeknis1Ctrl = TextEditingController(
+      text: init?['stafTeknis1'] ??
+          init?['stafTeknis'] ??
+          init?['strukturOrganisasiKegiatan']?['stafTeknis1'] ??
+          init?['strukturOrganisasiKegiatan']?['stafTeknis'] ??
+          '',
+    );
+    _stafTeknis2Ctrl = TextEditingController(
+      text: init?['stafTeknis2'] ??
+          init?['strukturOrganisasiKegiatan']?['stafTeknis2'] ??
+          '',
+    );
+    final String initialSiteEngineer = (init?['siteEngineerKegiatan']?.toString().isNotEmpty == true)
+        ? init!['siteEngineerKegiatan']
+        : ((init?['siteEngineer']?.toString().isNotEmpty == true)
+            ? init!['siteEngineer']
+            : ((init?['strukturOrganisasiKegiatan']?['siteEngineer']?.toString().isNotEmpty == true)
+                ? init!['strukturOrganisasiKegiatan']['siteEngineer']
+                : c.siteEngineer));
+    _siteEngineerKegiatanCtrl = TextEditingController(text: initialSiteEngineer);
+    _direkturPenyediaCtrl = TextEditingController(
+      text: init?['direkturPenyedia'] ??
+          init?['strukturOrganisasiKegiatan']?['direkturPenyedia'] ??
+          init?['direkturKontraktor'] ??
+          init?['direktur'] ??
+          '',
+    );
+
+    // 5. Struktur Organisasi Penyedia Jasa
+    _direkturKontraktorCtrl = TextEditingController(
+      text: init?['direkturKontraktor'] ??
+          init?['direktur'] ??
+          init?['strukturPenyediaJasa']?['direktur'] ??
+          _direkturPenyediaCtrl.text,
+    );
+    _pelaksanaLapanganCtrl = TextEditingController(
+      text: init?['pelaksanaLapangan'] ??
+          init?['strukturPenyediaJasa']?['pelaksanaLapangan'] ??
+          '',
+    );
+    _petugasK3Ctrl = TextEditingController(
+      text: init?['petugasK3'] ??
+          init?['ahliK3'] ??
+          init?['strukturPenyediaJasa']?['petugasK3'] ??
+          '',
+    );
+
+    // Listener untuk live update preview
+    _noSpkKonsultanCtrl.addListener(_onFieldChanged);
+    _tglSpkKonsultanCtrl.addListener(_onFieldChanged);
+    _noSpmkKonsultanCtrl.addListener(_onFieldChanged);
+    _tglSpmkKonsultanCtrl.addListener(_onFieldChanged);
+    _noSuratPesananCtrl.addListener(_onFieldChanged);
+    _tglSuratPesananCtrl.addListener(_onFieldChanged);
+    _noSpmkKontraktorCtrl.addListener(_onFieldChanged);
+    _tglSpmkKontraktorCtrl.addListener(_onFieldChanged);
+  }
+
+  void _onFieldChanged() {
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _namaKegiatanCtrl.dispose();
+    _lokasiCtrl.dispose();
+    _sumberDanaCtrl.dispose();
+    _konsultanPengawasCtrl.dispose();
+    _noSpkKonsultanCtrl.dispose();
+    _tglSpkKonsultanCtrl.dispose();
+    _noSpmkKonsultanCtrl.dispose();
+    _tglSpmkKonsultanCtrl.dispose();
+    _awalPelaksanaanCtrl.dispose();
+    _akhirPelaksanaanCtrl.dispose();
+    _masaPelaksanaanCtrl.dispose();
+    _waktuBerjalanCtrl.dispose();
+    _kontraktorCtrl.dispose();
+    _noSuratPesananCtrl.dispose();
+    _tglSuratPesananCtrl.dispose();
+    _noSpmkKontraktorCtrl.dispose();
+    _tglSpmkKontraktorCtrl.dispose();
+    _nilaiKontrakCtrl.dispose();
+    _jangkaWaktuCtrl.dispose();
+    _penggunaAnggaranCtrl.dispose();
+    _stafTeknis1Ctrl.dispose();
+    _stafTeknis2Ctrl.dispose();
+    _siteEngineerKegiatanCtrl.dispose();
+    _direkturPenyediaCtrl.dispose();
+    _direkturKontraktorCtrl.dispose();
+    _pelaksanaLapanganCtrl.dispose();
+    _petugasK3Ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDateFor(TextEditingController controller, {bool updateWaktuBerjalan = false}) async {
+    DateTime initial = DateTime.now();
+    final parsed = WeeklyReportModel.parseIndonesianDate(controller.text);
+    if (parsed != null) {
+      initial = parsed;
+    }
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+      locale: const Locale('id', 'ID'),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.primaryBlue,
+              onPrimary: Colors.white,
+              onSurface: AppColors.textDark,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      final formatted = WeeklyReportModel.formatIndonesianDate(picked);
+      setState(() {
+        controller.text = formatted;
+        if (updateWaktuBerjalan) {
+          _waktuBerjalanCtrl.text = KegiatanModel.calculateWaktuBerjalan(formatted);
+        }
+      });
+    }
+  }
+
+
+
+
+
+  void _simpan() {
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mohon lengkapi field wajib bertanda bintang (*)'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final Map<String, dynamic> kegiatanData = {
+      if (widget.initialKegiatan != null) ...widget.initialKegiatan!,
+      'namaKegiatan': _namaKegiatanCtrl.text.trim(),
+      'lokasi': _lokasiCtrl.text.trim(),
+      'sumberDana': _sumberDanaCtrl.text.trim(),
+      'konsultanPengawas': _konsultanPengawasCtrl.text.trim(),
+      'noSpkKonsultan': _noSpkKonsultanCtrl.text.trim(),
+      'tglSpkKonsultan': _tglSpkKonsultanCtrl.text.trim(),
+      'noSpmkKonsultan': _noSpmkKonsultanCtrl.text.trim(),
+      'tglSpmkKonsultan': _tglSpmkKonsultanCtrl.text.trim(),
+      'awalPelaksanaan': _awalPelaksanaanCtrl.text.trim(),
+      'akhirPelaksanaan': _akhirPelaksanaanCtrl.text.trim(),
+      'masaPelaksanaan': _masaPelaksanaanCtrl.text.trim(),
+      'waktuBerjalan': _waktuBerjalanCtrl.text.trim(),
+      'kontraktor': _kontraktorCtrl.text.trim(),
+      'noSuratPesanan': _noSuratPesananCtrl.text.trim(),
+      'tglSuratPesanan': _tglSuratPesananCtrl.text.trim(),
+      'noSpmkKontraktor': _noSpmkKontraktorCtrl.text.trim(),
+      'tglSpmkKontraktor': _tglSpmkKontraktorCtrl.text.trim(),
+      'nilaiKontrak': _nilaiKontrakCtrl.text.trim().isNotEmpty
+          ? 'Rp ${_nilaiKontrakCtrl.text.trim()}'
+          : '',
+      'jangkaWaktu': _jangkaWaktuCtrl.text.trim(),
+      'penggunaAnggaran': _penggunaAnggaranCtrl.text.trim(),
+      'stafTeknis1': _stafTeknis1Ctrl.text.trim(),
+      'stafTeknis2': _stafTeknis2Ctrl.text.trim(),
+      'siteEngineerKegiatan': _siteEngineerKegiatanCtrl.text.trim(),
+      'direkturPenyedia': _direkturPenyediaCtrl.text.trim(),
+      'direkturKontraktor': _direkturKontraktorCtrl.text.trim(),
+      'pelaksanaLapangan': _pelaksanaLapanganCtrl.text.trim(),
+      'petugasK3': _petugasK3Ctrl.text.trim(),
+      'strukturOrganisasiKegiatan': {
+        'penggunaAnggaran': _penggunaAnggaranCtrl.text.trim(),
+        'stafTeknis1': _stafTeknis1Ctrl.text.trim(),
+        'stafTeknis2': _stafTeknis2Ctrl.text.trim(),
+        'siteEngineer': _siteEngineerKegiatanCtrl.text.trim(),
+        'direkturPenyedia': _direkturPenyediaCtrl.text.trim(),
+      },
+      'strukturPenyediaJasa': {
+        'direktur': _direkturKontraktorCtrl.text.trim(),
+        'pelaksanaLapangan': _pelaksanaLapanganCtrl.text.trim(),
+        'petugasK3': _petugasK3Ctrl.text.trim(),
+      },
+    };
+
+    Navigator.pop(context, kegiatanData);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F4),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF111827)),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isEditing ? 'Edit Data Kegiatan' : 'Tambah Kegiatan Baru',
+              style: const TextStyle(
+                color: Color(0xFF111827),
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              widget.contract.namaKontrak,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Color(0xFF6B7280), fontSize: 11),
+            ),
+          ],
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: TextButton(
+              onPressed: _simpan,
+              child: const Text(
+                'Simpan',
+                style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF111827), fontSize: 14),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. DATA POKOK KEGIATAN
+              _buildSection1DataPokok(),
+              const SizedBox(height: 16),
+
+              // 2. KONSULTAN PENGAWAS
+              _buildSection2KonsultanPengawas(),
+              const SizedBox(height: 16),
+
+              // 3. PENYEDIA JASA / KONTRAKTOR PELAKSANA
+              _buildSection3KontraktorPelaksana(),
+              const SizedBox(height: 16),
+
+              // 4. STRUKTUR ORGANISASI KEGIATAN
+              _buildSection4StrukturKegiatan(),
+              const SizedBox(height: 16),
+
+              // 5. STRUKTUR ORGANISASI PENYEDIA JASA
+              _buildSection5StrukturPenyedia(),
+              const SizedBox(height: 28),
+
+              // TOMBOL SIMPAN
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: _simpan,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1F2937),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    isEditing ? 'Perbarui Data Kegiatan' : 'Simpan Data Kegiatan',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 36),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 1. DATA POKOK KEGIATAN
+  Widget _buildSection1DataPokok() {
+    return _buildCard(
+      title: 'Data Pokok Kegiatan',
+      children: [
+        _buildField(
+          controller: _namaKegiatanCtrl,
+          label: 'Nama Kegiatan *',
+          maxLines: 2,
+          isBold: true,
+          validator: (val) => val == null || val.trim().isEmpty ? 'Nama kegiatan wajib diisi' : null,
+        ),
+        const SizedBox(height: 14),
+        _buildField(
+          controller: _lokasiCtrl,
+          label: 'Lokasi Kegiatan *',
+          validator: (val) => val == null || val.trim().isEmpty ? 'Lokasi kegiatan wajib diisi' : null,
+        ),
+        const SizedBox(height: 14),
+        _buildField(
+          controller: _sumberDanaCtrl,
+          label: 'Sumber Dana',
+        ),
+      ],
+    );
+  }
+
+  // 2. KONSULTAN PENGAWAS
+  Widget _buildSection2KonsultanPengawas() {
+    return _buildCard(
+      title: 'Konsultan Pengawas',
+      children: [
+        _buildField(
+          controller: _konsultanPengawasCtrl,
+          label: 'Konsultan Pengawas',
+          isBold: true,
+        ),
+        const SizedBox(height: 16),
+
+        // No. SPK
+        _buildDocGroup(
+          label: 'No. SPK / Kontrak Pengawas',
+          docController: _noSpkKonsultanCtrl,
+          dateController: _tglSpkKonsultanCtrl,
+        ),
+        const SizedBox(height: 14),
+
+        // No. SPMK
+        _buildDocGroup(
+          label: 'No. SPMK Pengawas',
+          docController: _noSpmkKonsultanCtrl,
+          dateController: _tglSpmkKonsultanCtrl,
+        ),
+        const SizedBox(height: 16),
+
+        // Awal & Akhir Pelaksanaan
+        Row(
+          children: [
+            Expanded(
+              child: _buildField(
+                controller: _awalPelaksanaanCtrl,
+                label: 'Awal Pelaksanaan',
+                fontSize: 12,
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.calendar_month, color: Color(0xFF6B7280), size: 18),
+                  onPressed: () => _pickDateFor(_awalPelaksanaanCtrl, updateWaktuBerjalan: true),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildField(
+                controller: _akhirPelaksanaanCtrl,
+                label: 'Akhir Pelaksanaan',
+                fontSize: 12,
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.calendar_month, color: Color(0xFF6B7280), size: 18),
+                  onPressed: () => _pickDateFor(_akhirPelaksanaanCtrl),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // Masa Pelaksanaan
+        _buildField(
+          controller: _masaPelaksanaanCtrl,
+          label: 'Masa Pelaksanaan',
+        ),
+      ],
+    );
+  }
+
+  // 3. PENYEDIA JASA / KONTRAKTOR PELAKSANA
+  Widget _buildSection3KontraktorPelaksana() {
+    return _buildCard(
+      title: 'Penyedia Jasa / Kontraktor Pelaksana',
+      children: [
+        _buildField(
+          controller: _kontraktorCtrl,
+          label: 'Kontraktor Pelaksana *',
+          isBold: true,
+          validator: (val) => val == null || val.trim().isEmpty ? 'Kontraktor pelaksana wajib diisi' : null,
+        ),
+        const SizedBox(height: 14),
+
+        // Nilai Kontrak
+        _buildField(
+          controller: _nilaiKontrakCtrl,
+          label: 'Nilai Kontrak Kegiatan *',
+          isBold: true,
+          prefixText: 'Rp ',
+          keyboardType: TextInputType.number,
+          inputFormatters: [RupiahInputFormatter()],
+          validator: (val) => val == null || val.trim().isEmpty ? 'Nilai kontrak kegiatan wajib diisi' : null,
+        ),
+        const SizedBox(height: 16),
+
+        // No. Surat Pesanan
+        _buildDocGroup(
+          label: 'No. Surat Pesanan / SPK Kontraktor',
+          docController: _noSuratPesananCtrl,
+          dateController: _tglSuratPesananCtrl,
+        ),
+        const SizedBox(height: 14),
+
+        // No. SPMK Kontraktor
+        _buildDocGroup(
+          label: 'No. SPMK Kontraktor Pelaksana',
+          docController: _noSpmkKontraktorCtrl,
+          dateController: _tglSpmkKontraktorCtrl,
+        ),
+        const SizedBox(height: 14),
+
+        // Jangka Waktu
+        _buildField(
+          controller: _jangkaWaktuCtrl,
+          label: 'Jangka Waktu Pelaksanaan',
+        ),
+      ],
+    );
+  }
+
+  // 4. STRUKTUR ORGANISASI KEGIATAN
+  Widget _buildSection4StrukturKegiatan() {
+    return _buildCard(
+      title: 'Struktur Organisasi Kegiatan',
+      children: [
+        _buildField(
+          controller: _penggunaAnggaranCtrl,
+          label: 'Pengguna Anggaran / PPK',
+        ),
+        const SizedBox(height: 14),
+        _buildField(
+          controller: _stafTeknis1Ctrl,
+          label: 'Staf Teknis 1 DPU-PR',
+        ),
+        const SizedBox(height: 14),
+        _buildField(
+          controller: _stafTeknis2Ctrl,
+          label: 'Staf Teknis 2 DPU-PR',
+        ),
+        const SizedBox(height: 14),
+        _buildField(
+          controller: _siteEngineerKegiatanCtrl,
+          label: 'Site Engineer (CV. Tata Saka Consultant)',
+        ),
+        const SizedBox(height: 14),
+        _buildField(
+          controller: _direkturPenyediaCtrl,
+          label: 'Direktur Penyedia Jasa',
+        ),
+      ],
+    );
+  }
+
+  // 5. STRUKTUR ORGANISASI PENYEDIA JASA
+  Widget _buildSection5StrukturPenyedia() {
+    return _buildCard(
+      title: 'Struktur Organisasi Penyedia Jasa',
+      children: [
+        _buildField(
+          controller: _direkturKontraktorCtrl,
+          label: 'Direktur',
+        ),
+        const SizedBox(height: 14),
+        _buildField(
+          controller: _pelaksanaLapanganCtrl,
+          label: 'Pelaksana Lapangan',
+        ),
+        const SizedBox(height: 14),
+        _buildField(
+          controller: _petugasK3Ctrl,
+          label: 'Ahli / Petugas K3',
+        ),
+      ],
+    );
+  }
+
+  // ─── HELPER: Document Number + Date group ───
+  Widget _buildDocGroup({
+    required String label,
+    required TextEditingController docController,
+    required TextEditingController dateController,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF374151),
+            letterSpacing: 0.3,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: docController,
+          decoration: InputDecoration(
+            labelText: 'Nomor',
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF374151), width: 1.5),
+            ),
+            fillColor: Colors.white,
+            filled: true,
+          ),
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: dateController,
+          decoration: InputDecoration(
+            labelText: 'Tanggal',
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF374151), width: 1.5),
+            ),
+            fillColor: Colors.white,
+            filled: true,
+            suffixIcon: IconButton(
+              icon: const Icon(Icons.calendar_month, color: Color(0xFF6B7280), size: 18),
+              onPressed: () => _pickDateFor(dateController),
+            ),
+          ),
+          style: const TextStyle(fontSize: 12.5),
+        ),
+      ],
+    );
+  }
+
+  // ─── HELPER: Single text field ───
+  Widget _buildField({
+    required TextEditingController controller,
+    required String label,
+    int maxLines = 1,
+    bool isBold = false,
+    double fontSize = 13,
+    String? prefixText,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    Widget? suffixIcon,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        prefixText: prefixText,
+        prefixStyle: const TextStyle(
+          color: Color(0xFF111827),
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+        ),
+        suffixIcon: suffixIcon,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFF374151), width: 1.5),
+        ),
+        fillColor: Colors.white,
+        filled: true,
+      ),
+      style: TextStyle(
+        fontWeight: isBold ? FontWeight.w700 : FontWeight.normal,
+        fontSize: fontSize,
+        color: const Color(0xFF111827),
+      ),
+    );
+  }
+
+  // ─── HELPER: Section card ───
+  Widget _buildCard({
+    required String title,
+    required List<Widget> children,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFD1D5DB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF9FAFB),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
+              border: Border(bottom: BorderSide(color: Color(0xFFD1D5DB))),
+            ),
+            child: Text(
+              title.toUpperCase(),
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF374151),
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          // Content
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: children,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
