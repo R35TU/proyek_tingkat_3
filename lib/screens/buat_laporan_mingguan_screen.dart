@@ -8,6 +8,7 @@ import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/utils/rupiah_input_formatter.dart';
 import 'package:tata_saka_app/widgets/lembar_laporan_mingguan_widget.dart';
+import 'package:tata_saka_app/widgets/lembar_boq_mingguan_widget.dart';
 
 
 /// Struktur perhitungan rentang tanggal kalender per minggu
@@ -488,28 +489,7 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
     });
   }
 
-  /// Muat contoh template data demo
-  void _muatContohDummy() {
-    final sample = WeeklyReportModel.sampleDocument();
-    setState(() {
-      _tabelMingguan = sample.tabelMingguan.map((e) => WeeklyTableRow(
-        status: e.status,
-        mingguKe: e.mingguKe,
-        tglMulai: e.tglMulai,
-        tglSelesai: e.tglSelesai,
-        rencana: e.rencana,
-        realisasi: e.realisasi,
-      )).toList();
-      _mingguKe = 6;
-      _syncWeekLogic(6);
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Data contoh demo berhasil dimuat'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
+
 
   WeeklyReportModel _buildReportObject() {
     return WeeklyReportModel(
@@ -749,6 +729,13 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
           const SizedBox(height: 16),
           LembarLaporanMingguanWidget(
             report: reportObj,
+          ),
+          const SizedBox(height: 24),
+          LembarBoqMingguanWidget(
+            report: reportObj,
+            kegiatan: (_selectedContract?.kegiatans.isNotEmpty == true && _selectedKegiatanIndex != null && _selectedKegiatanIndex! < _selectedContract!.kegiatans.length)
+                ? _selectedContract!.kegiatans[_selectedKegiatanIndex!]
+                : null,
           ),
           const SizedBox(height: 36),
         ],

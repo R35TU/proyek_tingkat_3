@@ -8,6 +8,7 @@ import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/screens/buat_laporan_screen.dart';
 import 'package:tata_saka_app/screens/buat_laporan_mingguan_screen.dart';
 import 'package:tata_saka_app/widgets/lembar_laporan_mingguan_widget.dart';
+import 'package:tata_saka_app/widgets/lembar_boq_mingguan_widget.dart';
 import 'package:tata_saka_app/utils/plat_nomor_util.dart';
 
 class DetailDataLaporanScreen extends StatefulWidget {
@@ -77,17 +78,18 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
     final now = DateTime.now();
     _selectedDate = DateTime(now.year, now.month, now.day);
     _currentWeekMonday = _getMondayOfWeek(_selectedDate);
-
-    _initSampleReportIfEmpty();
-    _initSampleWeeklyReportIfEmpty();
   }
 
   void _initSampleReportIfEmpty() {
+    return; // Dikosongkan agar tidak memaksa data dummy laporan harian.
+  }
+
+  void _unusedLegacySampleReport() {
     final keg = _currentKegiatan;
     if (keg == null) return;
 
     List<dynamic> reports = keg['laporans'] ?? [];
-    final bool needsUpdate = reports.isEmpty || (reports.isNotEmpty && reports.first['pekerjaanList'] == null);
+    final bool needsUpdate = false;
     if (needsUpdate) {
       // Seed sample report matching the physical document of Buku Harian Standar
       final sample = {
@@ -101,19 +103,69 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
         'sumberDana': widget.contract.sumberDana,
         'kontraktor': keg['kontraktor'] ?? 'CV. LANGGENG',
 
-        // A. PEKERJAAN
+        // A. PEKERJAAN DENGAN SATU KESATUAN SUMBER DAYA (MATERIAL, ALAT, PERSONIL)
         'pekerjaanList': [
           {
             'no': '1',
             'jenis': 'Pekerjaan Galian Tanah untuk Saluran',
             'volume': '35 m³',
             'lokasi': 'STA 0+150 - 0+300',
+            'materials': [],
+            'peralatans': [
+              {
+                'no': '1.1',
+                'jenis': 'Excavator Mini PC 50',
+                'cacahAktif': '1 Unit',
+                'jumlah': '1 Unit',
+                'noRusak': '-',
+                'jenisRusak': '-',
+                'kode': '-',
+                'rusak': '-',
+              },
+            ],
+            'personils': [
+              {'no': '1.1', 'role': 'Pelaksana', 'cacah': '1', 'lokasi': 'STA 0+150'},
+              {'no': '1.2', 'role': 'Pekerja Galian', 'cacah': '4', 'lokasi': 'STA 0+150'},
+            ],
           },
           {
             'no': '2',
             'jenis': 'Pemasangan U-Ditch Precast 40x40',
             'volume': '20 Unit',
             'lokasi': 'STA 0+150 - 0+170',
+            'materials': [
+              {
+                'no': '2.1',
+                'jenis': 'U-Ditch Precast 40x40 cm',
+                'volume': '20 Buah',
+                'lokasiAwal': 'Basecamp',
+                'lokasiTujuan': 'STA 0+150',
+              },
+              {
+                'no': '2.2',
+                'jenis': 'Pasir Urug / Pasang',
+                'volume': '4 m³',
+                'lokasiAwal': 'Quarry',
+                'lokasiTujuan': 'STA 0+150',
+              },
+            ],
+            'peralatans': [
+              {
+                'no': '2.1',
+                'jenis': 'Dump Truck 5 Ton',
+                'cacahAktif': '1 Unit',
+                'jumlah': '1 Unit',
+                'noRusak': '1',
+                'jenisRusak': 'Dump Truck',
+                'kode': 'DT-02',
+                'rusak': 'Hidrolik Bocor',
+              },
+            ],
+            'personils': [
+              {'no': '2.1', 'role': 'Kepala Tukang Precast', 'cacah': '1', 'lokasi': 'STA 0+150'},
+              {'no': '2.2', 'role': 'Tukang Pasang', 'cacah': '4', 'lokasi': 'STA 0+150'},
+              {'no': '2.3', 'role': 'Pekerja Bantu', 'cacah': '4', 'lokasi': 'STA 0+150'},
+            ],
           },
         ],
 
@@ -172,10 +224,10 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
 
         // E. CUACA/BENCANA/KEJADIAN PENGHAMBAT PEKERJAAN
         'cuacaKejadianList': [
-          {'no': '1', 'jenis': 'Hujan Lebat', 'jam': '-', 'lokasi': '-', 'tanggungJawab': 'Tidak', 'akibat': '-'},
-          {'no': '2', 'jenis': 'Gerimis', 'jam': '14:00 - 15:00', 'lokasi': 'STA 0+150', 'tanggungJawab': 'Tidak', 'akibat': 'Pekerjaan dihentikan sementara'},
-          {'no': '3', 'jenis': 'Banjir / genangan air', 'jam': '-', 'lokasi': '-', 'tanggungJawab': 'Tidak', 'akibat': '-'},
-          {'no': '4', 'jenis': 'Longsor', 'jam': '-', 'lokasi': '-', 'tanggungJawab': 'Tidak', 'akibat': '-'},
+          {'no': '1', 'jenisKejadian': 'Hujan Lebat', 'cuaca': 'Hujan Lebat', 'jenis': 'Hujan Lebat', 'jam': '-', 'lokasi': '-', 'tanggungJawab': 'Tidak', 'akibat': '-'},
+          {'no': '2', 'jenisKejadian': 'Pekerjaan Tertunda', 'cuaca': 'Gerimis', 'jenis': 'Gerimis', 'jam': '14:00 - 15:00', 'lokasi': 'STA 0+150', 'tanggungJawab': 'Tidak', 'akibat': 'Pekerjaan dihentikan sementara'},
+          {'no': '3', 'jenisKejadian': 'Genangan Air', 'cuaca': 'Hujan', 'jenis': 'Banjir / genangan air', 'jam': '-', 'lokasi': '-', 'tanggungJawab': 'Tidak', 'akibat': '-'},
+          {'no': '4', 'jenisKejadian': 'Longsor', 'cuaca': 'Hujan Lebat', 'jenis': 'Longsor', 'jam': '-', 'lokasi': '-', 'tanggungJawab': 'Tidak', 'akibat': '-'},
         ],
 
         // F. INSTRUKSI DAN SARAN-SARAN
@@ -212,18 +264,22 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
             'no': '1',
             'nomorKendaraan': 'R 1234 AB',
             'jamDatang': '08:30',
+            'suhuDatang': '150°C',
             'suhu': '145°C',
             'jamMulaiTuang': '08:45',
             'jamSelesaiTuang': '09:15',
+            'suhuPemadatanAkhir': '95°C',
             'jamPulang': '09:20',
           },
           {
             'no': '2',
             'nomorKendaraan': 'R 5678 CD',
             'jamDatang': '09:10',
+            'suhuDatang': '148°C',
             'suhu': '142°C',
             'jamMulaiTuang': '09:20',
             'jamSelesaiTuang': '09:50',
+            'suhuPemadatanAkhir': '92°C',
             'jamPulang': '09:55',
           },
         ],
@@ -403,6 +459,64 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
     final customFields = (report['customFields'] as List<dynamic>?) ?? [];
     final fotoList = (report['fotoList'] as List<dynamic>?) ?? [];
 
+    final String namaKegiatan = _currentKegiatan?['namaKegiatan'] ?? widget.contract.namaKontrak;
+    final String lokasi = report['lokasi'] ?? _currentKegiatan?['lokasi'] ?? 'Kab. Purbalingga';
+    final String dana = report['sumberDana'] ?? widget.contract.sumberDana;
+    final String kontraktor = report['kontraktor'] ?? _currentKegiatan?['kontraktor'] ?? 'CV. LANGGENG';
+
+    // Build Normalized Pekerjaan List with their own Materials, Peralatans, and Personils
+    final List<Map<String, dynamic>> normalizedPekerjaanList = [];
+
+    if (pekerjaanList.isNotEmpty) {
+      for (int i = 0; i < pekerjaanList.length; i++) {
+        final rawItem = pekerjaanList[i];
+        if (rawItem is Map) {
+          final pMap = Map<String, dynamic>.from(rawItem);
+          final pIdx = i + 1;
+
+          // Extract nested materials or fallback to flat list matching pIdx
+          List<dynamic> mats = [];
+          if (pMap['materials'] is List) {
+            mats = List<dynamic>.from(pMap['materials'] as List);
+          } else {
+            mats = materialList.where((m) => m is Map && (m['pekerjaanIdx'] == pIdx || (i == 0 && m['pekerjaanIdx'] == null))).toList();
+          }
+
+          // Extract nested peralatans or fallback to flat list matching pIdx
+          List<dynamic> alats = [];
+          if (pMap['peralatans'] is List) {
+            alats = List<dynamic>.from(pMap['peralatans'] as List);
+          } else {
+            alats = peralatanList.where((a) => a is Map && (a['pekerjaanIdx'] == pIdx || (i == 0 && a['pekerjaanIdx'] == null))).toList();
+          }
+
+          // Extract nested personils or fallback to flat list matching pIdx
+          List<dynamic> pers = [];
+          if (pMap['personils'] is List) {
+            pers = List<dynamic>.from(pMap['personils'] as List);
+          } else {
+            pers = personilList.where((pr) => pr is Map && (pr['pekerjaanIdx'] == pIdx || (i == 0 && pr['pekerjaanIdx'] == null))).toList();
+          }
+
+          pMap['materials'] = mats;
+          pMap['peralatans'] = alats;
+          pMap['personils'] = pers;
+          normalizedPekerjaanList.add(pMap);
+        }
+      }
+    }
+
+    if (normalizedPekerjaanList.isEmpty) {
+      normalizedPekerjaanList.add({
+        'jenis': report['temuan']?.toString().isNotEmpty == true ? report['temuan'].toString() : 'Pekerjaan Lapangan',
+        'volume': '-',
+        'lokasi': lokasi,
+        'materials': materialList,
+        'peralatans': peralatanList,
+        'personils': personilList,
+      });
+    }
+
     // Rekapitulasi Dokumen (Halaman Terpisah)
     final hasRekapSuhuLapangan = report['hasRekapSuhuLapangan'] == true &&
         (report['rekapSuhuLapanganList'] as List?)?.isNotEmpty == true;
@@ -416,6 +530,10 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
         (report['rekapTonaseAspalList'] as List?)?.isNotEmpty == true;
     final rekapTonaseAspalList = (report['rekapTonaseAspalList'] as List<dynamic>?) ?? [];
 
+    final hasRekapBeton = (report['hasRekapBeton'] == true || report['hasRekapitulasiBeton'] == true) &&
+        (report['rekapPengecoranBetonList'] as List?)?.isNotEmpty == true;
+    final rekapPengecoranBetonList = (report['rekapPengecoranBetonList'] as List<dynamic>?) ?? [];
+
     final bool hasDataPerjalananDt = (report['hasRekapPerjalananDt'] == true ||
             report['hasRekapitulasiAspal'] == true) ||
         (hasRekapSuhuLapangan && hasRekapSuhuAmp);
@@ -425,17 +543,14 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
     if (hasRekapSuhuAmp) totalPages++;
     if (hasRekapTonaseAspal) totalPages++;
     if (hasDataPerjalananDt) totalPages++;
+    if (hasRekapBeton) totalPages++;
 
     int pageCounter = 1;
     final int suhuLapPage = hasRekapSuhuLapangan ? ++pageCounter : 0;
     final int suhuAmpPage = hasRekapSuhuAmp ? ++pageCounter : 0;
     final int tonasePage = hasRekapTonaseAspal ? ++pageCounter : 0;
     final int perjalananDtPage = hasDataPerjalananDt ? ++pageCounter : 0;
-
-    final String namaKegiatan = _currentKegiatan?['namaKegiatan'] ?? widget.contract.namaKontrak;
-    final String lokasi = report['lokasi'] ?? _currentKegiatan?['lokasi'] ?? 'Kab. Purbalingga';
-    final String dana = report['sumberDana'] ?? widget.contract.sumberDana;
-    final String kontraktor = report['kontraktor'] ?? _currentKegiatan?['kontraktor'] ?? 'CV. LANGGENG';
+    final int betonPage = hasRekapBeton ? ++pageCounter : 0;
 
     showModalBottomSheet(
       context: context,
@@ -567,138 +682,193 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                         _buildDocMetaRow('Dana', ':  $dana'),
                         const SizedBox(height: 14),
 
-                        // A. PEKERJAAN
-                        _buildDocSectionLabel('A.   PEKERJAAN'),
-                        const SizedBox(height: 4),
-                        _buildDocTable(
-                          colWidths: const {
-                            0: FixedColumnWidth(30),
-                            1: FlexColumnWidth(4),
-                            2: FlexColumnWidth(2),
-                            3: FlexColumnWidth(2.5),
-                          },
-                          headers: ['No', 'JENIS PEKERJAAN', 'VOLUME', 'LOKASI'],
-                          rows: pekerjaanList.isNotEmpty
-                              ? pekerjaanList.asMap().entries.map((e) => [
-                                  '${e.key + 1}',
-                                  e.value['jenis']?.toString() ?? '',
-                                  e.value['volume']?.toString() ?? '',
-                                  e.value['lokasi']?.toString() ?? '',
-                                ]).toList()
-                              : [
-                                  ['1', report['temuan'] ?? '', '-', lokasi],
-                                ],
-                        ),
-                        const SizedBox(height: 12),
+                        // SEKAT PER PEKERJAAN (MASING-MASING MEMILIKI A, B, C, D)
+                        ...normalizedPekerjaanList.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final p = entry.value;
+                          final pIdx = index + 1;
+                          final pJenis = p['jenis']?.toString() ?? 'Pekerjaan #$pIdx';
+                          final pVolume = p['volume']?.toString() ?? '-';
+                          final pLokasi = p['lokasi']?.toString() ?? lokasi;
 
-                        // B. MATERIAL DIGUNAKAN
-                        _buildDocSectionLabel('B.   MATERIAL DIGUNAKAN'),
-                        const SizedBox(height: 4),
-                        _buildDocTable(
-                          colWidths: const {
-                            0: FixedColumnWidth(30),
-                            1: FlexColumnWidth(3),
-                            2: FlexColumnWidth(2),
-                            3: FlexColumnWidth(2),
-                            4: FlexColumnWidth(2),
-                          },
-                          headers: ['No', 'Jenis', 'Cacah Volume', 'Lokasi Awal', 'Lokasi Tujuan'],
-                          rows: materialList.isNotEmpty
-                              ? materialList.asMap().entries.map((e) => [
-                                  '${e.key + 1}',
-                                  e.value['jenis']?.toString() ?? '',
-                                  e.value['volume']?.toString() ?? '',
-                                  e.value['lokasiAwal']?.toString() ?? '',
-                                  e.value['lokasiTujuan']?.toString() ?? '',
-                                ]).toList()
-                              : [
-                                  ['1', 'Material Proyek Standar', '-', 'Basecamp', lokasi],
-                                ],
-                        ),
-                        const SizedBox(height: 12),
+                          final mats = (p['materials'] as List<dynamic>?) ?? [];
+                          final alats = (p['peralatans'] as List<dynamic>?) ?? [];
+                          final pers = (p['personils'] as List<dynamic>?) ?? [];
 
-                        // C. JENIS PERALATAN YANG DIGUNAKAN
-                        _buildDocSectionLabel('C.   JENIS PERALATAN YANG DIGUNAKAN'),
-                        const SizedBox(height: 4),
-                        _buildDocTable(
-                          colWidths: const {
-                            0: FixedColumnWidth(26),
-                            1: FlexColumnWidth(2.8),
-                            2: FlexColumnWidth(1.6),
-                            3: FlexColumnWidth(1.4),
-                            4: FixedColumnWidth(26),
-                            5: FlexColumnWidth(2.0),
-                            6: FlexColumnWidth(1.4),
-                            7: FlexColumnWidth(1.6),
-                          },
-                          headers: ['No', 'Jenis Peralatan', 'Cacah aktif', 'Jumlah', 'No', 'Jenis', 'Kode', 'Rusak'],
-                          rows: peralatanList.isNotEmpty
-                              ? peralatanList.asMap().entries.map((e) => [
-                                  '${e.key + 1}',
-                                  e.value['jenis']?.toString() ?? '',
-                                  e.value['cacahAktif']?.toString() ?? e.value['jumlah']?.toString() ?? '',
-                                  e.value['jumlah']?.toString() ?? '',
-                                  e.value['noRusak']?.toString().isNotEmpty == true
-                                      ? e.value['noRusak'].toString()
-                                      : (e.value['jenisRusak']?.toString().isNotEmpty == true ? '${e.key + 1}' : '-'),
-                                  e.value['jenisRusak']?.toString().isNotEmpty == true ? e.value['jenisRusak'].toString() : '-',
-                                  e.value['kode']?.toString().isNotEmpty == true ? e.value['kode'].toString() : '-',
-                                  e.value['rusak']?.toString().isNotEmpty == true ? e.value['rusak'].toString() : '-',
-                                ]).toList()
-                              : [
-                                  ['1', '-', '-', '-', '-', '-', '-', '-'],
-                                ],
-                        ),
-                        const SizedBox(height: 12),
+                          final List<List<String>> jobRows = [
+                            [
+                              '1',
+                              pJenis.isNotEmpty ? pJenis : '-',
+                              pVolume.isNotEmpty ? pVolume : '-',
+                              pLokasi.isNotEmpty ? pLokasi : lokasi,
+                            ],
+                          ];
 
-                        // D. PERSONAL PROYEK PENGAWAS DAN KONTRAKTOR
-                        _buildDocSectionLabel('D.   PERSONAL PROYEK PENGAWAS DAN KONTRAKTOR'),
-                        const SizedBox(height: 4),
-                        _buildDocTable(
-                          colWidths: const {
-                            0: FixedColumnWidth(30),
-                            1: FlexColumnWidth(4),
-                            2: FlexColumnWidth(2),
-                            3: FlexColumnWidth(2.5),
-                          },
-                          headers: ['No', 'Personil proyek', 'Cacah', 'Lokasi'],
-                          rows: personilList.isNotEmpty
-                              ? personilList.asMap().entries.map((e) => [
-                                  '${e.key + 1}',
-                                  e.value['role']?.toString() ?? '',
-                                  '${e.value['cacah'] ?? e.value['count'] ?? ''}',
-                                  e.value['lokasi']?.toString() ?? lokasi,
-                                ]).toList()
+                          final List<List<String>> matRows = mats.isNotEmpty
+                              ? mats.asMap().entries.map((mEntry) {
+                                  final m = mEntry.value is Map ? (mEntry.value as Map) : <String, dynamic>{};
+                                  return [
+                                    '${mEntry.key + 1}',
+                                    m['jenis']?.toString() ?? '-',
+                                    m['volume']?.toString() ?? '-',
+                                    m['lokasiAwal']?.toString() ?? '-',
+                                    m['lokasiTujuan']?.toString() ?? '-',
+                                  ];
+                                }).toList()
                               : [
-                                  ['1', '-', '-', '-'],
-                                ],
-                        ),
-                        const SizedBox(height: 12),
+                                  ['1', 'Tidak ada penggunaan material pada pekerjaan ini', '-', '-', '-']
+                                ];
+
+                          final List<List<String>> alatRows = alats.isNotEmpty
+                              ? alats.asMap().entries.map((aEntry) {
+                                  final a = aEntry.value is Map ? (aEntry.value as Map) : <String, dynamic>{};
+                                  return [
+                                    '${aEntry.key + 1}',
+                                    a['jenis']?.toString() ?? '-',
+                                    a['cacahAktif']?.toString() ?? a['jumlah']?.toString() ?? '-',
+                                    a['jumlah']?.toString() ?? '-',
+                                    a['noRusak']?.toString().isNotEmpty == true
+                                        ? a['noRusak'].toString()
+                                        : (a['jenisRusak']?.toString().isNotEmpty == true ? '${aEntry.key + 1}' : '-'),
+                                    a['jenisRusak']?.toString().isNotEmpty == true ? a['jenisRusak'].toString() : '-',
+                                    a['kode']?.toString().isNotEmpty == true ? a['kode'].toString() : '-',
+                                    a['rusak']?.toString().isNotEmpty == true ? a['rusak'].toString() : '-',
+                                  ];
+                                }).toList()
+                              : [
+                                  ['1', 'Pekerjaan manual / tanpa peralatan mekanis', '-', '-', '-', '-', '-', '-']
+                                ];
+
+                          final List<List<String>> persRows = pers.isNotEmpty
+                              ? pers.asMap().entries.map((prEntry) {
+                                  final pr = prEntry.value is Map ? (prEntry.value as Map) : <String, dynamic>{};
+                                  return [
+                                    '${prEntry.key + 1}',
+                                    pr['role']?.toString() ?? '-',
+                                    '${pr['cacah'] ?? pr['count'] ?? '-'}',
+                                    pr['lokasi']?.toString() ?? pLokasi,
+                                  ];
+                                }).toList()
+                              : [
+                                  ['1', 'Personil proyek umum / terpadu', '-', pLokasi]
+                                ];
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _buildPekerjaanPartitionHeader(
+                                  index: pIdx,
+                                  title: pJenis,
+                                  volume: pVolume,
+                                  lokasi: pLokasi,
+                                ),
+                                const SizedBox(height: 6),
+
+                                // A. PEKERJAAN
+                                _buildDocSectionLabel('A.   PEKERJAAN'),
+                                const SizedBox(height: 4),
+                                _buildDocTable(
+                                  colWidths: const {
+                                    0: FixedColumnWidth(30),
+                                    1: FlexColumnWidth(4),
+                                    2: FlexColumnWidth(2),
+                                    3: FlexColumnWidth(2.5),
+                                  },
+                                  headers: ['No', 'JENIS PEKERJAAN', 'VOLUME', 'LOKASI'],
+                                  rows: jobRows,
+                                ),
+                                const SizedBox(height: 10),
+
+                                // B. MATERIAL DIGUNAKAN
+                                _buildDocSectionLabel('B.   MATERIAL DIGUNAKAN'),
+                                const SizedBox(height: 4),
+                                _buildDocTable(
+                                  colWidths: const {
+                                    0: FixedColumnWidth(30),
+                                    1: FlexColumnWidth(3),
+                                    2: FlexColumnWidth(2),
+                                    3: FlexColumnWidth(2),
+                                    4: FlexColumnWidth(2),
+                                  },
+                                  headers: ['No', 'Jenis', 'Cacah Volume', 'Lokasi Awal', 'Lokasi Tujuan'],
+                                  rows: matRows,
+                                ),
+                                const SizedBox(height: 10),
+
+                                // C. JENIS PERALATAN YANG DIGUNAKAN
+                                _buildDocSectionLabel('C.   JENIS PERALATAN YANG DIGUNAKAN'),
+                                const SizedBox(height: 4),
+                                _buildDocTable(
+                                  colWidths: const {
+                                    0: FixedColumnWidth(26),
+                                    1: FlexColumnWidth(2.8),
+                                    2: FlexColumnWidth(1.6),
+                                    3: FlexColumnWidth(1.4),
+                                    4: FixedColumnWidth(26),
+                                    5: FlexColumnWidth(2.0),
+                                    6: FlexColumnWidth(1.4),
+                                    7: FlexColumnWidth(1.6),
+                                  },
+                                  headers: ['No', 'Jenis Peralatan', 'Cacah aktif', 'Jumlah', 'No', 'Jenis', 'Kode', 'Rusak'],
+                                  rows: alatRows,
+                                ),
+                                const SizedBox(height: 10),
+
+                                // D. PERSONAL PROYEK PENGAWAS DAN KONTRAKTOR
+                                _buildDocSectionLabel('D.   PERSONAL PROYEK PENGAWAS DAN KONTRAKTOR'),
+                                const SizedBox(height: 4),
+                                _buildDocTable(
+                                  colWidths: const {
+                                    0: FixedColumnWidth(30),
+                                    1: FlexColumnWidth(4),
+                                    2: FlexColumnWidth(2),
+                                    3: FlexColumnWidth(2.5),
+                                  },
+                                  headers: ['No', 'Personil proyek', 'Cacah', 'Lokasi'],
+                                  rows: persRows,
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+
+                        const SizedBox(height: 4),
+                        const Divider(height: 18, thickness: 1.5, color: Colors.black45),
+                        const SizedBox(height: 8),
 
                         // E. CUACA/BENCANA/KEJADIAN PENGHAMBAT PEKERJAAN
                         _buildDocSectionLabel('E.   CUACA/BENCANA/KEJADIAN PENGHAMBAT PEKERJAAN'),
                         const SizedBox(height: 4),
                         _buildDocTable(
                           colWidths: const {
-                            0: FixedColumnWidth(30),
-                            1: FlexColumnWidth(2.5),
-                            2: FlexColumnWidth(1.8),
-                            3: FlexColumnWidth(1.8),
-                            4: FlexColumnWidth(2.2),
-                            5: FlexColumnWidth(2.5),
+                            0: FixedColumnWidth(28),
+                            1: FlexColumnWidth(1.8),
+                            2: FlexColumnWidth(2.2),
+                            3: FlexColumnWidth(1.6),
+                            4: FlexColumnWidth(1.6),
+                            5: FlexColumnWidth(2.0),
+                            6: FlexColumnWidth(2.2),
                           },
-                          headers: ['No', 'Jenis', 'Jam', 'Lokasi', 'Tanggung Jwb Kontraktor\n(Ya / Tidak)', 'Akibat'],
+                          headers: ['No', 'Cuaca', 'Jenis Kejadian', 'Jam', 'Lokasi', 'Tanggung Jwb Kontraktor\n(Ya / Tidak)', 'Akibat'],
                           rows: cuacaKejadianList.isNotEmpty
-                              ? cuacaKejadianList.asMap().entries.map((e) => [
-                                  '${e.key + 1}',
-                                  e.value['jenis']?.toString() ?? '',
-                                  e.value['jam']?.toString() ?? '-',
-                                  e.value['lokasi']?.toString() ?? '-',
-                                  e.value['tanggungJawab']?.toString() ?? 'Tidak',
-                                  e.value['akibat']?.toString() ?? '-',
-                                ]).toList()
+                              ? cuacaKejadianList.asMap().entries.map((e) {
+                                  final item = e.value is Map ? (e.value as Map) : <String, dynamic>{};
+                                  final cuacaVal = item['cuaca']?.toString() ?? '-';
+                                  final jk = item['jenisKejadian']?.toString() ?? item['jenis']?.toString() ?? '-';
+                                  return [
+                                    '${e.key + 1}',
+                                    cuacaVal.isNotEmpty ? cuacaVal : '-',
+                                    jk.isNotEmpty ? jk : '-',
+                                    item['jam']?.toString() ?? '-',
+                                    item['lokasi']?.toString() ?? '-',
+                                    item['tanggungJawab']?.toString() ?? 'Tidak',
+                                    item['akibat']?.toString() ?? '-',
+                                  ];
+                                }).toList()
                               : [
-                                  ['1', '-', '-', '-', '-', '-'],
+                                  ['1', '-', '-', '-', '-', '-', '-'],
                                 ],
                         ),
                         const SizedBox(height: 12),
@@ -711,7 +881,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
 
                         // FIELD TAMBAHAN / CUSTOM (Jika Ada)
                         if (customFields.isNotEmpty) ...[
-                          _buildDocSectionLabel('FIELD TAMBAHAN / CATATAN KHUSUS'),
+                          _buildDocSectionLabel('G.   FIELD TAMBAHAN / CATATAN KHUSUS'),
                           const SizedBox(height: 4),
                           _buildDocTable(
                             colWidths: const {
@@ -731,7 +901,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
 
                         // DOKUMENTASI FOTO LAPANGAN
                         if (fotoList.isNotEmpty) ...[
-                          _buildDocSectionLabel('DOKUMENTASI FOTO LAPANGAN'),
+                          _buildDocSectionLabel(customFields.isNotEmpty ? 'H.   DOKUMENTASI FOTO LAPANGAN' : 'G.   DOKUMENTASI FOTO LAPANGAN'),
                           const SizedBox(height: 6),
                           _buildDocSectionFoto(fotoList),
                           const SizedBox(height: 14),
@@ -797,6 +967,22 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                             totalPages: totalPages,
                           ),
                         ],
+
+                        if (hasRekapBeton) ...[
+                          _buildPageSeparator('REKAP PENGECORAN BETON READY MIX', betonPage, totalPages),
+                          _buildSheetRekapBeton(
+                            namaKegiatan: namaKegiatan,
+                            penyediaJasa: report['penyediaJasaBeton']?.toString().isNotEmpty == true
+                                ? report['penyediaJasaBeton'].toString()
+                                : kontraktor,
+                            jenisBeton: report['jenisBeton']?.toString().isNotEmpty == true
+                                ? report['jenisBeton'].toString()
+                                : '-',
+                            rows: rekapPengecoranBetonList,
+                            page: betonPage,
+                            totalPages: totalPages,
+                          ),
+                        ],
                         const SizedBox(height: 30),
                       ],
                     ),
@@ -806,6 +992,111 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPekerjaanPartitionHeader({
+    required int index,
+    required String title,
+    String? volume,
+    String? lokasi,
+  }) {
+    return Container(
+      margin: EdgeInsets.only(top: index == 1 ? 4 : 14, bottom: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B), // Dark slate navy
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.black, width: 1.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(3),
+            ),
+            child: Text(
+              'PEKERJAAN #$index',
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 10.5,
+                color: Color(0xFF1E293B),
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title.isNotEmpty ? title.toUpperCase() : 'PEKERJAAN KE-$index',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+                color: Colors.white,
+                letterSpacing: 0.3,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (volume != null && volume.trim().isNotEmpty && volume != '-') ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.18),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: Text(
+                'Vol: $volume',
+                style: const TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
+          if (lokasi != null && lokasi.trim().isNotEmpty && lokasi != '-') ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.location_on, size: 10, color: Colors.white70),
+                  const SizedBox(width: 3),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 120),
+                    child: Text(
+                      lokasi,
+                      style: const TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -1254,7 +1545,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
     );
   }
 
-  // --- LEMBAR REKAPITULASI 1: SUHU DI LAPANGAN (7 Kolom: a s/d g) ---
+  // --- LEMBAR REKAPITULASI 1: SUHU DI LAPANGAN (9 Kolom: a s/d i) ---
   Widget _buildSheetRekapSuhuLapangan({
     required String namaKegiatan,
     required String kontraktor,
@@ -1263,41 +1554,58 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
     required int totalPages,
   }) {
     const colWidths = <int, TableColumnWidth>{
-      0: FixedColumnWidth(26), // No [a]
-      1: FlexColumnWidth(2.4), // NOMOR KENDARAAN [b]
-      2: FlexColumnWidth(2.0), // JAM DATANG KE LAPANGAN [c]
-      3: FlexColumnWidth(1.8), // SUHU DI LAPANGAN [d]
-      4: FlexColumnWidth(2.2), // JAM MULAI TUANG KE FINISHER [e]
-      5: FlexColumnWidth(2.2), // JAM SELESEI TUANG KE FINISHER [f]
-      6: FlexColumnWidth(2.0), // JAM PULANG KE LAPANGAN [g]
+      0: FixedColumnWidth(24), // No [a]
+      1: FlexColumnWidth(2.3), // NOMOR KENDARAAN [b]
+      2: FlexColumnWidth(1.8), // JAM DATANG KE LAPANGAN [c]
+      3: FlexColumnWidth(1.6), // SUHU DATANG [d]
+      4: FlexColumnWidth(1.6), // SUHU HAMPAR [e]
+      5: FlexColumnWidth(1.9), // JAM MULAI TUANG KE FINISHER [f]
+      6: FlexColumnWidth(1.9), // JAM SELESEI TUANG KE FINISHER [g]
+      7: FlexColumnWidth(1.8), // SUHU PEMADATAN AKHIR [h]
+      8: FlexColumnWidth(1.8), // JAM PULANG KE LAPANGAN [i]
     };
 
     final headers = [
       'No',
       'NOMOR\nKENDARAAN',
       'JAM DATANG\nKE LAPANGAN',
-      'SUHU DI\nLAPANGAN',
+      'SUHU\nDATANG',
+      'SUHU\nHAMPAR',
       'JAM MULAI TUANG\nKE FINISHER',
       'JAM SELESEI TUANG\nKE FINISHER',
+      'SUHU PEMADATAN\nAKHIR',
       'JAM PULANG\nKE LAPANGAN',
     ];
-    final subLetters = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+    final subLetters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
+
+    String formatSuhu(dynamic val) {
+      if (val == null) return '-';
+      final s = val.toString().trim();
+      if (s.isEmpty || s == '-') return '-';
+      return s.endsWith('°C') ? s : '$s°C';
+    }
 
     final tableRows = rows.isNotEmpty
         ? rows.asMap().entries.map((entry) {
             final item = entry.value as Map<String, dynamic>;
+            final rawSuhuDatang = item['suhuDatang'];
+            final rawSuhuHampar = item['suhuHampar'] ?? item['suhuLap'] ?? item['suhu'];
+            final rawSuhuAkhir = item['suhuPemadatanAkhir'] ?? item['suhuAkhir'];
+
             return [
               '${entry.key + 1}',
               PlatNomorUtil.normalize(item['nomorKendaraan']?.toString() ?? ''),
-              item['jamDatang']?.toString() ?? '',
-              item['suhu']?.toString() ?? '',
-              item['jamMulaiTuang']?.toString() ?? '',
-              item['jamSelesaiTuang']?.toString() ?? '',
-              item['jamPulang']?.toString() ?? '',
+              item['jamDatang']?.toString().isNotEmpty == true ? item['jamDatang'].toString() : '-',
+              formatSuhu(rawSuhuDatang),
+              formatSuhu(rawSuhuHampar),
+              item['jamMulaiTuang']?.toString().isNotEmpty == true ? item['jamMulaiTuang'].toString() : '-',
+              item['jamSelesaiTuang']?.toString().isNotEmpty == true ? item['jamSelesaiTuang'].toString() : '-',
+              formatSuhu(rawSuhuAkhir),
+              item['jamPulang']?.toString().isNotEmpty == true ? item['jamPulang'].toString() : '-',
             ];
           }).toList()
         : [
-            ['1', '-', '-', '-', '-', '-', '-'],
+            ['1', '-', '-', '-', '-', '-', '-', '-', '-'],
           ];
 
     return Container(
@@ -1338,7 +1646,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
           _buildDocMetaRow('KONSULTAN PENGAWAS', ':  CV. Tata Saka Consultant'),
           const SizedBox(height: 12),
 
-          // Tabel 7 Kolom
+          // Tabel 9 Kolom (a s/d i)
           _buildDocTableWithSubheader(
             colWidths: colWidths,
             headers: headers,
@@ -1581,6 +1889,161 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
     );
   }
 
+  // --- LEMBAR REKAPITULASI BETON READY MIX (7 Kolom: a s/d g) ---
+  Widget _buildSheetRekapBeton({
+    required String namaKegiatan,
+    required String penyediaJasa,
+    required String jenisBeton,
+    required List<dynamic> rows,
+    required int page,
+    required int totalPages,
+  }) {
+    const colWidths = <int, TableColumnWidth>{
+      0: FixedColumnWidth(28), // No [a]
+      1: FlexColumnWidth(2.6), // NOMOR KENDARAAN [b]
+      2: FlexColumnWidth(2.8), // BATCHING PLANT [c]
+      3: FlexColumnWidth(2.2), // JAM BERANGKAT [d]
+      4: FlexColumnWidth(2.2), // JAM DATANG DI LAPANGAN [e]
+      5: FlexColumnWidth(2.0), // SLUMP TEST [f]
+      6: FlexColumnWidth(2.0), // VOLUME [g]
+    };
+
+    final headers = [
+      'No',
+      'NOMOR KENDARAAN\n(TRUCK MIXER)',
+      'BATCHING PLANT\nREADY MIX',
+      'JAM\nBERANGKAT',
+      'JAM DATANG\nDI LAPANGAN',
+      'SLUMP TEST\n(CM)',
+      'VOLUME\n(M³)',
+    ];
+    final subLetters = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+
+    final double totalVolume = rows.fold(0.0, (sum, item) {
+      if (item is Map) {
+        final val = double.tryParse((item['volume']?.toString() ?? '').replaceAll(',', '.')) ?? 0.0;
+        return sum + val;
+      }
+      return sum;
+    });
+
+    final String formattedTotal = totalVolume % 1 == 0
+        ? totalVolume.toInt().toString()
+        : totalVolume.toStringAsFixed(2).replaceAll('.', ',');
+
+    final tableRows = rows.isNotEmpty
+        ? rows.asMap().entries.map((entry) {
+            final item = entry.value as Map<String, dynamic>;
+            final rawVol = item['volume']?.toString() ?? '-';
+            return [
+              '${entry.key + 1}',
+              PlatNomorUtil.normalize(item['nomorKendaraan']?.toString() ?? ''),
+              item['batchingPlant']?.toString().isNotEmpty == true ? item['batchingPlant'].toString() : '-',
+              item['jamBerangkat']?.toString().isNotEmpty == true ? item['jamBerangkat'].toString() : '-',
+              item['jamDatang']?.toString().isNotEmpty == true ? item['jamDatang'].toString() : '-',
+              item['slumpTest']?.toString().isNotEmpty == true ? item['slumpTest'].toString() : '-',
+              rawVol.isNotEmpty ? (rawVol.endsWith('m³') ? rawVol : '$rawVol m³') : '-',
+            ];
+          }).toList()
+        : [
+            ['1', '-', '-', '-', '-', '-', '-'],
+          ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.black45, width: 1.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header Judul
+          const Center(
+            child: Text(
+              'REKAPITULASI PENGIRIMAN & PENGECORAN BETON READY MIX',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: Colors.black,
+                decoration: TextDecoration.underline,
+                letterSpacing: 0.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Metadata Kegiatan, Penyedia Jasa, Konsultan Pengawas, Jenis Beton
+          _buildDocMetaRow('KEGIATAN', ':  $namaKegiatan'),
+          _buildDocMetaRow('PENYEDIA JASA', ':  $penyediaJasa'),
+          _buildDocMetaRow('KONSULTAN PENGAWAS', ':  CV. Tata Saka Consultant'),
+          _buildDocMetaRow('JENIS BETON', ':  $jenisBeton'),
+          const SizedBox(height: 12),
+
+          // Tabel 7 Kolom
+          _buildDocTableWithSubheader(
+            colWidths: colWidths,
+            headers: headers,
+            subLetters: subLetters,
+            rows: tableRows,
+          ),
+
+          // Ringkasan Total Volume Kubikasi
+          Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFFF8FAFC),
+              border: Border(
+                left: BorderSide(color: Colors.black, width: 0.8),
+                right: BorderSide(color: Colors.black, width: 0.8),
+                bottom: BorderSide(color: Colors.black, width: 0.8),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'TOTAL VOLUME PENGECORAN BETON',
+                  style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.black87),
+                ),
+                Text(
+                  '$formattedTotal m³',
+                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.black),
+                ),
+              ],
+            ),
+          ),
+
+          // Footer Lembar Rekapitulasi
+          const SizedBox(height: 20),
+          const Divider(height: 1, color: Colors.black26),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'REKAPITULASI PENGECORAN BETON READY MIX',
+                style: TextStyle(fontSize: 8.5, color: Colors.black54),
+              ),
+              Text(
+                'Halaman $page dari $totalPages',
+                style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Colors.black87),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   // --- LEMBAR REKAPITULASI 4: DATA PERJALANAN DT (AMP - LAPANGAN - AMP) (21 Kolom: a s/d u) ---
   Widget _buildSheetDataPerjalananDt({
     required String namaKegiatan,
@@ -1606,8 +2069,35 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
         ? '$hari, $tanggal'
         : (tanggal.isNotEmpty ? tanggal : '-');
 
+    final rawLapList = (report['rekapSuhuLapanganList'] as List<dynamic>?) ?? [];
+    final rawDtList = (report['rekapPengirimanDtList'] as List<dynamic>?) ?? [];
+    final lapanganList = rawLapList.isNotEmpty
+        ? rawLapList.asMap().entries.map((e) {
+            final m = Map<String, dynamic>.from(e.value as Map);
+            if ((m['waktuAntrian'] == null || m['waktuAntrian'].toString().isEmpty) &&
+                e.key < rawDtList.length &&
+                rawDtList[e.key] is Map) {
+              m['waktuAntrian'] = (rawDtList[e.key] as Map)['waktuAntrian'];
+            }
+            return m;
+          }).toList()
+        : (rawDtList.isNotEmpty
+            ? rawDtList.map((m) => {
+                'nomorKendaraan': m['nomorKendaraan'],
+                'jamDatang': m['jamDatangLap'] ?? m['jamDatang'],
+                'suhuDatang': m['suhuDatang'],
+                'suhu': m['suhuLap'] ?? m['suhu'],
+                'suhuLap': m['suhuLap'] ?? m['suhu'],
+                'jamMulaiTuang': m['jamMulaiTuang'],
+                'jamSelesaiTuang': m['jamSelesaiTuang'],
+                'suhuPemadatanAkhir': m['suhuPemadatanAkhir'],
+                'jamPulang': m['jamPulangLap'] ?? m['jamPulang'],
+                'waktuAntrian': m['waktuAntrian'],
+              }).toList()
+            : []);
+
     final rows = PlatNomorUtil.computeDataPerjalananRows(
-      lapanganList: (report['rekapSuhuLapanganList'] as List<dynamic>?) ?? [],
+      lapanganList: lapanganList,
       ampList: (report['rekapSuhuAmpList'] as List<dynamic>?) ?? [],
       tonaseList: (report['rekapTonaseAspalList'] as List<dynamic>?) ?? [],
       jarakKm: jarakKm,
@@ -1899,7 +2389,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
               icon: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEEF2FF),
+                  color: AppColors.slateLighter,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Row(
@@ -1965,7 +2455,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEEF2FF),
+                    color: AppColors.slateLighter,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: const Icon(Icons.work_outline, color: AppColors.primaryBlue, size: 28),
@@ -2856,9 +3346,21 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                 padding: const EdgeInsets.all(12),
                 child: Center(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 820),
-                    child: LembarLaporanMingguanWidget(
-                      report: report,
+                    constraints: const BoxConstraints(maxWidth: 980),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Sheet 1: RINGKASAN KEGIATAN MINGGUAN
+                        LembarLaporanMingguanWidget(
+                          report: report,
+                        ),
+                        const SizedBox(height: 24),
+                        // Sheet 2: LEMBAR KEMAJUAN FISIK PEKERJAAN (BoQ / RKK RESMI PU)
+                        LembarBoqMingguanWidget(
+                          report: report,
+                          kegiatan: _currentKegiatan,
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -3067,6 +3569,8 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                         report['hasRekapPerjalananDt'] == true ||
                         report['hasRekapSuhuLapangan'] == true)
                       _buildReportChip(Icons.local_shipping_outlined, 'Pengawasan Aspal & DT'),
+                    if (report['hasRekapBeton'] == true || report['hasRekapitulasiBeton'] == true)
+                      _buildReportChip(Icons.domain_outlined, 'Pengecoran Beton Ready Mix'),
                     _buildReportChip(Icons.photo_camera_outlined, '${report['fotoCount'] ?? 0} Foto'),
                   ],
                 ),

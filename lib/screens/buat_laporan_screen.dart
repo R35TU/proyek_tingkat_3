@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:flutter/cupertino.dart'
+    show CupertinoTimerPicker, CupertinoTimerPickerMode, CupertinoTheme, CupertinoThemeData, CupertinoTextThemeData;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -33,19 +35,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
   int? _selectedKegiatanIndex;
   late DateTime _selectedDate;
 
-  // A. PEKERJAAN (No, Jenis Pekerjaan, Volume, Lokasi)
-  final List<Map<String, TextEditingController>> _pekerjaanList = [];
+  // A - D. PEKERJAAN & SUMBER DAYA (No, Jenis, Volume, Lokasi, Materials, Peralatans, Personils)
+  final List<Map<String, dynamic>> _pekerjaanList = [];
 
-  // B. MATERIAL DIGUNAKAN (No, Jenis, Cacah Volume, Lokasi Awal, Lokasi Tujuan)
-  final List<Map<String, TextEditingController>> _materialList = [];
-
-  // C. JENIS PERALATAN (No, Jenis Peralatan, Cacah aktif, Jumlah, Kode, Rusak/Kondisi)
-  final List<Map<String, TextEditingController>> _peralatanList = [];
-
-  // D. PERSONAL PROYEK PENGAWAS DAN KONTRAKTOR (No, Personil proyek, Cacah, Lokasi)
-  final List<Map<String, dynamic>> _personilList = [];
-
-  // E. CUACA/BENCANA/KEJADIAN PENGHAMBAT PEKERJAAN (No, Jenis, Jam, Lokasi, Tanggung Jwb Kontraktor, Akibat)
+  // E. CUACA/BENCANA/KEJADIAN PENGHAMBAT PEKERJAAN (No, Cuaca, Jenis Kejadian, Jam, Lokasi, Tanggung Jwb Kontraktor, Akibat)
   final List<Map<String, dynamic>> _cuacaKejadianList = [];
 
   // F. INSTRUKSI DAN SARAN-SARAN (Auto Konsultan Supervisi CV. TATA SAKA CONSULTANT)
@@ -71,18 +64,14 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
   final TextEditingController _penyediaAmpController = TextEditingController();
   final TextEditingController _jarakTempuhController = TextEditingController();
 
-  bool get _enableRekapSuhuLapangan => _enableRekapitulasiAspal;
-  bool get _enableRekapSuhuAmp => _enableRekapitulasiAspal;
-  bool get _enableRekapTonaseAspal => _enableRekapitulasiAspal;
+  // Rekapitulasi Terpadu Ritase Pengiriman DT Aspal (AMP, Lapangan, dan Tonase)
+  final List<Map<String, TextEditingController>> _rekapPengirimanDtList = [];
 
-  // 1. Rekapitulasi Waktu Tempuh DT & Suhu di Lapangan
-  final List<Map<String, TextEditingController>> _rekapSuhuLapanganList = [];
-
-  // 2. Rekapitulasi Waktu Tempuh DT & Suhu di AMP
-  final List<Map<String, TextEditingController>> _rekapSuhuAmpList = [];
-
-  // 3. Rekapitulasi Tonase Aspal
-  final List<Map<String, TextEditingController>> _rekapTonaseAspalList = [];
+  // DOKUMEN REKAPITULASI PENGECORAN BETON (OPSIONAL - PEKERJAAN BETON / READY MIX)
+  bool _enableRekapitulasiBeton = false;
+  final TextEditingController _jenisBetonController = TextEditingController();
+  final TextEditingController _penyediaJasaBetonController = TextEditingController();
+  final List<Map<String, TextEditingController>> _rekapPengecoranBetonList = [];
 
   static const List<String> _namaBulan = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -121,20 +110,12 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
   }
 
   void _loadInitialBlankTemplate() {
-    // A. Pekerjaan: baris awal
+    // A - D. Pekerjaan & Sumber Daya: baris awal (dengan slot sub-item kosong)
+    _pekerjaanList.clear();
     _addPekerjaanRow(jenis: '', volume: '', lokasi: '');
 
-    // B. Material: baris awal
-    _addMaterialRow(jenis: '', volume: '', lokasiAwal: '', lokasiTujuan: '');
-
-    // C. Peralatan: baris awal
-    _addPeralatanRow(jenis: '', cacahAktif: '', jumlah: '', kode: '', rusak: '');
-
-    // D. Personil: Kosongkan default (1 baris kosong)
-    _addPersonilRow(role: '', cacah: '', lokasi: '');
-
     // E. Cuaca & Kejadian: Kosongkan default (1 baris kosong)
-    _addCuacaRow(jenis: '', jam: '', lokasi: '', tanggungJawab: 'Tidak', akibat: '');
+    _addCuacaRow(cuaca: '', jenisKejadian: '', jam: '', lokasi: '', tanggungJawab: 'Tidak', akibat: '');
 
     // F. Instruksi dan Saran-Saran (Auto Konsultan Supervisi)
     _instruksiKonsultanController.clear();
@@ -148,69 +129,87 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     // H. Foto Dokumentasi
     _fotoList.clear();
 
+    // Rekapitulasi Aspal & Beton
+    _enableRekapitulasiAspal = false;
+    _rekapPengirimanDtList.clear();
+    _enableRekapitulasiBeton = false;
+    _jenisBetonController.clear();
+    _penyediaJasaBetonController.clear();
+    _rekapPengecoranBetonList.clear();
+
     // Field custom dibiarkan KOSONG (tanpa sugesti)
   }
 
   void _loadExistingReport(Map<String, dynamic> r) {
-    // A. Pekerjaan
+    // A - D. Pekerjaan & Sumber Daya (Material, Alat, Personil)
     final pList = r['pekerjaanList'] as List<dynamic>? ?? [];
+    _pekerjaanList.clear();
+
     if (pList.isNotEmpty) {
-      for (var item in pList) {
+      for (int i = 0; i < pList.length; i++) {
+        final item = pList[i];
+        final matList = (item['materials'] as List<dynamic>?)
+            ?.map((m) => Map<String, String>.from((m as Map).map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''))))
+            .toList();
+        final alatList = (item['peralatans'] as List<dynamic>?)
+            ?.map((a) => Map<String, String>.from((a as Map).map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''))))
+            .toList();
+        final perList = (item['personils'] as List<dynamic>?)
+            ?.map((p) => Map<String, String>.from((p as Map).map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''))))
+            .toList();
+
+        // Backward compatibility: If loaded data has no nested sub-items, attach root lists to first pekerjaan
+        List<Map<String, String>> finalMats = matList ?? [];
+        List<Map<String, String>> finalAlats = alatList ?? [];
+        List<Map<String, String>> finalPers = perList ?? [];
+
+        if (matList == null && i == 0) {
+          final oldMats = r['materialList'] as List<dynamic>? ?? [];
+          finalMats = oldMats.map((m) => {
+            'jenis': (m['jenis'] ?? '').toString(),
+            'volume': (m['volume'] ?? '').toString(),
+            'lokasiAwal': (m['lokasiAwal'] ?? m['lokasi'] ?? '').toString(),
+            'lokasiTujuan': (m['lokasiTujuan'] ?? '').toString(),
+          }).toList();
+        }
+
+        if (alatList == null && i == 0) {
+          final oldAlats = r['peralatanList'] as List<dynamic>? ?? [];
+          finalAlats = oldAlats.map((a) => {
+            'jenis': (a['jenis'] ?? '').toString(),
+            'cacahAktif': (a['cacahAktif'] ?? a['jumlah'] ?? '').toString(),
+            'jumlah': (a['jumlah'] ?? '').toString(),
+            'noRusak': (a['noRusak'] ?? '').toString(),
+            'jenisRusak': (a['jenisRusak'] ?? '').toString(),
+            'kode': (a['kode'] ?? '').toString(),
+            'rusak': (a['rusak'] ?? a['kondisi'] ?? '').toString(),
+          }).toList();
+        }
+
+        if (perList == null && i == 0) {
+          final oldPers = r['personilList'] as List<dynamic>? ?? [];
+          finalPers = oldPers.map((p) => {
+            'role': (p['role'] ?? '').toString(),
+            'cacah': (p['cacah'] ?? p['count'] ?? '').toString(),
+            'lokasi': (p['lokasi'] ?? '').toString(),
+          }).toList();
+        }
+
         _addPekerjaanRow(
           jenis: item['jenis'] ?? '',
           volume: item['volume'] ?? '',
           lokasi: item['lokasi'] ?? '',
+          noMataPembayaran: item['noMataPembayaran'] ?? '',
+          satuan: item['satuan'] ?? '',
+          rkkItemId: item['rkkItemId'] ?? '',
+          initialMaterials: finalMats,
+          initialPeralatans: finalAlats,
+          initialPersonils: finalPers,
+          addEmptySubRowsIfEmpty: false,
         );
       }
     } else {
       _addPekerjaanRow(jenis: r['temuan'] ?? '', volume: '', lokasi: r['lokasiSta'] ?? '');
-    }
-
-    // B. Material
-    final mList = r['materialList'] as List<dynamic>? ?? [];
-    if (mList.isNotEmpty) {
-      for (var item in mList) {
-        _addMaterialRow(
-          jenis: item['jenis'] ?? '',
-          volume: item['volume'] ?? '',
-          lokasiAwal: item['lokasiAwal'] ?? item['lokasi'] ?? '',
-          lokasiTujuan: item['lokasiTujuan'] ?? '',
-        );
-      }
-    } else {
-      _addMaterialRow(jenis: '', volume: '', lokasiAwal: '', lokasiTujuan: '');
-    }
-
-    // C. Peralatan
-    final alList = r['peralatanList'] as List<dynamic>? ?? [];
-    if (alList.isNotEmpty) {
-      for (var item in alList) {
-        _addPeralatanRow(
-          jenis: item['jenis'] ?? '',
-          cacahAktif: item['cacahAktif'] ?? item['jumlah'] ?? '',
-          jumlah: item['jumlah'] ?? '',
-          noRusak: item['noRusak'] ?? '',
-          jenisRusak: item['jenisRusak'] ?? '',
-          kode: item['kode'] ?? '',
-          rusak: item['rusak'] ?? item['kondisi'] ?? '',
-        );
-      }
-    } else {
-      _addPeralatanRow();
-    }
-
-    // D. Personil
-    final perList = r['personilList'] as List<dynamic>? ?? [];
-    if (perList.isNotEmpty) {
-      for (var item in perList) {
-        _addPersonilRow(
-          role: item['role'] ?? '',
-          cacah: (item['cacah'] ?? item['count'] ?? '').toString(),
-          lokasi: item['lokasi'] ?? '',
-        );
-      }
-    } else {
-      _addPersonilRow(role: '', cacah: '', lokasi: '');
     }
 
     // E. Cuaca
@@ -218,7 +217,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     if (cList.isNotEmpty) {
       for (var item in cList) {
         _addCuacaRow(
-          jenis: item['jenis'] ?? '',
+          cuaca: item['cuaca'] ?? '',
+          jenisKejadian: item['jenisKejadian'] ?? item['jenis'] ?? '',
           jam: item['jam'] ?? '',
           lokasi: item['lokasi'] ?? '',
           tanggungJawab: item['tanggungJawab'] ?? 'Tidak',
@@ -226,7 +226,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         );
       }
     } else {
-      _addCuacaRow(jenis: '', jam: '', lokasi: '', tanggungJawab: 'Tidak', akibat: '');
+      _addCuacaRow(cuaca: '', jenisKejadian: '', jam: '', lokasi: '', tanggungJawab: 'Tidak', akibat: '');
     }
 
     // F. Instruksi dan Saran-Saran (Auto Konsultan Supervisi)
@@ -270,45 +270,90 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       _jarakTempuhController.text = r['jarakTempuh'].toString();
     }
 
-    // Rekapitulasi 1: Suhu di Lapangan
-    final rslList = r['rekapSuhuLapanganList'] as List<dynamic>? ?? [];
-    if (rslList.isNotEmpty) {
+    // Load Rekapitulasi Aspal (Terpadu / Pengiriman DT)
+    final pdtList = r['rekapPengirimanDtList'] as List<dynamic>? ?? [];
+    if (pdtList.isNotEmpty) {
       _enableRekapitulasiAspal = true;
-      for (var item in rslList) {
-        _addRekapSuhuLapanganRow(
+      for (var item in pdtList) {
+        _addRekapPengirimanDtRow(
           nomorKendaraan: PlatNomorUtil.normalize(item['nomorKendaraan']?.toString() ?? ''),
-          jamDatang: item['jamDatang'] ?? '',
-          suhu: item['suhu'] ?? '',
-          jamMulaiTuang: item['jamMulaiTuang'] ?? '',
-          jamSelesaiTuang: item['jamSelesaiTuang'] ?? '',
-          jamPulang: item['jamPulang'] ?? '',
+          jamPergiAmp: PlatNomorUtil.normalizeTime(item['jamPergiAmp']?.toString() ?? ''),
+          suhuAmp: item['suhuAmp']?.toString() ?? '',
+          jamDatangLap: PlatNomorUtil.normalizeTime(item['jamDatangLap']?.toString() ?? ''),
+          suhuDatang: item['suhuDatang']?.toString() ?? '',
+          waktuAntrian: item['waktuAntrian']?.toString() ?? '5',
+          suhuLap: item['suhuLap']?.toString() ?? item['suhu']?.toString() ?? '',
+          jamMulaiTuang: PlatNomorUtil.normalizeTime(item['jamMulaiTuang']?.toString() ?? ''),
+          jamSelesaiTuang: PlatNomorUtil.normalizeTime(item['jamSelesaiTuang']?.toString() ?? ''),
+          suhuPemadatanAkhir: item['suhuPemadatanAkhir']?.toString() ?? '',
+          jamPulangLap: PlatNomorUtil.normalizeTime(item['jamPulangLap']?.toString() ?? ''),
+          jamPulangAmp: PlatNomorUtil.normalizeTime(item['jamPulangAmp']?.toString() ?? ''),
+          tonaseTiket: item['tonaseTiket']?.toString() ?? '',
+          jumlahKumulatif: item['jumlahKumulatif']?.toString() ?? '',
         );
+      }
+    } else {
+      // Fallback: gabungkan data lawas jika laporan lama tersimpan di 3 list terpisah
+      final rslList = r['rekapSuhuLapanganList'] as List<dynamic>? ?? [];
+      final rsaList = r['rekapSuhuAmpList'] as List<dynamic>? ?? [];
+      final rtaList = r['rekapTonaseAspalList'] as List<dynamic>? ?? [];
+
+      final int maxLen = [rslList.length, rsaList.length, rtaList.length].reduce((a, b) => a > b ? a : b);
+      if (maxLen > 0) {
+        _enableRekapitulasiAspal = true;
+        for (int i = 0; i < maxLen; i++) {
+          final lap = i < rslList.length && rslList[i] is Map ? rslList[i] as Map : null;
+          final amp = i < rsaList.length && rsaList[i] is Map ? rsaList[i] as Map : null;
+          final ton = i < rtaList.length && rtaList[i] is Map ? rtaList[i] as Map : null;
+
+          final plat = PlatNomorUtil.normalize(
+            (lap?['nomorKendaraan'] ?? amp?['nomorKendaraan'] ?? ton?['nomorKendaraan'] ?? '').toString(),
+          );
+
+          _addRekapPengirimanDtRow(
+            nomorKendaraan: plat,
+            jamPergiAmp: PlatNomorUtil.normalizeTime(amp?['jamPergi']?.toString() ?? ''),
+            suhuAmp: amp?['suhuAmp']?.toString() ?? '',
+            jamDatangLap: PlatNomorUtil.normalizeTime(lap?['jamDatang']?.toString() ?? ''),
+            suhuDatang: lap?['suhuDatang']?.toString() ?? '',
+            waktuAntrian: lap?['waktuAntrian']?.toString() ?? '5',
+            suhuLap: lap?['suhu']?.toString() ?? lap?['suhuLap']?.toString() ?? '',
+            jamMulaiTuang: PlatNomorUtil.normalizeTime(lap?['jamMulaiTuang']?.toString() ?? ''),
+            jamSelesaiTuang: PlatNomorUtil.normalizeTime(lap?['jamSelesaiTuang']?.toString() ?? ''),
+            suhuPemadatanAkhir: lap?['suhuPemadatanAkhir']?.toString() ?? '',
+            jamPulangLap: PlatNomorUtil.normalizeTime(lap?['jamPulang']?.toString() ?? ''),
+            jamPulangAmp: PlatNomorUtil.normalizeTime(amp?['jamPulang']?.toString() ?? ''),
+            tonaseTiket: ton?['tonaseTiket']?.toString() ?? '',
+            jumlahKumulatif: ton?['jumlahKumulatif']?.toString() ?? '',
+          );
+        }
       }
     }
 
-    // Rekapitulasi 2: Suhu di AMP
-    final rsaList = r['rekapSuhuAmpList'] as List<dynamic>? ?? [];
-    if (rsaList.isNotEmpty) {
-      _enableRekapitulasiAspal = true;
-      for (var item in rsaList) {
-        _addRekapSuhuAmpRow(
-          nomorKendaraan: PlatNomorUtil.normalize(item['nomorKendaraan']?.toString() ?? ''),
-          jamPergi: item['jamPergi'] ?? '',
-          suhuAmp: item['suhuAmp'] ?? '',
-          jamPulang: item['jamPulang'] ?? '',
-        );
-      }
+    // Rekapitulasi Pengecoran Beton (Ready Mix)
+    _enableRekapitulasiBeton = r['hasRekapBeton'] == true || r['hasRekapitulasiBeton'] == true;
+    if (r['jenisBeton'] != null && r['jenisBeton'].toString().isNotEmpty) {
+      _jenisBetonController.text = r['jenisBeton'].toString();
+    }
+    if (r['penyediaJasaBeton'] != null && r['penyediaJasaBeton'].toString().isNotEmpty) {
+      _penyediaJasaBetonController.text = r['penyediaJasaBeton'].toString();
+    } else if (_currentKegiatan?['kontraktor'] != null) {
+      _penyediaJasaBetonController.text = _currentKegiatan!['kontraktor'].toString();
     }
 
-    // Rekapitulasi 3: Tonase Aspal
-    final rtaList = r['rekapTonaseAspalList'] as List<dynamic>? ?? [];
-    if (rtaList.isNotEmpty) {
-      _enableRekapitulasiAspal = true;
-      for (var item in rtaList) {
-        _addRekapTonaseAspalRow(
-          nomorKendaraan: PlatNomorUtil.normalize(item['nomorKendaraan']?.toString() ?? ''),
-          tonaseTiket: item['tonaseTiket'] ?? '',
-          jumlahKumulatif: item['jumlahKumulatif'] ?? '',
+    final pBetonList = r['rekapPengecoranBetonList'] as List<dynamic>? ?? [];
+    _rekapPengecoranBetonList.clear();
+    if (pBetonList.isNotEmpty) {
+      _enableRekapitulasiBeton = true;
+      for (var item in pBetonList) {
+        _addRekapPengecoranBetonRow(
+          nomorKendaraan: item['nomorKendaraan']?.toString() ?? '',
+          batchingPlant: item['batchingPlant']?.toString() ?? '',
+          jamBerangkat: item['jamBerangkat']?.toString() ?? '',
+          jamDatang: item['jamDatang']?.toString() ?? '',
+          slumpTest: item['slumpTest']?.toString() ?? '',
+          volume: item['volume']?.toString() ?? '',
+          volumeKumulatif: item['volumeKumulatif']?.toString() ?? '',
         );
       }
     }
@@ -329,37 +374,25 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       m.values.forEach((c) => c.dispose());
     }
 
-    for (var m in _pekerjaanList) {
-      m.values.forEach((c) => c.dispose());
-    }
-    for (var m in _materialList) {
-      m.values.forEach((c) => c.dispose());
-    }
-    for (var m in _peralatanList) {
-      m.values.forEach((c) => c.dispose());
-    }
-    for (var m in _personilList) {
-      (m['roleController'] as TextEditingController).dispose();
-      (m['cacahController'] as TextEditingController).dispose();
-      (m['lokasiController'] as TextEditingController).dispose();
+    for (var p in _pekerjaanList) {
+      _disposePekerjaanControllers(p);
     }
     for (var m in _cuacaKejadianList) {
-      (m['jenisController'] as TextEditingController).dispose();
-      (m['jamController'] as TextEditingController).dispose();
-      (m['lokasiController'] as TextEditingController).dispose();
-      (m['akibatController'] as TextEditingController).dispose();
+      (m['jenisKejadianController'] as TextEditingController?)?.dispose();
+      (m['cuacaController'] as TextEditingController?)?.dispose();
+      (m['jenisController'] as TextEditingController?)?.dispose();
+      (m['jamController'] as TextEditingController?)?.dispose();
+      (m['lokasiController'] as TextEditingController?)?.dispose();
+      (m['akibatController'] as TextEditingController?)?.dispose();
     }
     for (var m in _customFields) {
       m.values.forEach((c) => c.dispose());
     }
-    for (var m in _rekapSuhuLapanganList) {
-      m.values.forEach((c) => c.dispose());
+    for (var m in _rekapPengirimanDtList) {
+      _disposePengirimanDtControllers(m);
     }
-    for (var m in _rekapSuhuAmpList) {
-      m.values.forEach((c) => c.dispose());
-    }
-    for (var m in _rekapTonaseAspalList) {
-      m.values.forEach((c) => c.dispose());
+    for (var m in _rekapPengecoranBetonList) {
+      _disposeBetonControllers(m);
     }
 
     _instruksiKonsultanController.dispose();
@@ -368,24 +401,128 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     _jenisMaterialAspalController.dispose();
     _penyediaAmpController.dispose();
     _jarakTempuhController.dispose();
+    _jenisBetonController.dispose();
+    _penyediaJasaBetonController.dispose();
 
     super.dispose();
   }
 
+  void _disposePekerjaanControllers(Map<String, dynamic> p) {
+    (p['jenis'] as TextEditingController?)?.dispose();
+    (p['volume'] as TextEditingController?)?.dispose();
+    (p['lokasi'] as TextEditingController?)?.dispose();
+    final mats = p['materials'] as List<Map<String, TextEditingController>>?;
+    if (mats != null) {
+      for (var m in mats) {
+        m.values.forEach((c) => c.dispose());
+      }
+    }
+    final alats = p['peralatans'] as List<Map<String, TextEditingController>>?;
+    if (alats != null) {
+      for (var a in alats) {
+        a.values.forEach((c) => c.dispose());
+      }
+    }
+    final pers = p['personils'] as List<Map<String, dynamic>>?;
+    if (pers != null) {
+      for (var per in pers) {
+        (per['roleController'] as TextEditingController?)?.dispose();
+        (per['cacahController'] as TextEditingController?)?.dispose();
+        (per['lokasiController'] as TextEditingController?)?.dispose();
+      }
+    }
+  }
+
   // Row Helpers
-  void _addPekerjaanRow({String jenis = '', String volume = '', String lokasi = ''}) {
+  void _addPekerjaanRow({
+    String jenis = '',
+    String volume = '',
+    String lokasi = '',
+    String noMataPembayaran = '',
+    String satuan = '',
+    String rkkItemId = '',
+    List<Map<String, String>> initialMaterials = const [],
+    List<Map<String, String>> initialPeralatans = const [],
+    List<Map<String, String>> initialPersonils = const [],
+    bool addEmptySubRowsIfEmpty = true,
+  }) {
     setState(() {
+      final materialsList = <Map<String, TextEditingController>>[];
+      for (var m in initialMaterials) {
+        materialsList.add({
+          'jenis': TextEditingController(text: m['jenis'] ?? ''),
+          'volume': TextEditingController(text: m['volume'] ?? ''),
+          'lokasiAwal': TextEditingController(text: m['lokasiAwal'] ?? ''),
+          'lokasiTujuan': TextEditingController(text: m['lokasiTujuan'] ?? ''),
+        });
+      }
+      if (materialsList.isEmpty && addEmptySubRowsIfEmpty) {
+        materialsList.add({
+          'jenis': TextEditingController(text: ''),
+          'volume': TextEditingController(text: ''),
+          'lokasiAwal': TextEditingController(text: ''),
+          'lokasiTujuan': TextEditingController(text: ''),
+        });
+      }
+
+      final peralatansList = <Map<String, TextEditingController>>[];
+      for (var p in initialPeralatans) {
+        peralatansList.add({
+          'jenis': TextEditingController(text: p['jenis'] ?? ''),
+          'cacahAktif': TextEditingController(text: p['cacahAktif'] ?? p['jumlah'] ?? ''),
+          'jumlah': TextEditingController(text: p['jumlah'] ?? ''),
+          'noRusak': TextEditingController(text: p['noRusak'] ?? ''),
+          'jenisRusak': TextEditingController(text: p['jenisRusak'] ?? ''),
+          'kode': TextEditingController(text: p['kode'] ?? ''),
+          'rusak': TextEditingController(text: p['rusak'] ?? p['kondisi'] ?? ''),
+        });
+      }
+      if (peralatansList.isEmpty && addEmptySubRowsIfEmpty) {
+        peralatansList.add({
+          'jenis': TextEditingController(text: ''),
+          'cacahAktif': TextEditingController(text: ''),
+          'jumlah': TextEditingController(text: ''),
+          'noRusak': TextEditingController(text: ''),
+          'jenisRusak': TextEditingController(text: ''),
+          'kode': TextEditingController(text: ''),
+          'rusak': TextEditingController(text: ''),
+        });
+      }
+
+      final personilsList = <Map<String, dynamic>>[];
+      for (var per in initialPersonils) {
+        personilsList.add({
+          'roleController': TextEditingController(text: per['role'] ?? ''),
+          'cacahController': TextEditingController(text: per['cacah'] ?? per['count'] ?? ''),
+          'lokasiController': TextEditingController(text: per['lokasi'] ?? ''),
+        });
+      }
+      if (personilsList.isEmpty && addEmptySubRowsIfEmpty) {
+        personilsList.add({
+          'roleController': TextEditingController(text: ''),
+          'cacahController': TextEditingController(text: ''),
+          'lokasiController': TextEditingController(text: ''),
+        });
+      }
+
       _pekerjaanList.add({
         'jenis': TextEditingController(text: jenis),
         'volume': TextEditingController(text: volume),
         'lokasi': TextEditingController(text: lokasi),
+        'noMataPembayaran': noMataPembayaran,
+        'satuan': satuan,
+        'rkkItemId': rkkItemId,
+        'materials': materialsList,
+        'peralatans': peralatansList,
+        'personils': personilsList,
       });
     });
   }
 
-  void _addMaterialRow({String jenis = '', String volume = '', String lokasiAwal = '', String lokasiTujuan = ''}) {
+  void _addMaterialToPekerjaan(int pIdx, {String jenis = '', String volume = '', String lokasiAwal = '', String lokasiTujuan = ''}) {
     setState(() {
-      _materialList.add({
+      final materials = _pekerjaanList[pIdx]['materials'] as List<Map<String, TextEditingController>>;
+      materials.add({
         'jenis': TextEditingController(text: jenis),
         'volume': TextEditingController(text: volume),
         'lokasiAwal': TextEditingController(text: lokasiAwal),
@@ -394,7 +531,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     });
   }
 
-  void _addPeralatanRow({
+  void _addPeralatanToPekerjaan(int pIdx, {
     String jenis = '',
     String cacahAktif = '',
     String jumlah = '',
@@ -404,7 +541,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     String rusak = '',
   }) {
     setState(() {
-      _peralatanList.add({
+      final peralatans = _pekerjaanList[pIdx]['peralatans'] as List<Map<String, TextEditingController>>;
+      peralatans.add({
         'jenis': TextEditingController(text: jenis),
         'cacahAktif': TextEditingController(text: cacahAktif),
         'jumlah': TextEditingController(text: jumlah),
@@ -416,9 +554,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     });
   }
 
-  void _addPersonilRow({String role = '', String cacah = '', String lokasi = ''}) {
+  void _addPersonilToPekerjaan(int pIdx, {String role = '', String cacah = '', String lokasi = ''}) {
     setState(() {
-      _personilList.add({
+      final personils = _pekerjaanList[pIdx]['personils'] as List<Map<String, dynamic>>;
+      personils.add({
         'roleController': TextEditingController(text: role),
         'cacahController': TextEditingController(text: cacah),
         'lokasiController': TextEditingController(text: lokasi),
@@ -426,10 +565,20 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     });
   }
 
-  void _addCuacaRow({String jenis = '', String jam = '', String lokasi = '', String tanggungJawab = 'Tidak', String akibat = ''}) {
+  void _addCuacaRow({
+    String cuaca = '',
+    String jenisKejadian = '',
+    String jam = '',
+    String lokasi = '',
+    String tanggungJawab = 'Tidak',
+    String akibat = '',
+    String jenis = '',
+  }) {
     setState(() {
+      final initialJenis = jenisKejadian.isNotEmpty ? jenisKejadian : jenis;
       _cuacaKejadianList.add({
-        'jenisController': TextEditingController(text: jenis),
+        'cuacaController': TextEditingController(text: cuaca),
+        'jenisKejadianController': TextEditingController(text: initialJenis),
         'jamController': TextEditingController(text: jam),
         'lokasiController': TextEditingController(text: lokasi),
         'tanggungJawab': tanggungJawab,
@@ -447,66 +596,25 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     });
   }
 
-  // Helper Rekap 1: Waktu Tempuh DT & Suhu di Lapangan
-  void _addRekapSuhuLapanganRow({
+  // Helper Rekap Terpadu Ritase Pengiriman DT Aspal
+  void _addRekapPengirimanDtRow({
     String nomorKendaraan = '',
-    String jamDatang = '',
-    String suhu = '',
+    String jamPergiAmp = '',
+    String suhuAmp = '',
+    String jamDatangLap = '',
+    String suhuDatang = '',
+    String waktuAntrian = '5',
+    String suhuLap = '',
     String jamMulaiTuang = '',
     String jamSelesaiTuang = '',
-    String jamPulang = '',
-  }) {
-    setState(() {
-      final ctrlPlat = TextEditingController(text: PlatNomorUtil.normalize(nomorKendaraan));
-      ctrlPlat.addListener(() {
-        if (mounted) setState(() {});
-      });
-
-      _rekapSuhuLapanganList.add({
-        'nomorKendaraan': ctrlPlat,
-        'jamDatang': TextEditingController(text: jamDatang),
-        'suhu': TextEditingController(text: suhu),
-        'jamMulaiTuang': TextEditingController(text: jamMulaiTuang),
-        'jamSelesaiTuang': TextEditingController(text: jamSelesaiTuang),
-        'jamPulang': TextEditingController(text: jamPulang),
-      });
-    });
-  }
-
-  // Helper Rekap 2: Waktu Tempuh DT & Suhu di AMP
-  void _addRekapSuhuAmpRow({
-    String nomorKendaraan = '',
-    String jamPergi = '',
-    String suhuAmp = '',
-    String jamPulang = '',
-  }) {
-    setState(() {
-      final ctrlPlat = TextEditingController(text: PlatNomorUtil.normalize(nomorKendaraan));
-      ctrlPlat.addListener(() {
-        if (mounted) setState(() {});
-      });
-
-      _rekapSuhuAmpList.add({
-        'nomorKendaraan': ctrlPlat,
-        'jamPergi': TextEditingController(text: jamPergi),
-        'suhuAmp': TextEditingController(text: suhuAmp),
-        'jamPulang': TextEditingController(text: jamPulang),
-      });
-    });
-  }
-
-  // Helper Rekap 3: Tonase Aspal (Dengan Auto-Kalkulasi Kumulatif)
-  void _addRekapTonaseAspalRow({
-    String nomorKendaraan = '',
+    String suhuPemadatanAkhir = '',
+    String jamPulangLap = '',
+    String jamPulangAmp = '',
     String tonaseTiket = '',
     String jumlahKumulatif = '',
   }) {
     setState(() {
       final ctrlPlat = TextEditingController(text: PlatNomorUtil.normalize(nomorKendaraan));
-      ctrlPlat.addListener(() {
-        if (mounted) setState(() {});
-      });
-
       final ctrlTonase = TextEditingController(text: tonaseTiket);
       final ctrlKumulatif = TextEditingController(text: jumlahKumulatif);
 
@@ -514,8 +622,19 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         _recalculateTonaseKumulatif();
       });
 
-      _rekapTonaseAspalList.add({
+      _rekapPengirimanDtList.add({
         'nomorKendaraan': ctrlPlat,
+        'jamPergiAmp': TextEditingController(text: jamPergiAmp),
+        'suhuAmp': TextEditingController(text: suhuAmp),
+        'jamDatangLap': TextEditingController(text: jamDatangLap),
+        'suhuDatang': TextEditingController(text: suhuDatang),
+        'waktuAntrian': TextEditingController(text: waktuAntrian.isNotEmpty ? waktuAntrian : '5'),
+        'suhuLap': TextEditingController(text: suhuLap),
+        'jamMulaiTuang': TextEditingController(text: jamMulaiTuang),
+        'jamSelesaiTuang': TextEditingController(text: jamSelesaiTuang),
+        'suhuPemadatanAkhir': TextEditingController(text: suhuPemadatanAkhir),
+        'jamPulangLap': TextEditingController(text: jamPulangLap),
+        'jamPulangAmp': TextEditingController(text: jamPulangAmp),
         'tonaseTiket': ctrlTonase,
         'jumlahKumulatif': ctrlKumulatif,
       });
@@ -526,9 +645,15 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     });
   }
 
+  void _disposePengirimanDtControllers(Map<String, TextEditingController> m) {
+    for (var c in m.values) {
+      c.dispose();
+    }
+  }
+
   void _recalculateTonaseKumulatif() {
     double runningTotal = 0;
-    for (var row in _rekapTonaseAspalList) {
+    for (var row in _rekapPengirimanDtList) {
       final tText = row['tonaseTiket']?.text.trim().replaceAll(',', '.') ?? '';
       final tVal = double.tryParse(tText) ?? 0;
       runningTotal += tVal;
@@ -541,12 +666,85 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     }
   }
 
+  void _addRekapPengecoranBetonRow({
+    String nomorKendaraan = '',
+    String batchingPlant = '',
+    String jamBerangkat = '',
+    String jamDatang = '',
+    String slumpTest = '',
+    String volume = '',
+    String volumeKumulatif = '',
+  }) {
+    setState(() {
+      final ctrlPlat = TextEditingController(text: PlatNomorUtil.normalize(nomorKendaraan));
+      final ctrlVolume = TextEditingController(text: volume);
+      final ctrlKumulatif = TextEditingController(text: volumeKumulatif);
+
+      ctrlVolume.addListener(() {
+        _recalculateBetonVolumeKumulatif();
+      });
+
+      _rekapPengecoranBetonList.add({
+        'nomorKendaraan': ctrlPlat,
+        'batchingPlant': TextEditingController(text: batchingPlant),
+        'jamBerangkat': TextEditingController(text: PlatNomorUtil.normalizeTime(jamBerangkat)),
+        'jamDatang': TextEditingController(text: PlatNomorUtil.normalizeTime(jamDatang)),
+        'slumpTest': TextEditingController(text: slumpTest),
+        'volume': ctrlVolume,
+        'volumeKumulatif': ctrlKumulatif,
+      });
+
+      if (volume.isNotEmpty && volumeKumulatif.isEmpty) {
+        _recalculateBetonVolumeKumulatif();
+      }
+    });
+  }
+
+  void _disposeBetonControllers(Map<String, TextEditingController> m) {
+    for (var c in m.values) {
+      c.dispose();
+    }
+  }
+
+  void _recalculateBetonVolumeKumulatif() {
+    double runningTotal = 0;
+    for (var row in _rekapPengecoranBetonList) {
+      final vText = row['volume']?.text.trim().replaceAll(',', '.') ?? '';
+      final vVal = double.tryParse(vText) ?? 0;
+      runningTotal += vVal;
+      if (vVal > 0 || vText.isNotEmpty) {
+        final formatted = (runningTotal % 1 == 0)
+            ? runningTotal.toInt().toString()
+            : runningTotal.toStringAsFixed(2);
+        row['volumeKumulatif']?.text = formatted;
+      }
+    }
+  }
+
   Future<void> _pickDate() async {
+    final firstDate = DateTime(2015);
+    final lastDate = DateTime(2040);
+    DateTime initial = _selectedDate;
+    if (initial.isBefore(firstDate)) initial = firstDate;
+    if (initial.isAfter(lastDate)) initial = lastDate;
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2035),
+      initialDate: initial,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.navySlate,
+              onPrimary: Colors.white,
+              onSurface: AppColors.textDark,
+            ),
+          ),
+          child: child ?? const SizedBox(),
+        );
+      },
     );
     if (picked != null) {
       setState(() {
@@ -595,52 +793,127 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     final String sumberDanaKontrak = _selectedContract!.sumberDana;
     final String namaKontraktor = keg['kontraktor'] ?? '-';
 
-    // A. Clean Pekerjaan (No, Jenis Pekerjaan, Volume, Lokasi)
-    final cleanPekerjaan = _pekerjaanList.asMap().entries.map((e) => {
-      'no': (e.key + 1).toString(),
-      'jenis': e.value['jenis']?.text.trim() ?? '',
-      'volume': e.value['volume']?.text.trim() ?? '',
-      'lokasi': e.value['lokasi']?.text.trim() ?? '',
-    }).where((m) => m['jenis']!.isNotEmpty).toList();
+    // A. Clean Pekerjaan (dengan sub-items Material, Peralatan, Personil)
+    final cleanPekerjaan = _pekerjaanList.asMap().entries.map((e) {
+      final pIdx = e.key + 1;
+      final p = e.value;
+      final jenisPek = (p['jenis'] as TextEditingController?)?.text.trim() ?? '';
+      final volPek = (p['volume'] as TextEditingController?)?.text.trim() ?? '';
+      final lokPek = (p['lokasi'] as TextEditingController?)?.text.trim() ?? '';
 
-    // B. Clean Material (No, Jenis, Cacah Volume, Lokasi Awal, Lokasi Tujuan)
-    final cleanMaterial = _materialList.asMap().entries.map((e) => {
-      'no': (e.key + 1).toString(),
-      'jenis': e.value['jenis']?.text.trim() ?? '',
-      'volume': e.value['volume']?.text.trim() ?? '',
-      'lokasiAwal': e.value['lokasiAwal']?.text.trim() ?? '',
-      'lokasiTujuan': e.value['lokasiTujuan']?.text.trim() ?? '',
-    }).where((m) => m['jenis']!.isNotEmpty).toList();
+      final mats = (p['materials'] as List<Map<String, TextEditingController>>?) ?? [];
+      final cleanMats = mats
+          .asMap()
+          .entries
+          .map((me) => {
+                'no': '$pIdx.${me.key + 1}',
+                'pekerjaanNama': jenisPek,
+                'pekerjaanIndex': '$pIdx',
+                'jenis': me.value['jenis']?.text.trim() ?? '',
+                'volume': me.value['volume']?.text.trim() ?? '',
+                'lokasiAwal': me.value['lokasiAwal']?.text.trim() ?? '',
+                'lokasiTujuan': me.value['lokasiTujuan']?.text.trim() ?? '',
+              })
+          .where((m) => m['jenis']!.isNotEmpty)
+          .toList();
 
-    // C. Clean Peralatan (No, Jenis Peralatan, Cacah aktif, Jumlah, No, Jenis, Kode, Rusak)
-    final cleanPeralatan = _peralatanList.asMap().entries.map((e) => {
-      'no': (e.key + 1).toString(),
-      'jenis': e.value['jenis']?.text.trim() ?? '',
-      'cacahAktif': e.value['cacahAktif']?.text.trim() ?? '',
-      'jumlah': e.value['jumlah']?.text.trim() ?? '',
-      'noRusak': e.value['noRusak']?.text.trim() ?? '',
-      'jenisRusak': e.value['jenisRusak']?.text.trim() ?? '',
-      'kode': e.value['kode']?.text.trim() ?? '',
-      'rusak': e.value['rusak']?.text.trim() ?? '',
-    }).where((m) => m['jenis']!.isNotEmpty || m['jenisRusak']!.isNotEmpty).toList();
+      final alats = (p['peralatans'] as List<Map<String, TextEditingController>>?) ?? [];
+      final cleanAlats = alats
+          .asMap()
+          .entries
+          .map((ae) => {
+                'no': '$pIdx.${ae.key + 1}',
+                'pekerjaanNama': jenisPek,
+                'pekerjaanIndex': '$pIdx',
+                'jenis': ae.value['jenis']?.text.trim() ?? '',
+                'cacahAktif': ae.value['cacahAktif']?.text.trim() ?? '',
+                'jumlah': ae.value['jumlah']?.text.trim() ?? '',
+                'noRusak': ae.value['noRusak']?.text.trim() ?? '',
+                'jenisRusak': ae.value['jenisRusak']?.text.trim() ?? '',
+                'kode': ae.value['kode']?.text.trim() ?? '',
+                'rusak': ae.value['rusak']?.text.trim() ?? '',
+              })
+          .where((m) => m['jenis']!.isNotEmpty || m['jenisRusak']!.isNotEmpty)
+          .toList();
 
-    // D. Clean Personil (No, Personil proyek, Cacah, Lokasi)
-    final cleanPersonil = _personilList.asMap().entries.map((e) => {
-      'no': (e.key + 1).toString(),
-      'role': (e.value['roleController'] as TextEditingController).text.trim(),
-      'cacah': (e.value['cacahController'] as TextEditingController).text.trim(),
-      'lokasi': (e.value['lokasiController'] as TextEditingController).text.trim(),
-    }).toList();
+      final pers = (p['personils'] as List<Map<String, dynamic>>?) ?? [];
+      final cleanPers = pers
+          .asMap()
+          .entries
+          .map((pe) => {
+                'no': '$pIdx.${pe.key + 1}',
+                'pekerjaanNama': jenisPek,
+                'pekerjaanIndex': '$pIdx',
+                'role': (pe.value['roleController'] as TextEditingController?)?.text.trim() ?? '',
+                'cacah': (pe.value['cacahController'] as TextEditingController?)?.text.trim() ?? '',
+                'lokasi': (pe.value['lokasiController'] as TextEditingController?)?.text.trim() ?? '',
+              })
+          .where((m) => m['role']!.isNotEmpty)
+          .toList();
+
+      return {
+        'no': pIdx.toString(),
+        'jenis': jenisPek,
+        'volume': volPek,
+        'lokasi': lokPek,
+        'noMataPembayaran': p['noMataPembayaran'] ?? '',
+        'satuan': p['satuan'] ?? '',
+        'rkkItemId': p['rkkItemId'] ?? '',
+        'materials': cleanMats,
+        'peralatans': cleanAlats,
+        'personils': cleanPers,
+      };
+    }).where((m) => (m['jenis'] as String).isNotEmpty).toList();
+
+    // B, C, D: Flattened Aggregated Lists for root & backward compatibility
+    final List<Map<String, String>> cleanMaterial = [];
+    final List<Map<String, String>> cleanPeralatan = [];
+    final List<Map<String, String>> cleanPersonil = [];
+
+    int matNo = 1;
+    int alatNo = 1;
+    int persNo = 1;
+
+    for (var p in cleanPekerjaan) {
+      final mats = p['materials'] as List<Map<String, String>>;
+      for (var m in mats) {
+        cleanMaterial.add({
+          ...m,
+          'no': '${matNo++}',
+        });
+      }
+      final alats = p['peralatans'] as List<Map<String, String>>;
+      for (var a in alats) {
+        cleanPeralatan.add({
+          ...a,
+          'no': '${alatNo++}',
+        });
+      }
+      final pers = p['personils'] as List<Map<String, String>>;
+      for (var pr in pers) {
+        cleanPersonil.add({
+          ...pr,
+          'no': '${persNo++}',
+        });
+      }
+    }
 
     // E. Clean Cuaca & Kejadian
-    final cleanCuaca = _cuacaKejadianList.asMap().entries.map((e) => {
-      'no': (e.key + 1).toString(),
-      'jenis': (e.value['jenisController'] as TextEditingController).text.trim(),
-      'jam': (e.value['jamController'] as TextEditingController).text.trim(),
-      'lokasi': (e.value['lokasiController'] as TextEditingController).text.trim(),
-      'tanggungJawab': e.value['tanggungJawab'] as String? ?? 'Tidak',
-      'akibat': (e.value['akibatController'] as TextEditingController).text.trim(),
-    }).where((m) => m['jenis']!.isNotEmpty).toList();
+    final cleanCuaca = _cuacaKejadianList.asMap().entries.map((e) {
+      final jk = (e.value['jenisKejadianController'] as TextEditingController?)?.text.trim() ??
+          (e.value['jenisController'] as TextEditingController?)?.text.trim() ?? '';
+      final cuacaVal = (e.value['cuacaController'] as TextEditingController?)?.text.trim() ?? '';
+      return {
+        'no': (e.key + 1).toString(),
+        'jenisKejadian': jk,
+        'cuaca': cuacaVal,
+        'jenis': jk.isNotEmpty ? jk : cuacaVal,
+        'jam': (e.value['jamController'] as TextEditingController).text.trim(),
+        'lokasi': (e.value['lokasiController'] as TextEditingController).text.trim(),
+        'tanggungJawab': e.value['tanggungJawab'] as String? ?? 'Tidak',
+        'akibat': (e.value['akibatController'] as TextEditingController).text.trim(),
+      };
+    }).where((m) => m['jenisKejadian']!.isNotEmpty || m['cuaca']!.isNotEmpty).toList();
 
     // F. Clean Instruksi (Konsultan Supervisi CV. TATA SAKA CONSULTANT)
     final String instruksiText = _instruksiKonsultanController.text.trim();
@@ -660,39 +933,94 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       'isi': c['isi']?.text.trim() ?? '',
     }).where((c) => c['nama']!.isNotEmpty).toList();
 
-    // Clean Rekapitulasi 1: Suhu Lapangan
-    final cleanRekapSuhuLapangan = _enableRekapSuhuLapangan
-        ? _rekapSuhuLapanganList.asMap().entries.map((e) => {
-            'no': (e.key + 1).toString(),
-            'nomorKendaraan': PlatNomorUtil.normalize(e.value['nomorKendaraan']?.text.trim() ?? ''),
-            'jamDatang': e.value['jamDatang']?.text.trim() ?? '',
-            'suhu': e.value['suhu']?.text.trim() ?? '',
-            'jamMulaiTuang': e.value['jamMulaiTuang']?.text.trim() ?? '',
-            'jamSelesaiTuang': e.value['jamSelesaiTuang']?.text.trim() ?? '',
-            'jamPulang': e.value['jamPulang']?.text.trim() ?? '',
-          }).where((m) => m['nomorKendaraan']!.isNotEmpty || m['jamDatang']!.isNotEmpty).toList()
-        : <Map<String, String>>[];
+    // Clean Rekapitulasi Terpadu Pengiriman DT Aspal & Ekspor Lembar Dokumen Resmi
+    final List<Map<String, String>> cleanRekapSuhuLapangan = [];
+    final List<Map<String, String>> cleanRekapSuhuAmp = [];
+    final List<Map<String, String>> cleanRekapTonaseAspal = [];
+    final List<Map<String, dynamic>> cleanRekapPengirimanDt = [];
 
-    // Clean Rekapitulasi 2: Suhu AMP
-    final cleanRekapSuhuAmp = _enableRekapSuhuAmp
-        ? _rekapSuhuAmpList.asMap().entries.map((e) => {
-            'no': (e.key + 1).toString(),
-            'nomorKendaraan': PlatNomorUtil.normalize(e.value['nomorKendaraan']?.text.trim() ?? ''),
-            'jamPergi': e.value['jamPergi']?.text.trim() ?? '',
-            'suhuAmp': e.value['suhuAmp']?.text.trim() ?? '',
-            'jamPulang': e.value['jamPulang']?.text.trim() ?? '',
-          }).where((m) => m['nomorKendaraan']!.isNotEmpty || m['jamPergi']!.isNotEmpty).toList()
-        : <Map<String, String>>[];
+    if (_enableRekapitulasiAspal) {
+      for (int i = 0; i < _rekapPengirimanDtList.length; i++) {
+        final m = _rekapPengirimanDtList[i];
+        final plat = PlatNomorUtil.normalize(m['nomorKendaraan']?.text.trim() ?? '');
+        final idxStr = '${i + 1}';
 
-    // Clean Rekapitulasi 3: Tonase Aspal
-    final cleanRekapTonaseAspal = _enableRekapTonaseAspal
-        ? _rekapTonaseAspalList.asMap().entries.map((e) => {
-            'no': (e.key + 1).toString(),
-            'nomorKendaraan': PlatNomorUtil.normalize(e.value['nomorKendaraan']?.text.trim() ?? ''),
-            'tonaseTiket': e.value['tonaseTiket']?.text.trim() ?? '',
-            'jumlahKumulatif': e.value['jumlahKumulatif']?.text.trim() ?? '',
-          }).where((m) => m['nomorKendaraan']!.isNotEmpty || m['tonaseTiket']!.isNotEmpty).toList()
-        : <Map<String, String>>[];
+        final jamPergiAmp = PlatNomorUtil.normalizeTime(m['jamPergiAmp']?.text.trim() ?? '');
+        final jamPulangAmp = PlatNomorUtil.normalizeTime(m['jamPulangAmp']?.text.trim() ?? '');
+        final jamDatangLap = PlatNomorUtil.normalizeTime(m['jamDatangLap']?.text.trim() ?? '');
+        final jamMulaiTuang = PlatNomorUtil.normalizeTime(m['jamMulaiTuang']?.text.trim() ?? '');
+        final jamSelesaiTuang = PlatNomorUtil.normalizeTime(m['jamSelesaiTuang']?.text.trim() ?? '');
+        final jamPulangLap = PlatNomorUtil.normalizeTime(m['jamPulangLap']?.text.trim() ?? '');
+
+        cleanRekapPengirimanDt.add({
+          'no': idxStr,
+          'nomorKendaraan': plat,
+          'jamPergiAmp': jamPergiAmp,
+          'suhuAmp': m['suhuAmp']?.text.trim() ?? '',
+          'jamDatangLap': jamDatangLap,
+          'suhuDatang': m['suhuDatang']?.text.trim() ?? '',
+          'waktuAntrian': m['waktuAntrian']?.text.trim() ?? '',
+          'suhuLap': m['suhuLap']?.text.trim() ?? '',
+          'jamMulaiTuang': jamMulaiTuang,
+          'jamSelesaiTuang': jamSelesaiTuang,
+          'suhuPemadatanAkhir': m['suhuPemadatanAkhir']?.text.trim() ?? '',
+          'jamPulangLap': jamPulangLap,
+          'jamPulangAmp': jamPulangAmp,
+          'tonaseTiket': m['tonaseTiket']?.text.trim() ?? '',
+          'jumlahKumulatif': m['jumlahKumulatif']?.text.trim() ?? '',
+        });
+
+        cleanRekapSuhuAmp.add({
+          'no': idxStr,
+          'nomorKendaraan': plat,
+          'jamPergi': jamPergiAmp,
+          'suhuAmp': m['suhuAmp']?.text.trim() ?? '',
+          'jamPulang': jamPulangAmp,
+        });
+
+        cleanRekapSuhuLapangan.add({
+          'no': idxStr,
+          'nomorKendaraan': plat,
+          'jamDatang': jamDatangLap,
+          'suhuDatang': m['suhuDatang']?.text.trim() ?? '',
+          'waktuAntrian': m['waktuAntrian']?.text.trim() ?? '',
+          'suhu': m['suhuLap']?.text.trim() ?? '',
+          'suhuLap': m['suhuLap']?.text.trim() ?? '',
+          'jamMulaiTuang': jamMulaiTuang,
+          'jamSelesaiTuang': jamSelesaiTuang,
+          'suhuPemadatanAkhir': m['suhuPemadatanAkhir']?.text.trim() ?? '',
+          'jamPulang': jamPulangLap,
+        });
+
+        cleanRekapTonaseAspal.add({
+          'no': idxStr,
+          'nomorKendaraan': plat,
+          'tonaseTiket': m['tonaseTiket']?.text.trim() ?? '',
+          'jumlahKumulatif': m['jumlahKumulatif']?.text.trim() ?? '',
+        });
+      }
+    }
+
+    final List<Map<String, dynamic>> cleanRekapPengecoranBeton = [];
+    if (_enableRekapitulasiBeton) {
+      for (int i = 0; i < _rekapPengecoranBetonList.length; i++) {
+        final m = _rekapPengecoranBetonList[i];
+        final plat = PlatNomorUtil.normalize(m['nomorKendaraan']?.text.trim() ?? '');
+        final jamBerangkat = PlatNomorUtil.normalizeTime(m['jamBerangkat']?.text.trim() ?? '');
+        final jamDatang = PlatNomorUtil.normalizeTime(m['jamDatang']?.text.trim() ?? '');
+
+        cleanRekapPengecoranBeton.add({
+          'no': '${i + 1}',
+          'nomorKendaraan': plat,
+          'batchingPlant': m['batchingPlant']?.text.trim() ?? '',
+          'jamBerangkat': jamBerangkat,
+          'jamDatang': jamDatang,
+          'slumpTest': m['slumpTest']?.text.trim() ?? '',
+          'volume': m['volume']?.text.trim() ?? '',
+          'volumeKumulatif': m['volumeKumulatif']?.text.trim() ?? '',
+        });
+      }
+    }
 
     final Map<String, dynamic> reportData = {
       'id': reportId,
@@ -734,6 +1062,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       'penyediaAmp': _penyediaAmpController.text.trim(),
       'jarakTempuh': _jarakTempuhController.text.trim(),
 
+      'rekapPengirimanDtList': cleanRekapPengirimanDt,
+
       'hasRekapSuhuLapangan': _enableRekapitulasiAspal && cleanRekapSuhuLapangan.isNotEmpty,
       'rekapSuhuLapanganList': cleanRekapSuhuLapangan,
 
@@ -743,11 +1073,26 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       'hasRekapTonaseAspal': _enableRekapitulasiAspal && cleanRekapTonaseAspal.isNotEmpty,
       'rekapTonaseAspalList': cleanRekapTonaseAspal,
 
+      // Dokumen Rekapitulasi Pengecoran Beton Ready Mix (Opsional Halaman Terpisah)
+      'hasRekapBeton': _enableRekapitulasiBeton && cleanRekapPengecoranBeton.isNotEmpty,
+      'hasRekapitulasiBeton': _enableRekapitulasiBeton,
+      'jenisBeton': _jenisBetonController.text.trim(),
+      'penyediaJasaBeton': _penyediaJasaBetonController.text.trim().isNotEmpty
+          ? _penyediaJasaBetonController.text.trim()
+          : namaKontraktor,
+      'rekapPengecoranBetonList': cleanRekapPengecoranBeton,
+
       // Backward Compatibility & Kartu
       'temuan': cleanPekerjaan.isNotEmpty
           ? cleanPekerjaan.map((p) => '${p['jenis']} (${p['volume']})').join(', ')
           : 'Pekerjaan sesuai buku harian standar.',
-      'cuaca': cleanCuaca.isNotEmpty ? cleanCuaca.first['jenis'] : 'Normal',
+      'cuaca': cleanCuaca.isNotEmpty
+          ? (cleanCuaca.first['cuaca']!.isNotEmpty
+              ? cleanCuaca.first['cuaca']!
+              : (cleanCuaca.first['jenisKejadian']!.isNotEmpty
+                  ? cleanCuaca.first['jenisKejadian']!
+                  : 'Normal'))
+          : 'Normal',
       'instruksi': instruksiText,
       'rekomendasi': '',
       'auditor': 'CV. Tata Saka Consultant',
@@ -854,20 +1199,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             _buildContractAndKegiatanSelector(contracts, lokasiAuto, sumberDanaAuto),
             const SizedBox(height: 16),
 
-            // 3. A. PEKERJAAN
+            // 3. A - D. PEKERJAAN & SUMBER DAYA (MATERIAL, ALAT, PERSONIL)
             _buildSectionA_Pekerjaan(),
-            const SizedBox(height: 16),
-
-            // 4. B. MATERIAL DIGUNAKAN
-            _buildSectionB_Material(),
-            const SizedBox(height: 16),
-
-            // 5. C. JENIS PERALATAN YANG DIGUNAKAN
-            _buildSectionC_Peralatan(),
-            const SizedBox(height: 16),
-
-            // 6. D. PERSONAL PROYEK PENGAWAS DAN KONTRAKTOR
-            _buildSectionD_Personil(),
             const SizedBox(height: 16),
 
             // 7. E. CUACA / BENCANA / KEJADIAN PENGHAMBAT PEKERJAAN
@@ -890,7 +1223,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             _buildSectionRekapitulasiOpsional(),
             const SizedBox(height: 16),
 
-            // 11. FIELD TAMBAHAN / CUSTOM
+            // 11. DOKUMEN REKAPITULASI (OPSIONAL - PEKERJAAN BETON / READY MIX)
+            _buildSectionRekapitulasiBetonOpsional(),
+            const SizedBox(height: 16),
+
+            // 12. FIELD TAMBAHAN / CUSTOM
             _buildSectionCustomFields(),
             const SizedBox(height: 28),
 
@@ -1050,224 +1387,509 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     );
   }
 
-  // ─── 3. A. PEKERJAAN ───
+  List<Map<String, dynamic>> _getRkkFlatItems() {
+    if (_selectedContract == null || _selectedContract!.kegiatans.isEmpty) return [];
+    final idx = _selectedKegiatanIndex ?? 0;
+    if (idx < 0 || idx >= _selectedContract!.kegiatans.length) return [];
+    final keg = _selectedContract!.kegiatans[idx];
+    final rawRkk = keg['rkkDivisiList'] as List? ?? [];
+
+    final List<Map<String, dynamic>> flat = [];
+    for (final div in rawRkk) {
+      final romawi = div['nomorRomawi']?.toString() ?? 'I';
+      final namaDiv = div['namaDivisi']?.toString() ?? 'DIVISI';
+      final items = div['items'] as List? ?? [];
+      for (final it in items) {
+        flat.add({
+          'id': '${romawi}_${it['uraian']}',
+          'divisiRomawi': romawi,
+          'divisiNama': namaDiv,
+          'uraian': it['uraian']?.toString() ?? '',
+          'satuan': it['satuan']?.toString() ?? 'm3',
+          'volumeCCO': it['volumeCCO'],
+          'nilaiBobot': it['nilaiBobot'],
+        });
+      }
+    }
+    return flat;
+  }
+
+  // ─── 3. A - D. PEKERJAAN & SUMBER DAYA (MATERIAL, ALAT, PERSONIL) ───
   Widget _buildSectionA_Pekerjaan() {
+    final rkkFlatItems = _getRkkFlatItems();
+
     return _buildCard(
-      title: 'A. PEKERJAAN',
-      badge: '${_pekerjaanList.length} Baris',
+      title: 'A - D. PEKERJAAN & SUMBER DAYA',
+      badge: '${_pekerjaanList.length} Pekerjaan',
       children: [
         ..._pekerjaanList.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final m = entry.value;
-          return _buildItemCard(
-            title: 'Pekerjaan #${idx + 1}',
-            onDelete: () {
-              setState(() {
-                _pekerjaanList.removeAt(idx);
-              });
-            },
-            children: [
-              _buildField(
-                controller: m['jenis']!,
-                label: 'Jenis Pekerjaan',
-                hintText: 'Contoh: Pekerjaan Galian Tanah / Pemasangan U-Ditch',
-                isBold: true,
-              ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: m['volume']!,
-                label: 'Volume',
-                hintText: 'Contoh: 35 m³ / 120 m²',
-              ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: m['lokasi']!,
-                label: 'Lokasi / STA',
-                hintText: 'Contoh: STA 0+150 - STA 0+200',
-              ),
-            ],
-          );
-        }),
-        _buildAddButton('+ Tambah Baris Pekerjaan', () => _addPekerjaanRow()),
-      ],
-    );
-  }
-
-  // ─── 4. B. MATERIAL DIGUNAKAN ───
-  Widget _buildSectionB_Material() {
-    return _buildCard(
-      title: 'B. MATERIAL DIGUNAKAN',
-      badge: '${_materialList.length} Baris',
-      children: [
-        ..._materialList.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final m = entry.value;
-          return _buildItemCard(
-            title: 'Material #${idx + 1}',
-            onDelete: () {
-              setState(() {
-                _materialList.removeAt(idx);
-              });
-            },
-            children: [
-              _buildField(
-                controller: m['jenis']!,
-                label: 'Jenis Material',
-                hintText: 'Contoh: Pasir Pasang / Semen Gresik / Aspal AC-WC',
-                isBold: true,
-              ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: m['volume']!,
-                label: 'Cacah Volume',
-                hintText: 'Contoh: 15 m³ / 20 Ton / 50 Sak',
-              ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: m['lokasiAwal']!,
-                label: 'Lokasi Awal (Asal)',
-                hintText: 'Contoh: Quarry / Basecamp / Gudang Utama',
-              ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: m['lokasiTujuan']!,
-                label: 'Lokasi Tujuan',
-                hintText: 'Contoh: STA 0+150',
-              ),
-            ],
-          );
-        }),
-        _buildAddButton('+ Tambah Baris Material', () => _addMaterialRow()),
-      ],
-    );
-  }
-
-  // ─── 5. C. JENIS PERALATAN YANG DIGUNAKAN ───
-  Widget _buildSectionC_Peralatan() {
-    return _buildCard(
-      title: 'C. JENIS PERALATAN YANG DIGUNAKAN',
-      badge: '${_peralatanList.length} Baris',
-      children: [
-        ..._peralatanList.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final m = entry.value;
-          return _buildItemCard(
-            title: 'Peralatan #${idx + 1}',
-            onDelete: () {
-              setState(() {
-                _peralatanList.removeAt(idx);
-              });
-            },
-            children: [
-              // 1. Peralatan Aktif
-              const Text(
-                'PERALATAN AKTIF DIGUNAKAN',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: Color(0xFF374151), letterSpacing: 0.3),
-              ),
-              const SizedBox(height: 8),
-              _buildField(
-                controller: m['jenis']!,
-                label: 'Jenis Peralatan',
-                hintText: 'Contoh: Excavator PC200, Tandem Roller, Dump Truck',
-                isBold: true,
-              ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: m['cacahAktif']!,
-                label: 'Cacah Aktif',
-                hintText: 'Contoh: 1 Unit',
-              ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: m['jumlah']!,
-                label: 'Jumlah Total',
-                hintText: 'Contoh: 2 Unit',
-              ),
-              const SizedBox(height: 14),
-              const Divider(height: 1, color: Color(0xFFE5E7EB)),
-              const SizedBox(height: 12),
-
-              // 2. Peralatan Rusak / Teridentifikasi
-              const Text(
-                'PERALATAN RUSAK / TERIDENTIFIKASI (JIKA ADA)',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: Color(0xFF6B7280), letterSpacing: 0.3),
-              ),
-              const SizedBox(height: 8),
-              _buildField(
-                controller: m['noRusak']!,
-                label: 'No. Urut Rusak',
-                hintText: 'Contoh: 1',
-              ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: m['kode']!,
-                label: 'Kode Alat',
-                hintText: 'Contoh: EX-01',
-              ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: m['jenisRusak']!,
-                label: 'Jenis Alat Rusak',
-                hintText: 'Contoh: Dump Truck Isuzu',
-              ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: m['rusak']!,
-                label: 'Kondisi Kerusakan',
-                hintText: 'Contoh: Ban pecah / hidrolik bocor, sedang perbaikan',
-              ),
-            ],
-          );
-        }),
-        _buildAddButton('+ Tambah Baris Peralatan', () => _addPeralatanRow()),
-      ],
-    );
-  }
-
-  // ─── 6. D. PERSONAL PROYEK PENGAWAS DAN KONTRAKTOR ───
-  Widget _buildSectionD_Personil() {
-    return _buildCard(
-      title: 'D. PERSONAL PROYEK PENGAWAS DAN KONTRAKTOR',
-      badge: '${_personilList.length} Personil',
-      children: [
-        ..._personilList.asMap().entries.map((entry) {
-          final idx = entry.key;
+          final pIdx = entry.key;
           final p = entry.value;
-          final roleCtrl = p['roleController'] as TextEditingController;
-          final cacahCtrl = p['cacahController'] as TextEditingController;
-          final lokasiCtrl = p['lokasiController'] as TextEditingController;
+          final jenisPekCtrl = p['jenis'] as TextEditingController;
+          final volPekCtrl = p['volume'] as TextEditingController;
+          final lokPekCtrl = p['lokasi'] as TextEditingController;
+          final materials = p['materials'] as List<Map<String, TextEditingController>>;
+          final peralatans = p['peralatans'] as List<Map<String, TextEditingController>>;
+          final personils = p['personils'] as List<Map<String, dynamic>>;
 
-          return _buildItemCard(
-            title: 'Personil #${idx + 1}',
-            onDelete: () {
-              setState(() {
-                _personilList.removeAt(idx);
-              });
-            },
-            children: [
-              _buildField(
-                controller: roleCtrl,
-                label: 'Personil Proyek / Jabatan',
-                hintText: 'Contoh: Pelaksana Lapangan, Mandor, Pekerja Kasar',
-                isBold: true,
-              ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: cacahCtrl,
-                label: 'Cacah (Jumlah Orang)',
-                hintText: 'Contoh: 4 Orang',
-              ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: lokasiCtrl,
-                label: 'Lokasi Penugasan',
-                hintText: 'Contoh: STA 0+150 - 0+300',
-              ),
-            ],
+          return Container(
+            margin: const EdgeInsets.only(bottom: 18),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF9FAFB),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header Card Pekerjaan
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(11)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1F2937),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Pekerjaan #${pIdx + 1}',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ),
+                      const Spacer(),
+                      if (_pekerjaanList.length > 1)
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Color(0xFFDC2626), size: 20),
+                          tooltip: 'Hapus Pekerjaan #${pIdx + 1}',
+                          onPressed: () {
+                            setState(() {
+                              _disposePekerjaanControllers(p);
+                              _pekerjaanList.removeAt(pIdx);
+                            });
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Sub-Header A. PEKERJAAN
+                      const Text(
+                        'A. PEKERJAAN',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Dropdown RKK Pekerjaan (Jika Kegiatan memiliki RKK)
+                      if (rkkFlatItems.isNotEmpty) ...[
+                        Row(
+                          children: [
+                            const Text(
+                              'Pilih dari RKK Kontrak *',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryBlue),
+                            ),
+                            const Spacer(),
+                            if (p['satuan'] != null && (p['satuan'] as String).isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.slateLighter,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: AppColors.border, width: 0.6),
+                                ),
+                                child: Text(
+                                  'Satuan: ${p['satuan']}',
+                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.navySlate),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<String>(
+                          value: (p['rkkItemId'] != null && rkkFlatItems.any((it) => it['id'] == p['rkkItemId']))
+                              ? p['rkkItemId'] as String
+                              : (p['rkkItemId'] == 'manual' ? 'manual' : null),
+                          isExpanded: true,
+                          decoration: _cleanInputDec('Pilih item pekerjaan dari daftar RKK'),
+                          items: [
+                            const DropdownMenuItem<String>(
+                              value: 'manual',
+                              child: Text(
+                                '✏️ Input Manual (Pekerjaan Bebas / Lainnya)',
+                                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF4B5563)),
+                              ),
+                            ),
+                            ...rkkFlatItems.map((item) {
+                              return DropdownMenuItem<String>(
+                                value: item['id'] as String,
+                                child: Text(
+                                  '${item['uraian']} (${item['divisiRomawi']})',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 12.5),
+                                ),
+                              );
+                            }),
+                          ],
+                          onChanged: (selectedId) {
+                            setState(() {
+                              p['rkkItemId'] = selectedId;
+                              if (selectedId != null && selectedId != 'manual') {
+                                final matched = rkkFlatItems.firstWhere((it) => it['id'] == selectedId);
+                                jenisPekCtrl.text = matched['uraian'] ?? '';
+                                p['satuan'] = matched['satuan'] ?? '';
+                                p['volumeCCO'] = matched['volumeCCO'];
+                                p['nilaiBobot'] = matched['nilaiBobot'];
+                              } else {
+                                p['satuan'] = '';
+                              }
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+
+                      _buildField(
+                        controller: jenisPekCtrl,
+                        label: 'Jenis Pekerjaan',
+                        hintText: 'Contoh: Pekerjaan Galian Tanah / Pemasangan U-Ditch',
+                        isBold: true,
+                      ),
+                      const SizedBox(height: 10),
+                      _buildField(
+                        controller: volPekCtrl,
+                        label: 'Volume',
+                        hintText: (p['satuan'] != null && (p['satuan'] as String).isNotEmpty)
+                            ? 'Contoh: 35.00 ${p['satuan']} (Vol CCO: ${p['volumeCCO'] ?? '-'})'
+                            : 'Contoh: 35 m³ / 120 m²',
+                      ),
+                      const SizedBox(height: 10),
+                      _buildField(
+                        controller: lokPekCtrl,
+                        label: 'Lokasi / STA',
+                        hintText: 'Contoh: STA 0+150 - STA 0+200',
+                      ),
+                      const SizedBox(height: 16),
+                      const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                      const SizedBox(height: 14),
+
+                      // Sub-Header B. MATERIAL DIGUNAKAN
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'B. MATERIAL DIGUNAKAN',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
+                            ),
+                          ),
+                          Text(
+                            '${materials.length} Bahan',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (materials.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFE5E7EB)),
+                          ),
+                          child: const Text(
+                            'Tidak ada material digunakan untuk pekerjaan ini (opsional).',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF6B7280), fontStyle: FontStyle.italic),
+                          ),
+                        )
+                      else
+                        ...materials.asMap().entries.map((mEntry) {
+                          final mIdx = mEntry.key;
+                          final m = mEntry.value;
+                          return _buildNestedItemCard(
+                            title: 'Material #${mIdx + 1}',
+                            onDelete: () {
+                              setState(() {
+                                m.values.forEach((c) => c.dispose());
+                                materials.removeAt(mIdx);
+                              });
+                            },
+                            children: [
+                              _buildField(
+                                controller: m['jenis']!,
+                                label: 'Jenis Material',
+                                hintText: 'Contoh: Pasir Pasang / Semen Gresik / U-Ditch 40x40',
+                                isBold: true,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildField(
+                                controller: m['volume']!,
+                                label: 'Cacah Volume',
+                                hintText: 'Contoh: 15 m³ / 20 Unit / 50 Sak',
+                              ),
+                              const SizedBox(height: 8),
+                              _buildField(
+                                controller: m['lokasiAwal']!,
+                                label: 'Lokasi Awal (Asal)',
+                                hintText: 'Contoh: Quarry / Basecamp / Gudang Utama',
+                              ),
+                              const SizedBox(height: 8),
+                              _buildField(
+                                controller: m['lokasiTujuan']!,
+                                label: 'Lokasi Tujuan',
+                                hintText: 'Contoh: STA 0+150',
+                              ),
+                            ],
+                          );
+                        }),
+                      const SizedBox(height: 8),
+                      _buildSubAddButton(
+                        '+ Tambah Material (Pek. #${pIdx + 1})',
+                        () => _addMaterialToPekerjaan(pIdx),
+                      ),
+                      const SizedBox(height: 16),
+                      const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                      const SizedBox(height: 14),
+
+                      // Sub-Header C. JENIS PERALATAN YANG DIGUNAKAN
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'C. JENIS PERALATAN YANG DIGUNAKAN',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
+                            ),
+                          ),
+                          Text(
+                            '${peralatans.length} Alat',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (peralatans.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFE5E7EB)),
+                          ),
+                          child: const Text(
+                            'Tidak ada peralatan khusus yang digunakan (opsional).',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF6B7280), fontStyle: FontStyle.italic),
+                          ),
+                        )
+                      else
+                        ...peralatans.asMap().entries.map((aEntry) {
+                          final aIdx = aEntry.key;
+                          final a = aEntry.value;
+                          return _buildNestedItemCard(
+                            title: 'Peralatan #${aIdx + 1}',
+                            onDelete: () {
+                              setState(() {
+                                a.values.forEach((c) => c.dispose());
+                                peralatans.removeAt(aIdx);
+                              });
+                            },
+                            children: [
+                              _buildField(
+                                controller: a['jenis']!,
+                                label: 'Jenis Peralatan',
+                                hintText: 'Contoh: Excavator PC200, Dump Truck',
+                                isBold: true,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildField(
+                                controller: a['cacahAktif']!,
+                                label: 'Cacah Aktif',
+                                hintText: 'Contoh: 1 Unit',
+                              ),
+                              const SizedBox(height: 8),
+                              _buildField(
+                                controller: a['jumlah']!,
+                                label: 'Jumlah Total',
+                                hintText: 'Contoh: 2 Unit',
+                              ),
+                              const SizedBox(height: 8),
+                              _buildField(
+                                controller: a['kode']!,
+                                label: 'Kode Alat (Opsional)',
+                                hintText: 'Contoh: EX-01',
+                              ),
+                              const SizedBox(height: 8),
+                              _buildField(
+                                controller: a['rusak']!,
+                                label: 'Kondisi Kerusakan (Jika Ada)',
+                                hintText: 'Contoh: Normal / Sedang Perbaikan',
+                              ),
+                            ],
+                          );
+                        }),
+                      const SizedBox(height: 8),
+                      _buildSubAddButton(
+                        '+ Tambah Peralatan (Pek. #${pIdx + 1})',
+                        () => _addPeralatanToPekerjaan(pIdx),
+                      ),
+                      const SizedBox(height: 16),
+                      const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                      const SizedBox(height: 14),
+
+                      // Sub-Header D. PERSONAL PROYEK PENGAWAS DAN KONTRAKTOR
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'D. PERSONAL PROYEK PENGAWAS DAN KONTRAKTOR',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
+                            ),
+                          ),
+                          Text(
+                            '${personils.length} Personil',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (personils.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFE5E7EB)),
+                          ),
+                          child: const Text(
+                            'Tidak ada personil spesifik (opsional).',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF6B7280), fontStyle: FontStyle.italic),
+                          ),
+                        )
+                      else
+                        ...personils.asMap().entries.map((pEntry) {
+                          final persIdx = pEntry.key;
+                          final pers = pEntry.value;
+                          final roleCtrl = pers['roleController'] as TextEditingController;
+                          final cacahCtrl = pers['cacahController'] as TextEditingController;
+                          final lokasiCtrl = pers['lokasiController'] as TextEditingController;
+
+                          return _buildNestedItemCard(
+                            title: 'Personil #${persIdx + 1}',
+                            onDelete: () {
+                              setState(() {
+                                roleCtrl.dispose();
+                                cacahCtrl.dispose();
+                                lokasiCtrl.dispose();
+                                personils.removeAt(persIdx);
+                              });
+                            },
+                            children: [
+                              _buildField(
+                                controller: roleCtrl,
+                                label: 'Personil Proyek / Jabatan',
+                                hintText: 'Contoh: Pelaksana Lapangan, Mandor, Pekerja',
+                                isBold: true,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildField(
+                                controller: cacahCtrl,
+                                label: 'Cacah (Jumlah Orang)',
+                                hintText: 'Contoh: 4 Orang',
+                              ),
+                              const SizedBox(height: 8),
+                              _buildField(
+                                controller: lokasiCtrl,
+                                label: 'Lokasi Penugasan',
+                                hintText: 'Contoh: STA 0+150',
+                              ),
+                            ],
+                          );
+                        }),
+                      const SizedBox(height: 8),
+                      _buildSubAddButton(
+                        '+ Tambah Personil (Pek. #${pIdx + 1})',
+                        () => _addPersonilToPekerjaan(pIdx),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           );
         }),
-        _buildAddButton('+ Tambah Baris Personil', () => _addPersonilRow(role: '', cacah: '', lokasi: '')),
+        const SizedBox(height: 8),
+        _buildAddButton('+ Tambah Baris Pekerjaan Baru', () => _addPekerjaanRow()),
       ],
+    );
+  }
+
+  Widget _buildSubAddButton(String label, VoidCallback onPressed) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(Icons.add, size: 14, color: Color(0xFF374151)),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF374151)),
+        ),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: Colors.white,
+          side: const BorderSide(color: Color(0xFFD1D5DB)),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNestedItemCard({
+    required String title,
+    required VoidCallback onDelete,
+    required List<Widget> children,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF4B5563)),
+              ),
+              InkWell(
+                onTap: onDelete,
+                child: const Padding(
+                  padding: EdgeInsets.all(2),
+                  child: Icon(Icons.close, size: 14, color: Color(0xFF9CA3AF)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ...children,
+        ],
+      ),
     );
   }
 
@@ -1297,7 +1919,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
           ..._cuacaKejadianList.asMap().entries.map((entry) {
             final idx = entry.key;
             final m = entry.value;
-            final jenisCtrl = m['jenisController'] as TextEditingController;
+            final jenisKejadianCtrl = (m['jenisKejadianController'] ?? m['jenisController']) as TextEditingController;
+            final cuacaCtrl = m['cuacaController'] as TextEditingController;
             final jamCtrl = m['jamController'] as TextEditingController;
             final lokasiCtrl = m['lokasiController'] as TextEditingController;
             final akibatCtrl = m['akibatController'] as TextEditingController;
@@ -1311,10 +1934,16 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
               },
               children: [
                 _buildField(
-                  controller: jenisCtrl,
-                  label: 'Jenis Kejadian / Cuaca',
-                  hintText: 'Contoh: Hujan Deras / Genangan Air / Longsor',
+                  controller: cuacaCtrl,
+                  label: 'Cuaca',
+                  hintText: 'Contoh: Cerah / Berawan / Hujan Deras / Gerimis',
                   isBold: true,
+                ),
+                const SizedBox(height: 10),
+                _buildField(
+                  controller: jenisKejadianCtrl,
+                  label: 'Jenis Kejadian',
+                  hintText: 'Contoh: Genangan Air / Longsor / Banjir',
                 ),
                 const SizedBox(height: 10),
                 _buildField(
@@ -1392,7 +2021,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         const SizedBox(height: 10),
         _buildAddButton(
           '+ Tambah Baris Cuaca / Hambatan',
-          () => _addCuacaRow(jenis: '', jam: '', lokasi: '', tanggungJawab: 'Tidak', akibat: ''),
+          () => _addCuacaRow(cuaca: '', jenisKejadian: '', jam: '', lokasi: '', tanggungJawab: 'Tidak', akibat: ''),
         ),
       ],
     );
@@ -1766,155 +2395,27 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     );
   }
 
-  // ─── HELPER SINKRONISASI PLAT & DATA PERJALANAN ───
-  Set<String> _getKnownPlateNumbers() {
-    final Set<String> plates = {};
-    for (var m in _rekapSuhuLapanganList) {
-      final raw = m['nomorKendaraan']?.text.trim() ?? '';
-      if (raw.isNotEmpty) {
-        final p = PlatNomorUtil.normalize(raw);
-        if (p.isNotEmpty) plates.add(p);
-      }
-    }
-    for (var m in _rekapSuhuAmpList) {
-      final raw = m['nomorKendaraan']?.text.trim() ?? '';
-      if (raw.isNotEmpty) {
-        final p = PlatNomorUtil.normalize(raw);
-        if (p.isNotEmpty) plates.add(p);
-      }
-    }
-    for (var m in _rekapTonaseAspalList) {
-      final raw = m['nomorKendaraan']?.text.trim() ?? '';
-      if (raw.isNotEmpty) {
-        final p = PlatNomorUtil.normalize(raw);
-        if (p.isNotEmpty) plates.add(p);
-      }
-    }
-    return plates;
-  }
-
   Widget _buildPlateInputField({
     required TextEditingController controller,
     required String label,
   }) {
-    final knownPlates = _getKnownPlateNumbers();
-    final currentText = controller.text.trim();
-    final currentPlate = PlatNomorUtil.normalize(currentText);
-
-    // Tampilkan suggestion plat:
-    // Jika field kosong, tampilkan semua plat yang sudah pernah diketik di form.
-    // Jika field sudah terisi sebagian, tampilkan yang mengandung teks tersebut.
-    // Sembunyikan jika sudah persis sama dengan isi field saat ini.
-    final suggestions = knownPlates.where((p) {
-      if (p.toUpperCase() == currentPlate.toUpperCase()) return false;
-      if (currentText.isEmpty) return true;
-      final cleanFilter = currentText.toUpperCase().replaceAll('-', ' ').replaceAll(RegExp(r'\s+'), '');
-      final cleanCandidate = p.toUpperCase().replaceAll(' ', '');
-      return cleanCandidate.contains(cleanFilter);
-    }).toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Focus(
-          onFocusChange: (hasFocus) {
-            if (!hasFocus) {
-              final norm = PlatNomorUtil.normalize(controller.text);
-              if (norm.isNotEmpty && norm != controller.text) {
-                setState(() {
-                  controller.text = norm;
-                });
-              }
-            }
-          },
-          child: _buildField(
-            controller: controller,
-            label: label,
-            hintText: 'Contoh: R 8076 OE',
-            isBold: true,
-            onChanged: (val) {
-              setState(() {});
-            },
-          ),
-        ),
-        if (suggestions.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0FDF4),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFBBF7D0)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: const [
-                    Icon(Icons.touch_app_outlined, size: 14, color: Color(0xFF16A34A)),
-                    SizedBox(width: 5),
-                    Text(
-                      'Pilih Cepat Plat Terdaftar:',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF15803D),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 5,
-                  children: suggestions.map((p) => InkWell(
-                    onTap: () {
-                      setState(() {
-                        controller.text = p;
-                        controller.selection = TextSelection.fromPosition(
-                          TextPosition(offset: p.length),
-                        );
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFF16A34A), width: 1.2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
-                            blurRadius: 2,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.local_shipping, size: 13, color: Color(0xFF16A34A)),
-                          const SizedBox(width: 5),
-                          Text(
-                            p,
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF166534),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )).toList(),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
+    return Focus(
+      onFocusChange: (hasFocus) {
+        if (!hasFocus) {
+          final norm = PlatNomorUtil.normalize(controller.text);
+          if (norm.isNotEmpty && norm != controller.text) {
+            setState(() {
+              controller.text = norm;
+            });
+          }
+        }
+      },
+      child: _buildField(
+        controller: controller,
+        label: label,
+        hintText: 'Contoh: R 8076 OE',
+        isBold: true,
+      ),
     );
   }
 
@@ -1953,9 +2454,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                 setState(() {
                   _enableRekapitulasiAspal = val;
                   if (val) {
-                    if (_rekapSuhuLapanganList.isEmpty) _addRekapSuhuLapanganRow();
-                    if (_rekapSuhuAmpList.isEmpty) _addRekapSuhuAmpRow();
-                    if (_rekapTonaseAspalList.isEmpty) _addRekapTonaseAspalRow();
+                    if (_rekapPengirimanDtList.isEmpty) _addRekapPengirimanDtRow();
                   }
                 });
               },
@@ -2008,37 +2507,47 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
           ),
           const SizedBox(height: 16),
 
-          // 1. REKAPITULASI WAKTU TEMPUH DT & SUHU DI LAPANGAN
+          // REKAPITULASI TERPADU RITASE PENGIRIMAN DT ASPAL
           _buildRekapSectionCard(
-            title: '1. Rekapitulasi Waktu Tempuh DT & Suhu di Lapangan',
-            subtitle: 'Kedatangan DT, suhu hampar, jam tuang finisher, dan jam pulang',
-            badge: '${_rekapSuhuLapanganList.length} Baris',
-            body: _buildRekapSuhuLapanganContent(),
+            title: 'Rekapitulasi Ritase Pengiriman DT Aspal',
+            subtitle: 'Satu kesatuan data kendaraan DT, AMP, Lapangan, dan Tonase tiket',
+            badge: '${_rekapPengirimanDtList.length} Ritase',
+            body: _buildRekapPengirimanDtContent(),
           ),
           const SizedBox(height: 14),
 
-          // 2. REKAPITULASI WAKTU TEMPUH DT & SUHU DI AMP
-          _buildRekapSectionCard(
-            title: '2. Rekapitulasi Waktu Tempuh DT & Suhu di AMP',
-            subtitle: 'Berangkat dari AMP, suhu di AMP, dan jam pulang ke AMP',
-            badge: '${_rekapSuhuAmpList.length} Baris',
-            body: _buildRekapSuhuAmpContent(),
-          ),
-          const SizedBox(height: 14),
-
-          // 3. REKAPITULASI TONASE ASPAL
-          _buildRekapSectionCard(
-            title: '3. Rekapitulasi Tonase Aspal',
-            subtitle: 'Nomor kendaraan, tonase tiket, dan kalkulasi otomatis kumulatif',
-            badge: '${_rekapTonaseAspalList.length} Baris',
-            body: _buildRekapTonaseAspalContent(),
-          ),
-          const SizedBox(height: 14),
-
-          // 4. DATA PERJALANAN DT (AMP - LAPANGAN - AMP)
+          // DATA PERJALANAN DT (AMP - LAPANGAN - AMP)
           _buildDataPerjalananDtSection(),
         ],
       ],
+    );
+  }
+
+  Widget _buildSubSectionBadge(String title, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: AppColors.primaryBlue),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2106,92 +2615,39 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     );
   }
 
-  Widget _buildRekapSuhuLapanganContent() {
+  Widget _buildRekapPengirimanDtContent() {
     return Column(
       children: [
-        ..._rekapSuhuLapanganList.asMap().entries.map((entry) {
+        ..._rekapPengirimanDtList.asMap().entries.map((entry) {
           final idx = entry.key;
           final m = entry.value;
 
           return _buildItemCard(
-            title: 'Kendaraan DT Lapangan #${idx + 1}',
+            title: 'Ritase / Pengiriman DT #${idx + 1}',
             onDelete: () {
               setState(() {
-                _rekapSuhuLapanganList.removeAt(idx);
+                final removed = _rekapPengirimanDtList.removeAt(idx);
+                _disposePengirimanDtControllers(removed);
+                _recalculateTonaseKumulatif();
               });
             },
             children: [
+              // 1. IDENTITAS KENDARAAN (HANYA DIISI 1 KALI)
+              _buildSubSectionBadge('1. IDENTITAS KENDARAAN (DT)', Icons.local_shipping_outlined),
+              const SizedBox(height: 8),
               _buildPlateInputField(
                 controller: m['nomorKendaraan']!,
-                label: 'Nomor Kendaraan (DT)',
+                label: 'Nomor Kendaraan / Plat DT',
               ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: m['jamDatang']!,
-                label: 'Jam Datang di Lapangan',
-                hintText: 'Contoh: 08:30 WIB',
-              ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: m['suhu']!,
-                label: 'Suhu Hampar (°C)',
-                hintText: 'Contoh: 145',
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: m['jamMulaiTuang']!,
-                label: 'Jam Mulai Tuang ke Finisher',
-                hintText: 'Contoh: 08:45 WIB',
-              ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: m['jamSelesaiTuang']!,
-                label: 'Jam Selesai Tuang',
-                hintText: 'Contoh: 09:15 WIB',
-              ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: m['jamPulang']!,
-                label: 'Jam Pulang Lapangan',
-                hintText: 'Contoh: 09:30 WIB',
-              ),
-            ],
-          );
-        }),
-        const SizedBox(height: 6),
-        _buildAddButton(
-          '+ Tambah Baris Suhu Lapangan',
-          () => _addRekapSuhuLapanganRow(),
-        ),
-      ],
-    );
-  }
+              const SizedBox(height: 14),
 
-  Widget _buildRekapSuhuAmpContent() {
-    return Column(
-      children: [
-        ..._rekapSuhuAmpList.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final m = entry.value;
-
-          return _buildItemCard(
-            title: 'Pengiriman AMP #${idx + 1}',
-            onDelete: () {
-              setState(() {
-                _rekapSuhuAmpList.removeAt(idx);
-              });
-            },
-            children: [
-              _buildPlateInputField(
-                controller: m['nomorKendaraan']!,
-                label: 'Nomor Kendaraan (DT)',
-              ),
-              const SizedBox(height: 10),
-              _buildField(
-                controller: m['jamPergi']!,
+              // 2. DATA DI PABRIK (AMP)
+              _buildSubSectionBadge('2. DATA DI PABRIK (AMP)', Icons.factory_outlined),
+              const SizedBox(height: 8),
+              _buildTimePickerField(
+                controller: m['jamPergiAmp']!,
                 label: 'Jam Berangkat dari AMP',
-                hintText: 'Contoh: 07:30 WIB',
+                hintText: 'Pilih jam (HH:mm:ss)',
               ),
               const SizedBox(height: 10),
               _buildField(
@@ -2201,44 +2657,72 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                 keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 10),
-              _buildField(
-                controller: m['jamPulang']!,
-                label: 'Jam Pulang ke AMP',
-                hintText: 'Contoh: 10:15 WIB',
+              _buildTimePickerField(
+                controller: m['jamPulangAmp']!,
+                label: 'Jam Tiba Kembali ke AMP',
+                hintText: 'Pilih jam (HH:mm:ss)',
               ),
-            ],
-          );
-        }),
-        const SizedBox(height: 6),
-        _buildAddButton(
-          '+ Tambah Baris Suhu AMP',
-          () => _addRekapSuhuAmpRow(),
-        ),
-      ],
-    );
-  }
+              const SizedBox(height: 14),
 
-  Widget _buildRekapTonaseAspalContent() {
-    return Column(
-      children: [
-        ..._rekapTonaseAspalList.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final m = entry.value;
-
-          return _buildItemCard(
-            title: 'Tiket Tonase Aspal #${idx + 1}',
-            onDelete: () {
-              setState(() {
-                _rekapTonaseAspalList.removeAt(idx);
-                _recalculateTonaseKumulatif();
-              });
-            },
-            children: [
-              _buildPlateInputField(
-                controller: m['nomorKendaraan']!,
-                label: 'Nomor Kendaraan (DT)',
+              // 3. DATA DI LOKASI PROYEK (LAPANGAN)
+              _buildSubSectionBadge('3. DATA DI LOKASI PROYEK (LAPANGAN)', Icons.location_on_outlined),
+              const SizedBox(height: 8),
+              _buildTimePickerField(
+                controller: m['jamDatangLap']!,
+                label: 'Jam Datang di Lapangan',
+                hintText: 'Pilih jam (HH:mm:ss)',
               ),
               const SizedBox(height: 10),
+              _buildField(
+                controller: m['suhuDatang']!,
+                label: 'Suhu Datang (°C)',
+                hintText: 'Contoh: 150',
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 10),
+              _buildField(
+                controller: m['waktuAntrian']!,
+                label: 'Waktu Antrian (Menit)',
+                hintText: 'Contoh: 5 (bisa diubah sesuai antrian)',
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 10),
+              _buildTimePickerField(
+                controller: m['jamMulaiTuang']!,
+                label: 'Jam Mulai Tuang ke Finisher',
+                hintText: 'Pilih jam (HH:mm:ss)',
+              ),
+              const SizedBox(height: 10),
+              _buildField(
+                controller: m['suhuLap']!,
+                label: 'Suhu Hampar di Lapangan (°C)',
+                hintText: 'Contoh: 145',
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 10),
+              _buildTimePickerField(
+                controller: m['jamSelesaiTuang']!,
+                label: 'Jam Selesai Tuang',
+                hintText: 'Pilih jam (HH:mm:ss)',
+              ),
+              const SizedBox(height: 10),
+              _buildField(
+                controller: m['suhuPemadatanAkhir']!,
+                label: 'Suhu Pemadatan Akhir (°C)',
+                hintText: 'Contoh: 95',
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 10),
+              _buildTimePickerField(
+                controller: m['jamPulangLap']!,
+                label: 'Jam Pulang dari Lapangan',
+                hintText: 'Pilih jam (HH:mm:ss)',
+              ),
+              const SizedBox(height: 14),
+
+              // 4. DATA TONASE TIKET
+              _buildSubSectionBadge('4. DATA TONASE TIKET', Icons.receipt_long_outlined),
+              const SizedBox(height: 8),
               _buildField(
                 controller: m['tonaseTiket']!,
                 label: 'Tonase Tiket (Ton)',
@@ -2258,8 +2742,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         }),
         const SizedBox(height: 6),
         _buildAddButton(
-          '+ Tambah Baris Tonase Aspal',
-          () => _addRekapTonaseAspalRow(),
+          '+ Tambah Ritase / Pengiriman DT',
+          () => _addRekapPengirimanDtRow(),
         ),
       ],
     );
@@ -2433,15 +2917,249 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
 
   List<Map<String, dynamic>> _computeDataPerjalananRows() {
     final double jarakKm = double.tryParse(_jarakTempuhController.text.replaceAll(',', '.')) ?? 35.5;
+
+    final List<Map<String, String>> lapanganList = _rekapPengirimanDtList.map((m) => {
+      'nomorKendaraan': m['nomorKendaraan']?.text.trim() ?? '',
+      'jamDatang': PlatNomorUtil.normalizeTime(m['jamDatangLap']?.text.trim() ?? ''),
+      'suhuDatang': m['suhuDatang']?.text.trim() ?? '',
+      'waktuAntrian': m['waktuAntrian']?.text.trim() ?? '',
+      'suhu': m['suhuLap']?.text.trim() ?? '',
+      'suhuLap': m['suhuLap']?.text.trim() ?? '',
+      'jamMulaiTuang': PlatNomorUtil.normalizeTime(m['jamMulaiTuang']?.text.trim() ?? ''),
+      'jamSelesaiTuang': PlatNomorUtil.normalizeTime(m['jamSelesaiTuang']?.text.trim() ?? ''),
+      'suhuPemadatanAkhir': m['suhuPemadatanAkhir']?.text.trim() ?? '',
+      'jamPulang': PlatNomorUtil.normalizeTime(m['jamPulangLap']?.text.trim() ?? ''),
+    }).toList();
+
+    final List<Map<String, String>> ampList = _rekapPengirimanDtList.map((m) => {
+      'nomorKendaraan': m['nomorKendaraan']?.text.trim() ?? '',
+      'jamPergi': PlatNomorUtil.normalizeTime(m['jamPergiAmp']?.text.trim() ?? ''),
+      'suhuAmp': m['suhuAmp']?.text.trim() ?? '',
+      'jamPulang': PlatNomorUtil.normalizeTime(m['jamPulangAmp']?.text.trim() ?? ''),
+    }).toList();
+
+    final List<Map<String, String>> tonaseList = _rekapPengirimanDtList.map((m) => {
+      'nomorKendaraan': m['nomorKendaraan']?.text.trim() ?? '',
+      'tonaseTiket': m['tonaseTiket']?.text.trim() ?? '',
+      'jumlahKumulatif': m['jumlahKumulatif']?.text.trim() ?? '',
+    }).toList();
+
     return PlatNomorUtil.computeDataPerjalananRows(
-      lapanganList: _rekapSuhuLapanganList,
-      ampList: _rekapSuhuAmpList,
-      tonaseList: _rekapTonaseAspalList,
+      lapanganList: lapanganList,
+      ampList: ampList,
+      tonaseList: tonaseList,
       jarakKm: jarakKm,
     );
   }
 
-  // ─── 11. FIELD TAMBAHAN / KUSTOM ───
+  // ─── 11. DOKUMEN REKAPITULASI PENGECORAN BETON READY MIX (OPSIONAL) ───
+  Widget _buildSectionRekapitulasiBetonOpsional() {
+    final double totalKubikasi = _rekapPengecoranBetonList.fold(
+      0.0,
+      (sum, r) => sum + (double.tryParse((r['volume']?.text.trim() ?? '').replaceAll(',', '.')) ?? 0.0),
+    );
+    final String formattedTotal = totalKubikasi % 1 == 0
+        ? totalKubikasi.toInt().toString()
+        : totalKubikasi.toStringAsFixed(2).replaceAll('.', ',');
+
+    final namaKegiatanOtomatis = _currentKegiatan?['namaKegiatan'] ?? '-';
+
+    return _buildCard(
+      title: 'DOKUMEN REKAPITULASI PENGECORAN BETON',
+      badge: _enableRekapitulasiBeton ? 'Aktif' : 'Nonaktif',
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Aktifkan Dokumen Pengawasan Beton',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13.5,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Mengaktifkan form rekapitulasi pengiriman ready mix, slump test, dan volume kubikasi',
+                    style: TextStyle(fontSize: 11.5, color: Color(0xFF6B7280)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Switch(
+              value: _enableRekapitulasiBeton,
+              onChanged: (val) {
+                setState(() {
+                  _enableRekapitulasiBeton = val;
+                  if (val && _rekapPengecoranBetonList.isEmpty) {
+                    _addRekapPengecoranBetonRow();
+                  }
+                  if (val && _penyediaJasaBetonController.text.isEmpty && _currentKegiatan?['kontraktor'] != null) {
+                    _penyediaJasaBetonController.text = _currentKegiatan!['kontraktor'].toString();
+                  }
+                });
+              },
+              activeThumbColor: const Color(0xFF1F2937),
+            ),
+          ],
+        ),
+        if (_enableRekapitulasiBeton) ...[
+          const SizedBox(height: 12),
+          // Informasi Header Pengecoran Beton
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF9FAFB),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Informasi Header Pengecoran Beton',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _buildField(
+                  controller: TextEditingController(text: namaKegiatanOtomatis),
+                  label: 'Kegiatan (Otomatis)',
+                  hintText: 'Nama Kegiatan Proyek',
+                  readOnly: true,
+                ),
+                const SizedBox(height: 10),
+                _buildField(
+                  controller: _penyediaJasaBetonController,
+                  label: 'Penyedia Jasa (Kontraktor)',
+                  hintText: 'Contoh: PT. ADHI KARYA / CV. LANGGENG',
+                ),
+                const SizedBox(height: 10),
+                _buildField(
+                  controller: _jenisBetonController,
+                  label: 'Jenis Beton',
+                  hintText: "Contoh: Fc' 20 MPa / K-250 / Rigid Pavement",
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Header List & Summary
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Data Pengiriman Truck Mixer (${_rekapPengecoranBetonList.length} Unit)',
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF1F2937)),
+              ),
+              if (totalKubikasi > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.slateLighter,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Text(
+                    'Total: $formattedTotal m³',
+                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppColors.navySlate),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // List of Mixer Trucks
+          ..._rekapPengecoranBetonList.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final m = entry.value;
+
+            return _buildItemCard(
+              title: 'Truck Mixer #${idx + 1}',
+              onDelete: () {
+                setState(() {
+                  final removed = _rekapPengecoranBetonList.removeAt(idx);
+                  _disposeBetonControllers(removed);
+                  _recalculateBetonVolumeKumulatif();
+                });
+              },
+              children: [
+                _buildPlateInputField(
+                  controller: m['nomorKendaraan']!,
+                  label: 'Nomor Kendaraan / Plat Truck Mixer',
+                ),
+                const SizedBox(height: 10),
+                _buildField(
+                  controller: m['batchingPlant']!,
+                  label: 'Batching Plant Ready Mix',
+                  hintText: 'Contoh: PT. VARIA USAHA BETON / SCG',
+                ),
+                const SizedBox(height: 10),
+                _buildTimePickerField(
+                  controller: m['jamBerangkat']!,
+                  label: 'Jam Berangkat dari Batching Plant',
+                  hintText: 'Pilih jam (HH:mm:ss)',
+                ),
+                const SizedBox(height: 10),
+                _buildTimePickerField(
+                  controller: m['jamDatang']!,
+                  label: 'Jam Datang di Lapangan',
+                  hintText: 'Pilih jam (HH:mm:ss)',
+                ),
+                const SizedBox(height: 10),
+                _buildField(
+                  controller: m['slumpTest']!,
+                  label: 'Slump Test',
+                  hintText: 'Contoh: 10 ± 2 cm / 12 cm',
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 6,
+                      child: _buildField(
+                        controller: m['volume']!,
+                        label: 'Volume Cor (m³ / Kubik)',
+                        hintText: 'Contoh: 6.0',
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 5,
+                      child: _buildField(
+                        controller: m['volumeKumulatif']!,
+                        label: 'Kumulatif (m³)',
+                        hintText: 'Otomatis',
+                        readOnly: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          }),
+          const SizedBox(height: 8),
+
+          _buildAddButton(
+            '+ Tambah Baris Pengiriman Beton (Truck Mixer)',
+            () => _addRekapPengecoranBetonRow(),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ─── 12. FIELD TAMBAHAN / KUSTOM ───
   Widget _buildSectionCustomFields() {
     return _buildCard(
       title: 'FIELD TAMBAHAN / KUSTOM',
@@ -2630,6 +3348,186 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       maxLines: maxLines,
       keyboardType: keyboardType,
       onChanged: onChanged,
+    );
+  }
+
+  /// Kolom input waktu yang menggunakan picker roda putar (scroll ala jam weker/alarm)
+  /// Menjamin seluruh input waktu seragam dalam format 24 jam (HH:mm:ss).
+  Widget _buildTimePickerField({
+    required TextEditingController controller,
+    required String label,
+    String hintText = 'Pilih jam (HH:mm:ss)',
+  }) {
+    return CleanTextFormField(
+      controller: controller,
+      label: label,
+      hintText: hintText,
+      readOnly: true,
+      onTap: () => _showTimePickerModal(
+        context: context,
+        controller: controller,
+        title: label,
+      ),
+      suffixIcon: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (controller.text.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.close, size: 16, color: Color(0xFF9CA3AF)),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              tooltip: 'Hapus Jam',
+              onPressed: () {
+                setState(() {
+                  controller.clear();
+                });
+              },
+            ),
+          const SizedBox(width: 4),
+          IconButton(
+            icon: const Icon(Icons.access_time_rounded, size: 20, color: Color(0xFF1E3A8A)),
+            padding: const EdgeInsets.only(right: 8),
+            constraints: const BoxConstraints(),
+            tooltip: 'Buka Pemilih Waktu',
+            onPressed: () => _showTimePickerModal(
+              context: context,
+              controller: controller,
+              title: label,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Modal Bottom Sheet dengan CupertinoTimerPicker 24 jam (Jam, Menit, Detik ala alarm/stopwatch)
+  Future<void> _showTimePickerModal({
+    required BuildContext context,
+    required TextEditingController controller,
+    required String title,
+  }) async {
+    Duration initialDuration = Duration.zero;
+    final text = controller.text.trim();
+    final normalized = PlatNomorUtil.normalizeTime(text);
+    final match = RegExp(r'^(\d{1,2}):(\d{2}):(\d{2})').firstMatch(normalized);
+    if (match != null) {
+      final h = int.parse(match.group(1)!);
+      final m = int.parse(match.group(2)!);
+      final s = int.parse(match.group(3)!);
+      initialDuration = Duration(hours: h, minutes: m, seconds: s);
+    } else {
+      final now = DateTime.now();
+      initialDuration = Duration(hours: now.hour, minutes: now.minute, seconds: 0);
+    }
+
+    Duration selectedDuration = initialDuration;
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (BuildContext sheetContext) {
+        return SafeArea(
+          child: SizedBox(
+            height: 310,
+            child: Column(
+              children: [
+                // Header Bar dengan tombol Batal, Judul, dan Selesai
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        child: const Text(
+                          'Batal',
+                          style: TextStyle(color: Color(0xFF6B7280), fontSize: 14),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          title,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Color(0xFF111827),
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          final h = selectedDuration.inHours.toString().padLeft(2, '0');
+                          final m = (selectedDuration.inMinutes % 60).toString().padLeft(2, '0');
+                          final s = (selectedDuration.inSeconds % 60).toString().padLeft(2, '0');
+                          controller.text = '$h:$m:$s';
+                          setState(() {});
+                          Navigator.pop(sheetContext);
+                        },
+                        child: const Text(
+                          'Selesai',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Color(0xFF1E3A8A),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: Color(0xFFE5E7EB)),
+
+                // Wheel Scroll Picker (CupertinoTimerPicker 24 jam dengan Detik: HH:mm:ss)
+                Expanded(
+                  child: CupertinoTheme(
+                    data: const CupertinoThemeData(
+                      brightness: Brightness.light,
+                      textTheme: CupertinoTextThemeData(
+                        pickerTextStyle: TextStyle(
+                          color: Color(0xFF111827),
+                          fontSize: 21,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    child: CupertinoTimerPicker(
+                      mode: CupertinoTimerPickerMode.hms,
+                      initialTimerDuration: initialDuration,
+                      onTimerDurationChanged: (Duration newDuration) {
+                        selectedDuration = newDuration;
+                      },
+                    ),
+                  ),
+                ),
+
+                // Tombol Kosongkan jika ingin menghapus nilai jam
+                if (controller.text.isNotEmpty) ...[
+                  const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                  TextButton.icon(
+                    onPressed: () {
+                      controller.clear();
+                      setState(() {});
+                      Navigator.pop(sheetContext);
+                    },
+                    icon: const Icon(Icons.clear, size: 16, color: Color(0xFFEF4444)),
+                    label: const Text(
+                      'Kosongkan Waktu',
+                      style: TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

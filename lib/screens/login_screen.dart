@@ -79,17 +79,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           decoration: BoxDecoration(
-                            color: isSelected ? AppColors.primaryBlue.withOpacity(0.1) : AppColors.inputBackground,
+                            color: isSelected ? AppColors.navySlate : AppColors.slateLighter,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: isSelected ? AppColors.primaryBlue : Colors.transparent,
+                              color: isSelected ? AppColors.navySlate : AppColors.border,
                             ),
                           ),
                           child: Text(
                             role,
                             style: TextStyle(
-                              color: isSelected ? AppColors.primaryBlue : AppColors.textLight,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                              color: isSelected ? Colors.white : AppColors.slate,
+                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
                             ),
                           ),
                         ),

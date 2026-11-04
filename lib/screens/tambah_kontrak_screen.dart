@@ -134,11 +134,30 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
   }
 
   Future<void> _selectDate(BuildContext context, TextEditingController controller, {bool isMulaiSpmk = false}) async {
+    final firstDate = DateTime(2000);
+    final lastDate = DateTime(2101);
+    DateTime initial = (isMulaiSpmk && _tglMulaiSpmk != null) ? _tglMulaiSpmk! : DateTime.now();
+    if (initial.isBefore(firstDate)) initial = firstDate;
+    if (initial.isAfter(lastDate)) initial = lastDate;
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: (isMulaiSpmk && _tglMulaiSpmk != null) ? _tglMulaiSpmk! : DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
+      initialDate: initial,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      locale: const Locale('id', 'ID'),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.navySlate,
+              onPrimary: Colors.white,
+              onSurface: AppColors.textDark,
+            ),
+          ),
+          child: child ?? const SizedBox(),
+        );
+      },
     );
     if (picked != null && mounted) {
       setState(() {

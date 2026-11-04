@@ -731,7 +731,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEEF2FF),
+                      color: AppColors.slateLighter,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -747,7 +747,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
               ),
               Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEEF2FF),
+                  color: AppColors.slateLighter,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Material(
@@ -853,7 +853,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEEF2FF),
+                    color: AppColors.slateLighter,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.work_outline, color: AppColors.primaryBlue, size: 22),

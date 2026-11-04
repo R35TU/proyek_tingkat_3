@@ -6,6 +6,7 @@ import 'package:tata_saka_app/models/kegiatan_model.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/screens/detail_data_laporan_screen.dart';
 import 'package:tata_saka_app/screens/form_kegiatan_screen.dart';
+import 'package:tata_saka_app/screens/kelola_rkk_screen.dart';
 
 class _DocData {
   String name;
@@ -421,9 +422,14 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
         children: [
           // Info Kegiatan Top Section (Executive Card)
           _buildExecutiveGeneralInfo(),
-          
-          const SizedBox(height: 32),
-          
+
+          const SizedBox(height: 18),
+
+          // Action Card: Rincian Kuantitas & Bobot Pekerjaan (RKK)
+          _buildRkkActionCard(),
+
+          const SizedBox(height: 28),
+
           // Administrasi Section
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -438,7 +444,7 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
               ),
               Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEEF2FF),
+                  color: AppColors.slateLighter,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Material(
@@ -1075,30 +1081,164 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
+                    const Text(
                       'Progres Fisik',
                       style: TextStyle(color: Color(0xFF374151), fontWeight: FontWeight.w600, fontSize: 11.5),
                     ),
                     Text(
-                      '0%',
-                      style: TextStyle(color: Color(0xFF374151), fontWeight: FontWeight.w700, fontSize: 11.5),
+                      '${_currentProgresFisik.toStringAsFixed(2)}%',
+                      style: const TextStyle(color: Color(0xFF374151), fontWeight: FontWeight.w700, fontSize: 11.5),
                     ),
                   ],
                 ),
                 const SizedBox(height: 6),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4),
-                  child: const LinearProgressIndicator(
-                    value: 0.0,
+                  child: LinearProgressIndicator(
+                    value: (_currentProgresFisik / 100.0).clamp(0.0, 1.0),
                     minHeight: 6,
-                    backgroundColor: Color(0xFFE5E7EB),
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF374151)),
+                    backgroundColor: const Color(0xFFE5E7EB),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF374151)),
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  double get _currentProgresFisik {
+    final rawMingguan = _kegiatanMap['laporanMingguan'];
+    if (rawMingguan != null && rawMingguan is List && rawMingguan.isNotEmpty) {
+      final latest = rawMingguan.last;
+      if (latest is Map && latest['realisasiPersen'] != null) {
+        return (latest['realisasiPersen'] as num).toDouble();
+      }
+    }
+    return 0.0;
+  }
+
+  Widget _buildRkkActionCard() {
+    final rawRkk = _kegiatanMap['rkkDivisiList'] as List? ?? [];
+    int totalItems = 0;
+    double totalBobot = 0.0;
+    for (final div in rawRkk) {
+      final items = (div['items'] as List? ?? []);
+      totalItems += items.length;
+      for (final it in items) {
+        totalBobot += (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
+      }
+    }
+
+    final hasRkk = rawRkk.isNotEmpty && totalItems > 0;
+    final is100Percent = (totalBobot - 100.0).abs() < 0.05;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD1D5DB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBlue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.assignment_outlined, color: AppColors.primaryBlue, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Rincian Kuantitas & Bobot Pekerjaan',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textDark,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      hasRkk
+                          ? '${rawRkk.length} Divisi • $totalItems Item Pekerjaan'
+                          : 'Belum diisi • Acuan dropdown laporan harian & BoQ mingguan',
+                      style: const TextStyle(fontSize: 11.5, color: AppColors.textLight),
+                    ),
+                  ],
+                ),
+              ),
+              if (hasRkk)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: is100Percent ? const Color(0xFFE6F4EA) : const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${totalBobot.toStringAsFixed(1)}%',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: is100Percent ? AppColors.successGreen : const Color(0xFFB45309),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: Color(0xFFE5E7EB)),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryBlue,
+                side: const BorderSide(color: AppColors.primaryBlue),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              onPressed: () async {
+                final changed = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => KelolaRkkScreen(
+                      contract: widget.contract,
+                      kegiatanIndex: widget.kegiatanIndex,
+                    ),
+                  ),
+                );
+                if (changed == true) {
+                  setState(() {
+                    _loadData();
+                  });
+                }
+              },
+              icon: const Icon(Icons.edit_note, size: 18),
+              label: Text(
+                hasRkk ? 'Kelola Rincian Pekerjaan (RKK)' : 'Setup Rincian Kuantitas (RKK)',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+              ),
             ),
           ),
         ],

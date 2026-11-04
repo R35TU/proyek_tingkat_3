@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
+import 'package:tata_saka_app/utils/sample_contract_data.dart';
 import 'dart:math';
 
 class ContractProvider with ChangeNotifier {
@@ -16,79 +17,26 @@ class ContractProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final String? contractsJson = prefs.getString('contracts');
     if (contractsJson != null) {
-      final List<dynamic> decoded = jsonDecode(contractsJson);
-      _contracts = decoded.map((item) => ContractModel.fromJson(item)).toList();
-      for (final contract in _contracts) {
-        if (contract.id == 'contract-mt-haryono') {
-          for (final keg in contract.kegiatans) {
-            if (keg['penggunaAnggaran'] == null || keg['penggunaAnggaran'].toString().isEmpty) {
-              if (keg['kontraktor'] == null ||
-                  keg['kontraktor'] == 'PT. ANDHIKA BANGUNAN PERKASA' ||
-                  keg['kontraktor'] == 'CV. SATYA WIGUNA') {
-                keg['kontraktor'] = 'CV. SATYA WIGUNA';
-              }
-              keg['penggunaAnggaran'] = 'DRAJAT UJI WAKHYONO, S.T., M.T.';
-              keg['stafTeknis1'] = 'MUBALLIGH, ST., M.Sc.';
-              keg['stafTeknis2'] = 'BILAL A.Md';
-              keg['siteEngineerKegiatan'] = 'SENDAYU GALIH K., ST';
-              keg['direkturPenyedia'] = 'IKSAN';
-              keg['direkturKontraktor'] = 'IKSAN';
-              keg['pelaksanaLapangan'] = 'GALIH WAHYU UTAMA';
-              keg['petugasK3'] = 'IQBAL ZAINUL ARIFIN';
-            }
-          }
-        }
+      try {
+        final List<dynamic> decoded = jsonDecode(contractsJson);
+        _contracts = decoded
+            .map((item) => ContractModel.fromJson(item))
+            .where((c) => c.id != 'contract-mt-haryono') // Remove old dummy contract
+            .toList();
+      } catch (_) {
+        _contracts = [];
       }
+    } else {
+      _contracts = [];
     }
     
-    // Seed initial contract matching the official PU document if completely empty
+    // Jika data kontrak kosong, inisialisasi dengan 1 kontrak demo sesuai permintaan:
+    // "PEMELIHARAAN BERKALA JL. MT HARYONO" dengan 3 Kegiatan: Ruas Jalan A, B, C
     if (_contracts.isEmpty) {
-      final defaultContract = ContractModel(
-        id: 'contract-mt-haryono',
-        jenisKegiatan: 'Pengawasan Teknis',
-        namaKontrak: 'PEMELIHARAAN BERKALA JALAN LETJEND MT. HARYONO',
-        nomorSpk: '000.3.3/ 1128 /KONST/BM/IV/2026',
-        tglMulaiSpk: '20 April 2026',
-        nomorSpmk: '000.3.3/ 1128 /KONST/BM/IV/2026',
-        tglMulaiSpmk: '20 April 2026',
-        tglSelesaiSpmk: '18 Juli 2026',
-        hariKalender: 90,
-        nilaiKontrak: 'Rp 3.000.000.000,00',
-        instansiDinas: ['DPUPR Purbalingga'],
-        sumberDana: 'APBD Kab. Purbalingga',
-        deskripsi: 'Pekerjaan Pemeliharaan Berkala Jalan Letjend MT. Haryono',
-        progressFisik: 0.0693,
-        strukturOrganisasi: {
-          'siteEngineer': 'SENDAYU GALIH KUSUMA, ST',
-          'inspektors': ['RIZAL PRASTOMO'],
-          'administrasi': 'HANGGORO AJI',
-        },
-        kegiatans: [
-          {
-            'namaKegiatan': 'Pemeliharaan Berkala Jalan Letjend MT. Haryono',
-            'lokasi': 'KEC. PURBALINGGA',
-            'kontraktor': 'CV. SATYA WIGUNA',
-            'penggunaAnggaran': 'DRAJAT UJI WAKHYONO, S.T., M.T.',
-            'stafTeknis1': 'MUBALLIGH, ST., M.Sc.',
-            'stafTeknis2': 'BILAL A.Md',
-            'siteEngineerKegiatan': 'SENDAYU GALIH K., ST',
-            'direkturPenyedia': 'IKSAN',
-            'direkturKontraktor': 'IKSAN',
-            'pelaksanaLapangan': 'GALIH WAHYU UTAMA',
-            'petugasK3': 'IQBAL ZAINUL ARIFIN',
-            'laporans': [],
-            'laporanMingguan': [],
-            'folders': [
-              {'name': 'Laporan Harian', 'isExpanded': false, 'documents': []},
-              {'name': 'Laporan Mingguan', 'isExpanded': true, 'documents': []},
-              {'name': 'Foto Progres', 'isExpanded': false, 'documents': []},
-            ],
-          }
-        ],
-      );
-      _contracts.add(defaultContract);
-      _saveContracts();
+      _contracts = [SampleContractData.getDemoContract()];
+      await _saveContracts();
     }
+
     notifyListeners();
   }
 
@@ -122,6 +70,18 @@ class ContractProvider with ChangeNotifier {
   void deleteContract(String id) {
     _contracts.removeWhere((c) => c.id == id);
     _saveContracts();
+    notifyListeners();
+  }
+
+  Future<void> clearAllContracts() async {
+    _contracts.clear();
+    await _saveContracts();
+    notifyListeners();
+  }
+
+  Future<void> resetToDemoContract() async {
+    _contracts = [SampleContractData.getDemoContract()];
+    await _saveContracts();
     notifyListeners();
   }
 

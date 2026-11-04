@@ -44,6 +44,9 @@ class KegiatanModel {
   List<dynamic> laporans;
   List<dynamic> laporanMingguan;
 
+  // Master Data Rincian Kuantitas & Bobot Pekerjaan (RKK / BoQ Kontrak)
+  List<Map<String, dynamic>> rkkDivisiList;
+
   KegiatanModel({
     required this.namaKegiatan,
     this.lokasi = '',
@@ -75,13 +78,15 @@ class KegiatanModel {
     List<Map<String, dynamic>>? folders,
     List<dynamic>? laporans,
     List<dynamic>? laporanMingguan,
+    List<Map<String, dynamic>>? rkkDivisiList,
   })  : folders = folders ?? [
           {'name': 'Laporan Harian', 'isExpanded': false, 'documents': []},
           {'name': 'Laporan Mingguan', 'isExpanded': false, 'documents': []},
           {'name': 'Foto Progres', 'isExpanded': false, 'documents': []},
         ],
         laporans = laporans ?? [],
-        laporanMingguan = laporanMingguan ?? [];
+        laporanMingguan = laporanMingguan ?? [],
+        rkkDivisiList = rkkDivisiList ?? [];
 
   /// Menghitung Waktu yang Telah Berjalan secara dinamis berdasarkan Awal Pelaksanaan vs Hari ini
   static String calculateWaktuBerjalan(String awalPelaksanaanStr) {
@@ -286,6 +291,10 @@ class KegiatanModel {
       folders: json['folders'] != null ? List<Map<String, dynamic>>.from(json['folders']) : null,
       laporans: json['laporans'] != null ? List<dynamic>.from(json['laporans']) : null,
       laporanMingguan: json['laporanMingguan'] != null ? List<dynamic>.from(json['laporanMingguan']) : null,
+      rkkDivisiList: json['rkkDivisiList'] != null
+          ? List<Map<String, dynamic>>.from(
+              (json['rkkDivisiList'] as List).map((e) => Map<String, dynamic>.from(e)))
+          : null,
     );
   }
 
@@ -333,6 +342,134 @@ class KegiatanModel {
       'folders': folders,
       'laporans': laporans,
       'laporanMingguan': laporanMingguan,
+      'rkkDivisiList': rkkDivisiList,
     };
+  }
+
+  /// Template Standar RKK (Rincian Kuantitas & Bobot Pekerjaan) Resmi PU Bina Marga
+  /// Berdasarkan acuan fisik dokumen Laporan Mingguan Kab. Purbalingga
+  static List<Map<String, dynamic>> defaultSampleRkk() {
+    return [
+      {
+        'nomorRomawi': 'I',
+        'namaDivisi': 'DIVISI 1 UMUM',
+        'items': [
+          {
+            'no': '1',
+            'noMataPembayaran': '1.2',
+            'uraian': 'Mobilisasi',
+            'satuan': 'Ls',
+            'volumeCCO': 1.00,
+            'nilaiBobot': 4.474,
+          },
+          {
+            'no': '2',
+            'noMataPembayaran': '1.8.(1)',
+            'uraian': 'Keselamatan dan Kesehatan Kerja (SMK3)',
+            'satuan': 'Ls',
+            'volumeCCO': 1.00,
+            'nilaiBobot': 1.786,
+          },
+          {
+            'no': '3',
+            'noMataPembayaran': '1.19',
+            'uraian': 'Biaya Penerapan SMKK',
+            'satuan': 'Ls',
+            'volumeCCO': 1.00,
+            'nilaiBobot': 0.513,
+          },
+          {
+            'no': '4',
+            'noMataPembayaran': 'Taksir',
+            'uraian': 'Bongkaran',
+            'satuan': 'Ls',
+            'volumeCCO': 0.0,
+            'nilaiBobot': 0.0,
+          },
+        ],
+      },
+      {
+        'nomorRomawi': 'II',
+        'namaDivisi': 'DIVISI 2. DRAINASE',
+        'items': [
+          {
+            'no': '1',
+            'noMataPembayaran': '2.3.(12)',
+            'uraian': 'Gorong2 Kotak Beton Bertulang Ukuran dalam 50x50cm',
+            'satuan': 'm1',
+            'volumeCCO': 4.80,
+            'nilaiBobot': 3.561,
+          },
+          {
+            'no': '2',
+            'noMataPembayaran': '2.3.(24)',
+            'uraian': 'Saluran berbentuk U Tipe DS 2',
+            'satuan': 'm1',
+            'volumeCCO': 115.00,
+            'nilaiBobot': 26.362,
+          },
+        ],
+      },
+      {
+        'nomorRomawi': 'VI',
+        'namaDivisi': 'DIVISI 6. PERKERASAN ASPAL',
+        'items': [
+          {
+            'no': '1',
+            'noMataPembayaran': '6.1 (1)(a)',
+            'uraian': 'Lapis Resap Pengikat - Aspal Cair/Emulsi',
+            'satuan': 'liter',
+            'volumeCCO': 118.79,
+            'nilaiBobot': 1.069,
+          },
+          {
+            'no': '2',
+            'noMataPembayaran': '6.7.(1)',
+            'uraian': 'Lapis Penetrasi Macadam',
+            'satuan': 'm3',
+            'volumeCCO': 29.17,
+            'nilaiBobot': 25.456,
+          },
+          {
+            'no': '3',
+            'noMataPembayaran': 'SNI 6749-2008(S)',
+            'uraian': 'LATASIR KELAS B (1,5 cm)',
+            'satuan': 'm2',
+            'volumeCCO': 944.00,
+            'nilaiBobot': 33.494,
+          },
+        ],
+      },
+      {
+        'nomorRomawi': 'VII',
+        'namaDivisi': 'DIVISI 7 STRUKTUR',
+        'items': [
+          {
+            'no': '1',
+            'noMataPembayaran': '7.1(8)',
+            'uraian': 'Beton fc\' 15Mpa',
+            'satuan': 'm3',
+            'volumeCCO': 4.79,
+            'nilaiBobot': 2.752,
+          },
+          {
+            'no': '2',
+            'noMataPembayaran': '7.3(1)',
+            'uraian': 'Baja Tulangan Polos-BJTP 280',
+            'satuan': 'kg',
+            'volumeCCO': 93.52,
+            'nilaiBobot': 0.533,
+          },
+          {
+            'no': '3',
+            'noMataPembayaran': '3.9.8.3',
+            'uraian': 'Pasangan Keramik 40 x 40 cm (Bekas Bongkaran)',
+            'satuan': 'm2',
+            'volumeCCO': 0.0,
+            'nilaiBobot': 0.0,
+          },
+        ],
+      },
+    ];
   }
 }

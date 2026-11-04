@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 
 class SettingScreen extends StatelessWidget {
@@ -133,64 +135,76 @@ class SettingScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
+            Consumer<ContractProvider>(
+              builder: (context, provider, child) {
+                final contracts = provider.contracts;
+                if (contracts.isEmpty) {
+                  return Container(
+                    padding: const EdgeInsets.all(20),
+                    width: double.infinity,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE6F4EA),
-                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.border),
                     ),
-                    child: const Icon(
-                      Icons.work_outline,
-                      color: AppColors.successGreen,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Paket C',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textDark,
-                          fontSize: 14,
-                        ),
+                    child: const Center(
+                      child: Text(
+                        'Belum ada kontrak aktif saat ini.',
+                        style: TextStyle(color: AppColors.slate, fontSize: 13),
                       ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE6F4EA),
-                          borderRadius: BorderRadius.circular(16),
+                    ),
+                  );
+                }
+                return Column(
+                  children: contracts.map((c) => Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE6F4EA),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.work_outline,
+                            color: AppColors.successGreen,
+                          ),
                         ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.sync, size: 12, color: AppColors.successGreen),
-                            SizedBox(width: 4),
-                            Text(
-                              'Progres',
-                              style: TextStyle(
-                                color: AppColors.successGreen,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                c.namaKontrak,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textDark,
+                                  fontSize: 14,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 6),
+                              Text(
+                                '${c.kegiatans.length} Kegiatan • ${c.jenisKegiatan}',
+                                style: const TextStyle(color: AppColors.slate, fontSize: 12),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                      ],
+                    ),
+                  )).toList(),
+                );
+              },
             ),
             const SizedBox(height: 24),
 

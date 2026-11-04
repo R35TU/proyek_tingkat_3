@@ -39,44 +39,123 @@ class PlatNomorUtil {
     };
   }
 
-  /// Menghitung selisih waktu antara dua jam (HH:mm) dalam satuan desimal jam.
-  /// Contoh: 09:21 ke 11:00 = 99 menit / 60 = 1.650 jam.
+  /// Menstandarkan format jam menjadi HH:mm:ss 24-jam.
+  /// Menyelaraskan berbagai variasi input seperti "15.30", "15", "8:5", "15:30:25", "15:30 WIB".
+  static String normalizeTime(String raw) {
+    if (raw.trim().isEmpty) return '';
+    final clean = raw
+        .trim()
+        .toLowerCase()
+        .replaceAll('wib', '')
+        .replaceAll('wita', '')
+        .replaceAll('wit', '')
+        .trim();
+
+    // Format HH:mm:ss atau HH.mm.ss (misal: 15:30:45, 08.45.20)
+    final matchWithSeconds = RegExp(r'^(\d{1,2})[:.](\d{1,2})[:.](\d{1,2})$').firstMatch(clean);
+    if (matchWithSeconds != null) {
+      final h = int.parse(matchWithSeconds.group(1)!).clamp(0, 23);
+      final m = int.parse(matchWithSeconds.group(2)!).clamp(0, 59);
+      final s = int.parse(matchWithSeconds.group(3)!).clamp(0, 59);
+      return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    }
+
+    // Format HH:mm atau HH.mm (misal: 15:30, 8:5, 15.30) -> format ke HH:mm:00
+    final matchFull = RegExp(r'^(\d{1,2})[:.](\d{1,2})$').firstMatch(clean);
+    if (matchFull != null) {
+      final h = int.parse(matchFull.group(1)!).clamp(0, 23);
+      final m = int.parse(matchFull.group(2)!).clamp(0, 59);
+      return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:00';
+    }
+
+    // Format jam saja tanpa menit (misal: "15" -> "15:00:00", "8" -> "08:00:00")
+    final matchHour = RegExp(r'^(\d{1,2})$').firstMatch(clean);
+    if (matchHour != null) {
+      final h = int.parse(matchHour.group(1)!).clamp(0, 23);
+      return '${h.toString().padLeft(2, '0')}:00:00';
+    }
+
+    return raw.trim();
+  }
+
+  /// Menghitung selisih waktu antara dua jam (HH:mm:ss) dalam satuan desimal jam.
+  /// Contoh: 07:14:00 ke 08:44:00 = 90 menit / 60 = 1.500 jam.
   static double calcHourDiff(String startTime, String endTime) {
-    if (startTime.trim().isEmpty || endTime.trim().isEmpty) return 0.0;
-    final matchStart = RegExp(r'(\d{1,2})[:.](\d{2})').firstMatch(startTime);
-    final matchEnd = RegExp(r'(\d{1,2})[:.](\d{2})').firstMatch(endTime);
+    final cleanStart = normalizeTime(startTime);
+    final cleanEnd = normalizeTime(endTime);
+    if (cleanStart.isEmpty || cleanEnd.isEmpty) return 0.0;
+    final matchStart = RegExp(r'(\d{1,2}):(\d{2}):(\d{2})').firstMatch(cleanStart);
+    final matchEnd = RegExp(r'(\d{1,2}):(\d{2}):(\d{2})').firstMatch(cleanEnd);
     if (matchStart == null || matchEnd == null) return 0.0;
 
     final h1 = int.parse(matchStart.group(1)!);
     final m1 = int.parse(matchStart.group(2)!);
+    final s1 = int.parse(matchStart.group(3)!);
+
     final h2 = int.parse(matchEnd.group(1)!);
     final m2 = int.parse(matchEnd.group(2)!);
+    final s2 = int.parse(matchEnd.group(3)!);
 
-    int startMin = h1 * 60 + m1;
-    int endMin = h2 * 60 + m2;
-    if (endMin < startMin) {
-      endMin += 24 * 60; // Melewati tengah malam
+    int startSec = h1 * 3600 + m1 * 60 + s1;
+    int endSec = h2 * 3600 + m2 * 60 + s2;
+    if (endSec < startSec) {
+      endSec += 24 * 3600; // Melewati tengah malam
     }
-    return (endMin - startMin) / 60.0;
+    return (endSec - startSec) / 3600.0;
   }
 
   /// Menghitung selisih waktu dalam satuan menit (dengan nilai fallback jika kosong).
   static double calcMinuteDiff(String startTime, String endTime, {double fallback = 5.0}) {
-    if (startTime.trim().isEmpty || endTime.trim().isEmpty) return fallback;
-    final matchStart = RegExp(r'(\d{1,2})[:.](\d{2})').firstMatch(startTime);
-    final matchEnd = RegExp(r'(\d{1,2})[:.](\d{2})').firstMatch(endTime);
+    final cleanStart = normalizeTime(startTime);
+    final cleanEnd = normalizeTime(endTime);
+    if (cleanStart.isEmpty || cleanEnd.isEmpty) return fallback;
+    final matchStart = RegExp(r'(\d{1,2}):(\d{2}):(\d{2})').firstMatch(cleanStart);
+    final matchEnd = RegExp(r'(\d{1,2}):(\d{2}):(\d{2})').firstMatch(cleanEnd);
     if (matchStart == null || matchEnd == null) return fallback;
 
     final h1 = int.parse(matchStart.group(1)!);
     final m1 = int.parse(matchStart.group(2)!);
+    final s1 = int.parse(matchStart.group(3)!);
+
     final h2 = int.parse(matchEnd.group(1)!);
     final m2 = int.parse(matchEnd.group(2)!);
+    final s2 = int.parse(matchEnd.group(3)!);
 
-    int startMin = h1 * 60 + m1;
-    int endMin = h2 * 60 + m2;
-    if (endMin < startMin) endMin += 24 * 60;
-    final diff = (endMin - startMin).toDouble();
+    int startSec = h1 * 3600 + m1 * 60 + s1;
+    int endSec = h2 * 3600 + m2 * 60 + s2;
+    if (endSec < startSec) endSec += 24 * 3600;
+    final diff = (endSec - startSec) / 60.0;
     return diff > 0 ? diff : fallback;
+  }
+
+  /// Mengurai nilai waktu antrian/menit menjadi desimal menit.
+  /// Mendukung format:
+  /// - Angka menit: "5", "10", "12.5", "12,5"
+  /// - Format teks: "5 menit", "10 mnt", "15 mins"
+  /// - Format jam:menit[:detik]: "0:05:00", "00:10", "0:12:30"
+  static double parseMinutes(String raw, {double fallback = 5.0}) {
+    final clean = raw.trim().toLowerCase();
+    if (clean.isEmpty) return fallback;
+
+    // Cek format HH:mm:ss atau HH:mm
+    final timeMatch = RegExp(r'^(\d{1,2}):(\d{2})(?::(\d{2}))?$').firstMatch(clean);
+    if (timeMatch != null) {
+      final h = int.parse(timeMatch.group(1)!);
+      final m = int.parse(timeMatch.group(2)!);
+      final s = timeMatch.group(3) != null ? int.parse(timeMatch.group(3)!) : 0;
+      return (h * 60) + m + (s / 60.0);
+    }
+
+    // Ekstrak angka desimal atau integer
+    final numMatch = RegExp(r'(\d+(?:[.,]\d+)?)').firstMatch(clean);
+    if (numMatch != null) {
+      final val = double.tryParse(numMatch.group(1)!.replaceAll(',', '.'));
+      if (val != null && val >= 0) {
+        return val;
+      }
+    }
+
+    return fallback;
   }
 
   /// Format menit ke teks durasi jam:menit:detik (contoh: 8.467 menit -> "0:08:28")
@@ -127,6 +206,7 @@ class PlatNomorUtil {
         'jamMulaiTuang': _extractStr(m, 'jamMulaiTuang'),
         'jamSelesaiTuang': _extractStr(m, 'jamSelesaiTuang'),
         'jamPulang': _extractStr(m, 'jamPulang'),
+        'waktuAntrian': _extractStr(m, 'waktuAntrian'),
       });
     }
 
@@ -194,7 +274,9 @@ class PlatNomorUtil {
         final double waktuBerangkatJam = calcHourDiff(jamDariAmp, jamTibaLokasi);
         final double waktuPulangJam = calcHourDiff(jamDariLokasi, jamTibaAmp);
         final double waktuHamparMenit = calcMinuteDiff(jamMulaiTuang, jamSelesaiTuang, fallback: 8.0);
-        const double waktuAntrianMenit = 5.0; // 0:05:00 default
+        
+        final rawAntrian = lapData['waktuAntrian'] ?? '';
+        final double waktuAntrianMenit = parseMinutes(rawAntrian, fallback: 5.0);
 
         final double totalJam = waktuBerangkatJam +
             (waktuAntrianMenit / 60.0) +
@@ -226,7 +308,7 @@ class PlatNomorUtil {
           'jamDariLokasi': jamDariLokasi,
           'jamTibaAmp': jamTibaAmp,
           'waktuBerangkatJam': waktuBerangkatJam,
-          'waktuAntrian': '0:05:00',
+          'waktuAntrian': formatMinutesToDuration(waktuAntrianMenit),
           'waktuHampar': formatMinutesToDuration(waktuHamparMenit),
           'waktuPulangJam': waktuPulangJam,
           'totalJam': totalJam,

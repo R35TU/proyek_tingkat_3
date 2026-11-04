@@ -74,6 +74,7 @@ class WeeklyReportModel {
   int sisaWaktu; // e.g. 49 (Hari Kalender)
   String akhirMasaKontrak; // e.g. '18 Juli 2026'
   List<WeeklyTableRow> tabelMingguan;
+  List<Map<String, dynamic>>? boqProgressList;
   String createdAt;
 
   WeeklyReportModel({
@@ -101,6 +102,7 @@ class WeeklyReportModel {
     required this.sisaWaktu,
     required this.akhirMasaKontrak,
     required this.tabelMingguan,
+    this.boqProgressList,
     String? createdAt,
   }) : createdAt = createdAt ?? DateTime.now().toIso8601String();
 
@@ -133,6 +135,10 @@ class WeeklyReportModel {
               ?.map((item) => WeeklyTableRow.fromJson(Map<String, dynamic>.from(item)))
               .toList() ??
           [],
+      boqProgressList: json['boqProgressList'] != null
+          ? List<Map<String, dynamic>>.from(
+              (json['boqProgressList'] as List).map((e) => Map<String, dynamic>.from(e)))
+          : null,
       createdAt: json['createdAt'],
     );
   }
@@ -163,6 +169,7 @@ class WeeklyReportModel {
       'sisaWaktu': sisaWaktu,
       'akhirMasaKontrak': akhirMasaKontrak,
       'tabelMingguan': tabelMingguan.map((e) => e.toJson()).toList(),
+      'boqProgressList': boqProgressList,
       'createdAt': createdAt,
     };
   }

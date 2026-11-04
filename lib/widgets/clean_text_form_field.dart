@@ -20,6 +20,8 @@ class CleanTextFormField extends StatefulWidget {
   final ValueChanged<String>? onChanged;
   final FocusNode? focusNode;
   final FormFieldValidator<String>? validator;
+  final VoidCallback? onTap;
+  final Widget? suffixIcon;
 
   const CleanTextFormField({
     super.key,
@@ -36,6 +38,8 @@ class CleanTextFormField extends StatefulWidget {
     this.onChanged,
     this.focusNode,
     this.validator,
+    this.onTap,
+    this.suffixIcon,
   });
 
   @override
@@ -114,6 +118,7 @@ class _CleanTextFormFieldState extends State<CleanTextFormField> {
       controller: widget.controller,
       focusNode: _effectiveFocusNode,
       readOnly: widget.readOnly,
+      onTap: widget.onTap,
       maxLines: widget.maxLines,
       keyboardType: widget.keyboardType,
       onChanged: widget.onChanged,
@@ -127,6 +132,7 @@ class _CleanTextFormFieldState extends State<CleanTextFormField> {
       decoration: baseDec.copyWith(
         hintText: effectiveHint,
         hintStyle: widget.hintStyle ?? defaultHintStyle,
+        suffixIcon: widget.suffixIcon ?? baseDec.suffixIcon,
       ),
     );
 
@@ -135,13 +141,16 @@ class _CleanTextFormFieldState extends State<CleanTextFormField> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            widget.label!,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF374151),
-              letterSpacing: 0.3,
+          GestureDetector(
+            onTap: widget.onTap,
+            child: Text(
+              widget.label!,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF374151),
+                letterSpacing: 0.3,
+              ),
             ),
           ),
           const SizedBox(height: 6),

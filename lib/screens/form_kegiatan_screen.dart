@@ -248,28 +248,32 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
   }
 
   Future<void> _pickDateFor(TextEditingController controller, {bool updateWaktuBerjalan = false}) async {
+    final firstDate = DateTime(2015);
+    final lastDate = DateTime(2040);
     DateTime initial = DateTime.now();
     final parsed = WeeklyReportModel.parseIndonesianDate(controller.text);
     if (parsed != null) {
       initial = parsed;
     }
+    if (initial.isBefore(firstDate)) initial = firstDate;
+    if (initial.isAfter(lastDate)) initial = lastDate;
 
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2035),
+      firstDate: firstDate,
+      lastDate: lastDate,
       locale: const Locale('id', 'ID'),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: AppColors.primaryBlue,
+              primary: AppColors.navySlate,
               onPrimary: Colors.white,
               onSurface: AppColors.textDark,
             ),
           ),
-          child: child!,
+          child: child ?? const SizedBox(),
         );
       },
     );
