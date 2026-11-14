@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
+import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/utils/rupiah_input_formatter.dart';
 import 'package:tata_saka_app/widgets/lembar_laporan_mingguan_widget.dart';
@@ -309,6 +310,52 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
     }
   }
 
+  Future<void> _pickDateForWeekly(TextEditingController controller, {bool isSpmk = false}) async {
+    final firstDate = DateTime(2015);
+    final lastDate = DateTime(2040);
+    DateTime initial = DateTime.now();
+    final parsed = WeeklyReportModel.parseIndonesianDate(controller.text);
+    if (parsed != null) {
+      initial = parsed;
+    }
+    if (initial.isBefore(firstDate)) initial = firstDate;
+    if (initial.isAfter(lastDate)) initial = lastDate;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      locale: const Locale('id', 'ID'),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.navySlate,
+              onPrimary: Colors.white,
+              onSurface: AppColors.textDark,
+            ),
+          ),
+          child: child ?? const SizedBox(),
+        );
+      },
+    );
+
+    if (picked != null && mounted) {
+      setState(() {
+        controller.text = WeeklyReportModel.formatIndonesianDate(picked);
+        if (isSpmk) {
+          final totalDays = int.tryParse(_jangkaWaktuController.text) ?? 90;
+          if (totalDays > 0) {
+            final endDt = picked.add(Duration(days: totalDays - 1));
+            _akhirMasaKontrakController.text = WeeklyReportModel.formatIndonesianDate(endDt);
+          }
+          _autoBuildWeeklyTableAndState();
+        }
+      });
+    }
+  }
+
   /// Membangun otomatis tabel bobot mingguan (1 s/d totalMinggu) dengan mengompilasi
   /// riwayat laporan mingguan yang sudah pernah disimpan sebelumnya untuk kegiatan ini.
   void _autoBuildWeeklyTableAndState() {
@@ -435,8 +482,16 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
         _realisasiPersen = row.realisasi!;
         _realisasiPersenController.text = _realisasiPersen.toStringAsFixed(3).replaceAll('.', ',');
       } else {
-        _realisasiPersen = 0.0;
-        _realisasiPersenController.text = '';
+        // Otomatis hitung agregasi realisasi bobot dari Laporan Harian s/d minggu ini
+        final autoRealisasi = _calcAutoRealisasiBobot(range.endDt);
+        if (autoRealisasi > 0) {
+          _realisasiPersen = autoRealisasi;
+          _realisasiPersenController.text = _realisasiPersen.toStringAsFixed(3).replaceAll('.', ',');
+          row.realisasi = autoRealisasi;
+        } else {
+          _realisasiPersen = 0.0;
+          _realisasiPersenController.text = '';
+        }
       }
     } else {
       _statusDokumen = 'Kontrak';
@@ -447,6 +502,84 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
     }
 
     setState(() {});
+  }
+
+  double _calcAutoRealisasiBobot(DateTime? endDt) {
+    final keg = _currentKegiatan;
+    if (keg == null) return 0.0;
+
+    List rawRkk = [];
+    final adds = (keg['addendums'] as List?) ?? [];
+    if (adds.isNotEmpty) {
+      final latest = adds.last;
+      final divList = (latest['rkkDivisiList'] as List?);
+      if (divList != null && divList.isNotEmpty) {
+        rawRkk = divList;
+      }
+    }
+    if (rawRkk.isEmpty) {
+      rawRkk = (keg['rkkDivisiList'] as List?) ?? [];
+    }
+    if (rawRkk.isEmpty) return 0.0;
+
+    final dailyReports = (keg['laporans'] as List?) ?? [];
+    if (dailyReports.isEmpty) return 0.0;
+
+    double totalBobotRealisasi = 0.0;
+
+    for (final rawDiv in rawRkk) {
+      final items = (rawDiv['items'] as List?) ?? [];
+      for (final rawIt in items) {
+        final it = Map<String, dynamic>.from(rawIt);
+        final noMata = (it['noMataPembayaran'] ?? '').toString();
+        final volKontrak = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
+        final bbtKontrak = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
+        if (volKontrak <= 0 || bbtKontrak <= 0) continue;
+
+        double volAkumulasi = 0.0;
+        for (final rep in dailyReports) {
+          if (rep is! Map) continue;
+          if (endDt != null) {
+            DateTime? repDate;
+            final repTglStr = rep['tanggal']?.toString() ?? '';
+            if (repTglStr.isNotEmpty) {
+              repDate = WeeklyReportModel.parseIndonesianDate(repTglStr) ?? DateTime.tryParse(repTglStr);
+            }
+            if (repDate != null) {
+              final repDayOnly = DateTime(repDate.year, repDate.month, repDate.day);
+              final endDayOnly = DateTime(endDt.year, endDt.month, endDt.day);
+              if (repDayOnly.isAfter(endDayOnly)) continue;
+            }
+          }
+
+          final pList = (rep['pekerjaanList'] as List?) ?? [];
+          final rkkId = '${rawDiv['nomorRomawi'] ?? 'I'}_${it['uraian']}';
+          final uraianClean = it['uraian']?.toString().trim().toLowerCase() ?? '';
+
+          for (final p in pList) {
+            if (p is! Map) continue;
+            final pId = p['rkkItemId']?.toString().trim() ?? '';
+            final pNoMata = p['noMataPembayaran']?.toString().trim() ?? '';
+            final pUraian = (p['uraian'] ?? p['jenis'])?.toString().trim().toLowerCase() ?? '';
+
+            final matchId = pId.isNotEmpty && pId == rkkId;
+            final matchNoMata = noMata.isNotEmpty && pNoMata == noMata.trim();
+            final matchUraian = uraianClean.isNotEmpty && (pUraian == uraianClean || uraianClean.contains(pUraian) || pUraian.contains(uraianClean));
+
+            if (matchId || matchNoMata || matchUraian) {
+              final vStr = (p['volume'] ?? '').toString();
+              final vNum = double.tryParse(vStr.split(' ').first.replaceAll(',', '.')) ?? 0.0;
+              volAkumulasi += vNum;
+            }
+          }
+        }
+
+        final bbtItem = (volAkumulasi / volKontrak) * bbtKontrak;
+        totalBobotRealisasi += bbtItem;
+      }
+    }
+
+    return totalBobotRealisasi;
   }
 
   void _onStatusDokumenChanged(String newStatus) {
@@ -491,7 +624,125 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
 
 
 
+  List<Map<String, dynamic>> _buildBoqProgressSnapshot({
+    required Map<String, dynamic> keg,
+    required DateTime? startDt,
+    required DateTime? endDt,
+  }) {
+    List rawRkk = [];
+    final adds = (keg['addendums'] as List?) ?? [];
+    if (adds.isNotEmpty) {
+      final latest = adds.last;
+      final divList = (latest['rkkDivisiList'] as List?);
+      if (divList != null && divList.isNotEmpty) {
+        rawRkk = divList;
+      }
+    }
+    if (rawRkk.isEmpty) {
+      rawRkk = (keg['rkkDivisiList'] as List?) ?? (keg['rkkKontrakAwal'] as List?) ?? [];
+    }
+
+    final dailyReports = (keg['laporans'] as List?) ?? [];
+    final List<Map<String, dynamic>> resultDivisions = [];
+
+    for (final rawDiv in rawRkk) {
+      final div = Map<String, dynamic>.from(rawDiv);
+      final rawItems = (div['items'] as List? ?? []);
+      final List<Map<String, dynamic>> computedItems = [];
+
+      for (final rawIt in rawItems) {
+        final it = Map<String, dynamic>.from(rawIt);
+        final noMata = (it['noMataPembayaran'] ?? '').toString().trim();
+        final uraian = (it['uraian'] ?? '').toString().trim().toLowerCase();
+        final rkkId = '${div['nomorRomawi'] ?? 'I'}_${it['uraian']}';
+        final volKontrak = (it['volumeCCO'] ?? it['volume'] as num?)?.toDouble() ?? 0.0;
+        final bbtKontrak = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
+
+        double volMingguIni = 0.0;
+        double volMingguLalu = 0.0;
+
+        for (final rep in dailyReports) {
+          if (rep is! Map) continue;
+          DateTime? repDate;
+          final repTglStr = rep['tanggal']?.toString() ?? '';
+          if (repTglStr.isNotEmpty) {
+            repDate = WeeklyReportModel.parseIndonesianDate(repTglStr) ?? DateTime.tryParse(repTglStr);
+          }
+
+          bool isMingguIni = false;
+          bool isMingguLalu = false;
+
+          if (startDt != null && endDt != null && repDate != null) {
+            final repDayOnly = DateTime(repDate.year, repDate.month, repDate.day);
+            final startDayOnly = DateTime(startDt.year, startDt.month, startDt.day);
+            final endDayOnly = DateTime(endDt.year, endDt.month, endDt.day);
+
+            if (repDayOnly.isBefore(startDayOnly)) {
+              isMingguLalu = true;
+            } else if (!repDayOnly.isAfter(endDayOnly)) {
+              isMingguIni = true;
+            }
+          } else {
+            isMingguIni = true;
+          }
+
+          final pList = (rep['pekerjaanList'] as List?) ?? [];
+          for (final p in pList) {
+            if (p is! Map) continue;
+            final pId = p['rkkItemId']?.toString().trim() ?? '';
+            final pNoMata = p['noMataPembayaran']?.toString().trim() ?? '';
+            final pUraian = (p['uraian'] ?? p['jenis'])?.toString().trim().toLowerCase() ?? '';
+
+            final matchId = pId.isNotEmpty && pId == rkkId;
+            final matchNoMata = noMata.isNotEmpty && pNoMata == noMata;
+            final matchUraian = uraian.isNotEmpty && (pUraian == uraian || uraian.contains(pUraian) || pUraian.contains(uraian));
+
+            if (matchId || matchNoMata || matchUraian) {
+              final vStr = (p['volume'] ?? '').toString();
+              final vNum = double.tryParse(vStr.split(' ').first.replaceAll(',', '.')) ?? 0.0;
+              if (isMingguIni) {
+                volMingguIni += vNum;
+              } else if (isMingguLalu) {
+                volMingguLalu += vNum;
+              }
+            }
+          }
+        }
+
+        final bbtMingguLalu = volKontrak > 0 ? (volMingguLalu / volKontrak) * bbtKontrak : 0.0;
+        final bbtMingguIni = volKontrak > 0 ? (volMingguIni / volKontrak) * bbtKontrak : 0.0;
+        final volSdMingguIni = volMingguLalu + volMingguIni;
+        final bbtSdMingguIni = bbtMingguLalu + bbtMingguIni;
+        final volSisa = (volKontrak - volSdMingguIni).clamp(0.0, volKontrak);
+        final bbtSisa = (bbtKontrak - bbtSdMingguIni).clamp(0.0, bbtKontrak);
+
+        it['mingguLaluVolume'] = volMingguLalu;
+        it['mingguLaluBobot'] = bbtMingguLalu;
+        it['mingguIniVolume'] = volMingguIni;
+        it['mingguIniBobot'] = bbtMingguIni;
+        it['sdMingguIniVolume'] = volSdMingguIni;
+        it['sdMingguIniBobot'] = bbtSdMingguIni;
+        it['sisaVolume'] = volSisa;
+        it['sisaBobot'] = bbtSisa;
+
+        computedItems.add(it);
+      }
+
+      div['items'] = computedItems;
+      resultDivisions.add(div);
+    }
+
+    return resultDivisions;
+  }
+
   WeeklyReportModel _buildReportObject() {
+    final startDt = WeeklyReportModel.parseIndonesianDate(_periodeAwalController.text.trim());
+    final endDt = WeeklyReportModel.parseIndonesianDate(_periodeAkhirController.text.trim());
+    final keg = _currentKegiatan;
+    final List<Map<String, dynamic>>? boqSnapshot = keg != null
+        ? _buildBoqProgressSnapshot(keg: keg, startDt: startDt, endDt: endDt)
+        : null;
+
     return WeeklyReportModel(
       id: widget.editReport?.id ?? 'weekly-${DateTime.now().millisecondsSinceEpoch}',
       pekerjaan: _pekerjaanController.text.trim(),
@@ -521,6 +772,7 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
       sisaWaktu: int.tryParse(_sisaWaktuController.text) ?? 0,
       akhirMasaKontrak: _akhirMasaKontrakController.text.trim(),
       tabelMingguan: _tabelMingguan,
+      boqProgressList: boqSnapshot,
     );
   }
 
@@ -579,6 +831,37 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
     }
 
     provider.updateContract(_selectedContract!);
+
+    try {
+      final timeline = Provider.of<TimelineProvider>(context, listen: false);
+      final kName = keg['namaKegiatan']?.toString() ?? '';
+      final kontraktor = keg['kontraktor']?.toString() ?? '';
+      final dinas = _selectedContract!.instansiDinas.isNotEmpty
+          ? _selectedContract!.instansiDinas.first
+          : 'DPU-PR Kab. Purbalingga';
+      final isEdit = widget.editReport != null;
+      timeline.logEvent(
+        actorName: 'CV. Tata Saka Consultant',
+        actionType: isEdit ? 'UPDATE' : 'CREATE',
+        entityType: 'LAPORAN_MINGGUAN',
+        contractId: _selectedContract!.id,
+        contractName: _selectedContract!.namaKontrak,
+        kegiatanName: kName,
+        kontraktorName: kontraktor,
+        dinasName: dinas,
+        title: isEdit
+            ? 'Pembaruan Laporan Mingguan ke-$_mingguKe: $kName'
+            : 'Penerbitan Laporan Mingguan ke-$_mingguKe: $kName',
+        description:
+            'Laporan Mingguan Periode ${reportObj.periodeAwal} s/d ${reportObj.periodeAkhir} dengan progres kumulatif ${reportObj.realisasiPersen.toStringAsFixed(2)}%.',
+        metadata: {
+          'mingguKe': _mingguKe,
+          'realisasi': reportObj.realisasiPersen,
+          'rencana': reportObj.rencanaPersen,
+          'deviasi': reportObj.deviasiPersen,
+        },
+      );
+    } catch (_) {}
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -947,6 +1230,11 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
                 label: 'Tanggal Kontrak (SPK)',
                 hintText: '20 April 2026',
                 readOnly: true,
+                onTap: () => _pickDateForWeekly(_tanggalKontrakController),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.calendar_month, color: Color(0xFF6B7280), size: 18),
+                  onPressed: () => _pickDateForWeekly(_tanggalKontrakController),
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -978,7 +1266,11 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
                 label: 'Tanggal SPMK',
                 hintText: '20 April 2026',
                 readOnly: true,
-                onChanged: (_) => _autoBuildWeeklyTableAndState(),
+                onTap: () => _pickDateForWeekly(_tanggalSpmkController, isSpmk: true),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.calendar_month, color: Color(0xFF6B7280), size: 18),
+                  onPressed: () => _pickDateForWeekly(_tanggalSpmkController, isSpmk: true),
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -1514,6 +1806,8 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
     bool isBold = false,
     String? prefixText,
     String? suffixText,
+    Widget? suffixIcon,
+    VoidCallback? onTap,
     TextInputType keyboardType = TextInputType.text,
     List<TextInputFormatter>? inputFormatters,
     ValueChanged<String>? onChanged,
@@ -1533,6 +1827,7 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
         TextFormField(
           controller: controller,
           readOnly: readOnly,
+          onTap: onTap,
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,
           onChanged: onChanged,
@@ -1556,6 +1851,7 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
+            suffixIcon: suffixIcon,
             isDense: true,
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             filled: true,

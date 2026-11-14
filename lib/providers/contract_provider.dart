@@ -30,11 +30,35 @@ class ContractProvider with ChangeNotifier {
       _contracts = [];
     }
     
-    // Jika data kontrak kosong, inisialisasi dengan 1 kontrak demo sesuai permintaan:
-    // "PEMELIHARAAN BERKALA JL. MT HARYONO" dengan 3 Kegiatan: Ruas Jalan A, B, C
+    // Jika data kontrak kosong, inisialisasi dengan 1 kontrak demo:
+    // "PEMELIHARAAN BERKALA JL. MT HARYONO" (Dataset 1 Bulan Berjalan)
     if (_contracts.isEmpty) {
       _contracts = [SampleContractData.getDemoContract()];
       await _saveContracts();
+    } else {
+      // Cek apakah demo contract MT Haryono yang tersimpan di local cache masih data lama (tanpa harga satuan pada RKK)
+      final demoIdx = _contracts.indexWhere((c) => c.id == 'kontrak-mt-haryono-demo');
+      if (demoIdx >= 0) {
+        final demoContract = _contracts[demoIdx];
+        bool isOldData = false;
+        if (demoContract.kegiatans.isNotEmpty) {
+          final rkk = demoContract.kegiatans[0]['rkkDivisiList'] as List? ?? [];
+          if (rkk.isNotEmpty) {
+            final items = rkk[0]['items'] as List? ?? [];
+            if (items.isEmpty || ((items[0]['hargaSatuan'] as num?)?.toDouble() ?? 0) == 0) {
+              isOldData = true;
+            }
+          } else {
+            isOldData = true;
+          }
+        } else {
+          isOldData = true;
+        }
+        if (isOldData) {
+          _contracts[demoIdx] = SampleContractData.getDemoContract();
+          await _saveContracts();
+        }
+      }
     }
 
     notifyListeners();

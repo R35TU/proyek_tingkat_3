@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
+import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -37,7 +38,7 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
   final TextEditingController _sumberDanaController = TextEditingController();
   final TextEditingController _deskripsiController = TextEditingController();
 
-  // Struktur Organisasi Anggota Konsultan (Site Engineer, Inspektor 1-4, Administrasi)
+  // Struktur Organisasi Personel Konsultan (Site Engineer, Inspektor 1-4, Administrasi)
   final TextEditingController _siteEngineerController = TextEditingController();
   final List<TextEditingController> _inspektorControllers = [];
   final TextEditingController _administrasiController = TextEditingController();
@@ -498,9 +499,9 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Struktur Organisasi Anggota Konsultan
+            // Struktur Organisasi Personel Konsultan
             const Text(
-              'Struktur Anggota Konsultan',
+              'Struktur Personel Konsultan',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -633,6 +634,21 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
                       strukturOrganisasi: strukturMap,
                     );
                     provider.updateContract(updatedContract);
+                    try {
+                      final timeline = Provider.of<TimelineProvider>(context, listen: false);
+                      timeline.logEvent(
+                        actorName: 'CV. Tata Saka Consultant',
+                        actionType: 'UPDATE',
+                        entityType: 'KONTRAK',
+                        contractId: updatedContract.id,
+                        contractName: updatedContract.namaKontrak,
+                        dinasName: updatedContract.instansiDinas.isNotEmpty
+                            ? updatedContract.instansiDinas.first
+                            : 'DPU-PR Kab. Purbalingga',
+                        title: 'Pembaruan Kontrak: ${updatedContract.namaKontrak}',
+                        description: 'Data administrasi kontrak diperbarui (SPK: ${updatedContract.nomorSpk}).',
+                      );
+                    } catch (_) {}
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Kontrak berhasil diperbarui')),
                     );
@@ -657,6 +673,21 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
                       strukturOrganisasi: strukturMap,
                     );
                     provider.addContract(newContract);
+                    try {
+                      final timeline = Provider.of<TimelineProvider>(context, listen: false);
+                      timeline.logEvent(
+                        actorName: 'CV. Tata Saka Consultant',
+                        actionType: 'CREATE',
+                        entityType: 'KONTRAK',
+                        contractId: newContract.id,
+                        contractName: newContract.namaKontrak,
+                        dinasName: newContract.instansiDinas.isNotEmpty
+                            ? newContract.instansiDinas.first
+                            : 'DPU-PR Kab. Purbalingga',
+                        title: 'Pembuatan Kontrak Baru: ${newContract.namaKontrak}',
+                        description: 'Kontrak pengawasan teknis baru ditambahkan ke sistem.',
+                      );
+                    } catch (_) {}
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Kontrak berhasil ditambahkan')),
                     );

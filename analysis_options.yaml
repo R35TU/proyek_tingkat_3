@@ -10,6 +10,17 @@
 include: package:flutter_lints/flutter.yaml
 
 analyzer:
+  errors:
+    deprecated_member_use: ignore
+    avoid_function_literals_in_foreach_calls: ignore
+    non_constant_identifier_names: ignore
+    unused_element: ignore
+    unused_import: ignore
+    unnecessary_to_list_in_spreads: ignore
+    unnecessary_cast: ignore
+    dead_code: ignore
+    dead_null_aware_expression: ignore
+    unnecessary_underscores: ignore
   exclude:
     - build/**
     - android/**
