@@ -31,13 +31,20 @@ class KegiatanModel {
   String penggunaAnggaran;
   String stafTeknis1;
   String stafTeknis2;
+
+  // STRUKTUR ORGANISASI KONSULTAN
+  String direkturKonsultan;
   String siteEngineerKegiatan;
-  String direkturPenyedia;
 
   // STRUKTUR ORGANISASI PENYEDIA JASA
-  String direkturKontraktor;
   String pelaksanaLapangan;
   String petugasK3;
+
+  // Backward compatibility getters & setters
+  String get direkturPenyedia => direkturKonsultan;
+  set direkturPenyedia(String v) => direkturKonsultan = v;
+  String get direkturKontraktor => direkturKonsultan;
+  set direkturKontraktor(String v) => direkturKonsultan = v;
 
   // Dokumen & Laporan
   List<Map<String, dynamic>> folders;
@@ -46,6 +53,26 @@ class KegiatanModel {
 
   // Master Data Rincian Kuantitas & Bobot Pekerjaan (RKK / BoQ Kontrak)
   List<Map<String, dynamic>> rkkDivisiList;
+  List<Map<String, dynamic>> rkkKontrakAwal;
+  List<Map<String, dynamic>> addendums;
+
+  /// Mengembalikan RKK yang sedang aktif.
+  /// Jika sudah ada addendum (CCO), mengembalikan rkkDivisiList dari addendum terakhir.
+  /// Jika belum ada addendum, mengembalikan rkkDivisiList (Kontrak Awal).
+  List<Map<String, dynamic>> get activeRkkDivisiList {
+    if (addendums.isNotEmpty) {
+      final latest = addendums.last;
+      final divList = latest['rkkDivisiList'] as List?;
+      if (divList != null && divList.isNotEmpty) {
+        return divList.map((e) => Map<String, dynamic>.from(e)).toList();
+      }
+    }
+    return (rkkKontrakAwal.isNotEmpty) ? rkkKontrakAwal : rkkDivisiList;
+  }
+
+  bool get hasAddendum => addendums.isNotEmpty;
+  int get totalAddendumCount => addendums.length;
+  Map<String, dynamic>? get latestAddendum => addendums.isNotEmpty ? addendums.last : null;
 
   KegiatanModel({
     required this.namaKegiatan,
@@ -71,14 +98,17 @@ class KegiatanModel {
     this.stafTeknis1 = '',
     this.stafTeknis2 = '',
     this.siteEngineerKegiatan = '',
-    this.direkturPenyedia = '',
-    this.direkturKontraktor = '',
+    this.direkturKonsultan = '',
+    String? direkturPenyedia,
+    String? direkturKontraktor,
     this.pelaksanaLapangan = '',
     this.petugasK3 = '',
     List<Map<String, dynamic>>? folders,
     List<dynamic>? laporans,
     List<dynamic>? laporanMingguan,
     List<Map<String, dynamic>>? rkkDivisiList,
+    List<Map<String, dynamic>>? rkkKontrakAwal,
+    List<Map<String, dynamic>>? addendums,
   })  : folders = folders ?? [
           {'name': 'Laporan Harian', 'isExpanded': false, 'documents': []},
           {'name': 'Laporan Mingguan', 'isExpanded': false, 'documents': []},
@@ -86,7 +116,13 @@ class KegiatanModel {
         ],
         laporans = laporans ?? [],
         laporanMingguan = laporanMingguan ?? [],
-        rkkDivisiList = rkkDivisiList ?? [];
+        rkkDivisiList = rkkDivisiList ?? [],
+        rkkKontrakAwal = rkkKontrakAwal ?? (rkkDivisiList != null ? List<Map<String, dynamic>>.from(rkkDivisiList) : []),
+        addendums = addendums ?? [] {
+    if (direkturKonsultan.isEmpty && (direkturPenyedia != null || direkturKontraktor != null)) {
+      direkturKonsultan = direkturPenyedia ?? direkturKontraktor ?? '';
+    }
+  }
 
   /// Menghitung Waktu yang Telah Berjalan secara dinamis berdasarkan Awal Pelaksanaan vs Hari ini
   static String calculateWaktuBerjalan(String awalPelaksanaanStr) {
@@ -131,8 +167,9 @@ class KegiatanModel {
     final tgl = tglSuratPesanan.trim();
     if (no.isEmpty && tgl.isEmpty) return '-';
     if (tgl.isEmpty) return no;
-    if (no.isEmpty) return 'Tanggal $tgl';
-    return '$no Tanggal $tgl';
+    final tglClean = tgl.toLowerCase().startsWith('tanggal ') ? tgl.substring(8).trim() : tgl;
+    if (no.isEmpty) return 'Tanggal $tglClean';
+    return '$no Tanggal $tglClean';
   }
 
   /// Format gabungan resmi SPMK Kontraktor: "000.3.3 / ... Tanggal 18 Juni 2026"
@@ -141,8 +178,9 @@ class KegiatanModel {
     final tgl = tglSpmkKontraktor.trim();
     if (no.isEmpty && tgl.isEmpty) return '-';
     if (tgl.isEmpty) return no;
-    if (no.isEmpty) return 'Tanggal $tgl';
-    return '$no Tanggal $tgl';
+    final tglClean = tgl.toLowerCase().startsWith('tanggal ') ? tgl.substring(8).trim() : tgl;
+    if (no.isEmpty) return 'Tanggal $tglClean';
+    return '$no Tanggal $tglClean';
   }
 
   /// Format gabungan staf teknis: "MUBALLIGH, ST.,M.Sc. & BILAL A.Md"
@@ -214,9 +252,13 @@ class KegiatanModel {
 
     final kontraktor = json['kontraktor'] ?? '';
     final noSuratPesanan = json['noSuratPesanan'] ?? '';
-    final tglSuratPesanan = json['tglSuratPesanan'] ?? '';
+    final tglSuratPesanan = (json['tglSuratPesanan'] != null && json['tglSuratPesanan'].toString().isNotEmpty)
+        ? json['tglSuratPesanan'].toString()
+        : (fallbackContract?.tglMulaiSpk ?? '');
     final noSpmkKontraktor = json['noSpmkKontraktor'] ?? '';
-    final tglSpmkKontraktor = json['tglSpmkKontraktor'] ?? '';
+    final tglSpmkKontraktor = (json['tglSpmkKontraktor'] != null && json['tglSpmkKontraktor'].toString().isNotEmpty)
+        ? json['tglSpmkKontraktor'].toString()
+        : (fallbackContract?.tglMulaiSpmk ?? '');
     final nilaiKontrak = json['nilaiKontrak'] ?? '';
 
     final jangkaWaktu = (json['jangkaWaktu'] != null && json['jangkaWaktu'].toString().isNotEmpty)
@@ -240,18 +282,19 @@ class KegiatanModel {
     final siteEngineerKegiatan = json['siteEngineerKegiatan'] ??
         json['siteEngineer'] ??
         json['strukturOrganisasiKegiatan']?['siteEngineer'] ??
+        json['strukturOrganisasiKonsultan']?['siteEngineer'] ??
         (fallbackContract?.siteEngineer ?? '');
-    final direkturPenyedia = json['direkturPenyedia'] ??
-        json['strukturOrganisasiKegiatan']?['direkturPenyedia'] ??
-        json['direkturKontraktor'] ??
-        json['direktur'] ??
-        '';
+    final direkturKonsultan = (json['direkturKonsultan'] != null && json['direkturKonsultan'].toString().isNotEmpty)
+        ? json['direkturKonsultan'].toString()
+        : (json['direkturPenyedia'] ??
+            json['direkturKontraktor'] ??
+            json['direktur'] ??
+            json['strukturOrganisasiKegiatan']?['direkturPenyedia'] ??
+            json['strukturOrganisasiKonsultan']?['direkturKonsultan'] ??
+            json['strukturPenyediaJasa']?['direktur'] ??
+            '').toString();
 
     // Struktur Organisasi Penyedia Jasa
-    final direkturKontraktor = json['direkturKontraktor'] ??
-        json['direktur'] ??
-        json['strukturPenyediaJasa']?['direktur'] ??
-        direkturPenyedia;
     final pelaksanaLapangan = json['pelaksanaLapangan'] ??
         json['strukturPenyediaJasa']?['pelaksanaLapangan'] ??
         '';
@@ -284,8 +327,7 @@ class KegiatanModel {
       stafTeknis1: stafTeknis1,
       stafTeknis2: stafTeknis2,
       siteEngineerKegiatan: siteEngineerKegiatan,
-      direkturPenyedia: direkturPenyedia,
-      direkturKontraktor: direkturKontraktor,
+      direkturKonsultan: direkturKonsultan,
       pelaksanaLapangan: pelaksanaLapangan,
       petugasK3: petugasK3,
       folders: json['folders'] != null ? List<Map<String, dynamic>>.from(json['folders']) : null,
@@ -294,6 +336,14 @@ class KegiatanModel {
       rkkDivisiList: json['rkkDivisiList'] != null
           ? List<Map<String, dynamic>>.from(
               (json['rkkDivisiList'] as List).map((e) => Map<String, dynamic>.from(e)))
+          : null,
+      rkkKontrakAwal: json['rkkKontrakAwal'] != null
+          ? List<Map<String, dynamic>>.from(
+              (json['rkkKontrakAwal'] as List).map((e) => Map<String, dynamic>.from(e)))
+          : null,
+      addendums: json['addendums'] != null
+          ? List<Map<String, dynamic>>.from(
+              (json['addendums'] as List).map((e) => Map<String, dynamic>.from(e)))
           : null,
     );
   }
@@ -323,19 +373,21 @@ class KegiatanModel {
       'stafTeknis1': stafTeknis1,
       'stafTeknis2': stafTeknis2,
       'siteEngineerKegiatan': siteEngineerKegiatan,
-      'direkturPenyedia': direkturPenyedia,
-      'direkturKontraktor': direkturKontraktor,
+      'direkturKonsultan': direkturKonsultan,
+      'direkturPenyedia': direkturKonsultan,
+      'direkturKontraktor': direkturKonsultan,
       'pelaksanaLapangan': pelaksanaLapangan,
       'petugasK3': petugasK3,
       'strukturOrganisasiKegiatan': {
         'penggunaAnggaran': penggunaAnggaran,
         'stafTeknis1': stafTeknis1,
         'stafTeknis2': stafTeknis2,
+      },
+      'strukturOrganisasiKonsultan': {
+        'direkturKonsultan': direkturKonsultan,
         'siteEngineer': siteEngineerKegiatan,
-        'direkturPenyedia': direkturPenyedia,
       },
       'strukturPenyediaJasa': {
-        'direktur': direkturKontraktor,
         'pelaksanaLapangan': pelaksanaLapangan,
         'petugasK3': petugasK3,
       },
@@ -343,11 +395,13 @@ class KegiatanModel {
       'laporans': laporans,
       'laporanMingguan': laporanMingguan,
       'rkkDivisiList': rkkDivisiList,
+      'rkkKontrakAwal': rkkKontrakAwal.isNotEmpty ? rkkKontrakAwal : rkkDivisiList,
+      'addendums': addendums,
     };
   }
 
   /// Template Standar RKK (Rincian Kuantitas & Bobot Pekerjaan) Resmi PU Bina Marga
-  /// Berdasarkan acuan fisik dokumen Laporan Mingguan Kab. Purbalingga
+  /// Berdasarkan acuan fisik dokumen Laporan Mingguan Kab. Purbalingga (Format RAB 7 Kolom)
   static List<Map<String, dynamic>> defaultSampleRkk() {
     return [
       {
@@ -359,32 +413,44 @@ class KegiatanModel {
             'noMataPembayaran': '1.2',
             'uraian': 'Mobilisasi',
             'satuan': 'Ls',
-            'volumeCCO': 1.00,
+            'hargaSatuan': 12900000.0,
+            'volume': 1.00,
+            'totalHarga': 12900000.0,
             'nilaiBobot': 4.474,
+            'volumeCCO': 1.00,
           },
           {
             'no': '2',
             'noMataPembayaran': '1.8.(1)',
             'uraian': 'Keselamatan dan Kesehatan Kerja (SMK3)',
             'satuan': 'Ls',
-            'volumeCCO': 1.00,
+            'hargaSatuan': 5150000.0,
+            'volume': 1.00,
+            'totalHarga': 5150000.0,
             'nilaiBobot': 1.786,
+            'volumeCCO': 1.00,
           },
           {
             'no': '3',
             'noMataPembayaran': '1.19',
             'uraian': 'Biaya Penerapan SMKK',
             'satuan': 'Ls',
-            'volumeCCO': 1.00,
+            'hargaSatuan': 1478500.0,
+            'volume': 1.00,
+            'totalHarga': 1478500.0,
             'nilaiBobot': 0.513,
+            'volumeCCO': 1.00,
           },
           {
             'no': '4',
             'noMataPembayaran': 'Taksir',
             'uraian': 'Bongkaran',
             'satuan': 'Ls',
-            'volumeCCO': 0.0,
+            'hargaSatuan': 1352000.0,
+            'volume': 0.0,
+            'totalHarga': 0.0,
             'nilaiBobot': 0.0,
+            'volumeCCO': 0.0,
           },
         ],
       },
@@ -395,18 +461,24 @@ class KegiatanModel {
           {
             'no': '1',
             'noMataPembayaran': '2.3.(12)',
-            'uraian': 'Gorong2 Kotak Beton Bertulang Ukuran dalam 50x50cm',
+            'uraian': 'Gorong-Gorong Kotak Beton Bertulang Ukuran dalam 50cmx50cm',
             'satuan': 'm1',
-            'volumeCCO': 4.80,
+            'hargaSatuan': 2139059.32,
+            'volume': 4.80,
+            'totalHarga': 10267484.74,
             'nilaiBobot': 3.561,
+            'volumeCCO': 4.80,
           },
           {
             'no': '2',
             'noMataPembayaran': '2.3.(24)',
             'uraian': 'Saluran berbentuk U Tipe DS 2',
             'satuan': 'm1',
-            'volumeCCO': 115.00,
+            'hargaSatuan': 661011.25,
+            'volume': 115.00,
+            'totalHarga': 76016293.75,
             'nilaiBobot': 26.362,
+            'volumeCCO': 115.00,
           },
         ],
       },
@@ -419,24 +491,33 @@ class KegiatanModel {
             'noMataPembayaran': '6.1 (1)(a)',
             'uraian': 'Lapis Resap Pengikat - Aspal Cair/Emulsi',
             'satuan': 'liter',
-            'volumeCCO': 118.79,
+            'hargaSatuan': 25958.00,
+            'volume': 118.79,
+            'totalHarga': 3083550.82,
             'nilaiBobot': 1.069,
+            'volumeCCO': 118.79,
           },
           {
             'no': '2',
             'noMataPembayaran': '6.7.(1)',
             'uraian': 'Lapis Penetrasi Macadam',
             'satuan': 'm3',
-            'volumeCCO': 29.17,
+            'hargaSatuan': 2516272.00,
+            'volume': 29.17,
+            'totalHarga': 73401969.21,
             'nilaiBobot': 25.456,
+            'volumeCCO': 29.17,
           },
           {
             'no': '3',
             'noMataPembayaran': 'SNI 6749-2008(S)',
             'uraian': 'LATASIR KELAS B (1,5 cm)',
             'satuan': 'm2',
-            'volumeCCO': 944.00,
+            'hargaSatuan': 102310.00,
+            'volume': 944.00,
+            'totalHarga': 96580640.0,
             'nilaiBobot': 33.494,
+            'volumeCCO': 944.00,
           },
         ],
       },
@@ -449,24 +530,33 @@ class KegiatanModel {
             'noMataPembayaran': '7.1(8)',
             'uraian': 'Beton fc\' 15Mpa',
             'satuan': 'm3',
-            'volumeCCO': 4.79,
+            'hargaSatuan': 1655793.06,
+            'volume': 4.79,
+            'totalHarga': 7935388.25,
             'nilaiBobot': 2.752,
+            'volumeCCO': 4.79,
           },
           {
             'no': '2',
             'noMataPembayaran': '7.3(1)',
-            'uraian': 'Baja Tulangan Polos-BJTP 280',
+            'uraian': 'Baja Tulangan Polos-BjTP 280',
             'satuan': 'kg',
-            'volumeCCO': 93.52,
+            'hargaSatuan': 16433.49,
+            'volume': 93.52,
+            'totalHarga': 1536876.26,
             'nilaiBobot': 0.533,
+            'volumeCCO': 93.52,
           },
           {
             'no': '3',
             'noMataPembayaran': '3.9.8.3',
             'uraian': 'Pasangan Keramik 40 x 40 cm (Bekas Bongkaran)',
             'satuan': 'm2',
-            'volumeCCO': 0.0,
+            'hargaSatuan': 167594.80,
+            'volume': 0.0,
+            'totalHarga': 0.0,
             'nilaiBobot': 0.0,
+            'volumeCCO': 0.0,
           },
         ],
       },

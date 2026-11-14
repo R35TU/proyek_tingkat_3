@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
+import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/utils/plat_nomor_util.dart';
 import 'package:tata_saka_app/widgets/clean_text_form_field.dart';
@@ -30,6 +31,27 @@ class BuatLaporanScreen extends StatefulWidget {
   State<BuatLaporanScreen> createState() => _BuatLaporanScreenState();
 }
 
+class _TtdPengawasItem {
+  final String id;
+  final TextEditingController namaController;
+  final TextEditingController jabatanController;
+  String? signatureBase64;
+
+  _TtdPengawasItem({
+    String? id,
+    String nama = '',
+    String jabatan = '',
+    this.signatureBase64,
+  })  : id = id ?? UniqueKey().toString(),
+        namaController = TextEditingController(text: nama),
+        jabatanController = TextEditingController(text: jabatan);
+
+  void dispose() {
+    namaController.dispose();
+    jabatanController.dispose();
+  }
+}
+
 class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
   ContractModel? _selectedContract;
   int? _selectedKegiatanIndex;
@@ -45,10 +67,29 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
   final TextEditingController _instruksiKonsultanController = TextEditingController();
   final List<Map<String, TextEditingController>> _instruksiList = [];
 
-  // G. TANDA TANGAN (TTD) PENGAWAS
-  final TextEditingController _ttdNamaController = TextEditingController();
-  final TextEditingController _ttdJabatanController = TextEditingController();
-  String? _ttdSignatureBase64;
+  // G. TANDA TANGAN (TTD) PENGAWAS (Mendukung Multi-Penandatangan)
+  final List<_TtdPengawasItem> _ttdPengawasList = [];
+
+  void _addTtdPengawasRow({String nama = '', String jabatan = '', String? signature}) {
+    setState(() {
+      _ttdPengawasList.add(
+        _TtdPengawasItem(
+          nama: nama,
+          jabatan: jabatan,
+          signatureBase64: signature,
+        ),
+      );
+    });
+  }
+
+  void _removeTtdPengawasRow(int index) {
+    if (_ttdPengawasList.length > 1) {
+      setState(() {
+        _ttdPengawasList[index].dispose();
+        _ttdPengawasList.removeAt(index);
+      });
+    }
+  }
 
   // H. DOKUMENTASI FOTO LAPANGAN (Kamera, File, Drag & Drop)
   final List<String> _fotoList = [];
@@ -122,9 +163,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     _instruksiList.clear();
 
     // G. Tanda Tangan (TTD) Pengawas
-    _ttdNamaController.text = '';
-    _ttdJabatanController.text = '';
-    _ttdSignatureBase64 = null;
+    for (var item in _ttdPengawasList) {
+      item.dispose();
+    }
+    _ttdPengawasList.clear();
+    _addTtdPengawasRow(nama: '', jabatan: '');
 
     // H. Foto Dokumentasi
     _fotoList.clear();
@@ -239,14 +282,33 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       _instruksiKonsultanController.text = konsultanUraian.toString();
     }
 
-    // G. Tanda Tangan (TTD)
-    if (r['ttdNama'] != null && r['ttdNama'].toString().isNotEmpty) {
-      _ttdNamaController.text = r['ttdNama'].toString();
+    // G. Tanda Tangan (TTD) Pengawas
+    for (var item in _ttdPengawasList) {
+      item.dispose();
     }
-    if (r['ttdJabatan'] != null && r['ttdJabatan'].toString().isNotEmpty) {
-      _ttdJabatanController.text = r['ttdJabatan'].toString();
+    _ttdPengawasList.clear();
+
+    final ttdListRaw = r['ttdPengawasList'] as List<dynamic>?;
+    if (ttdListRaw != null && ttdListRaw.isNotEmpty) {
+      for (var t in ttdListRaw) {
+        if (t is Map) {
+          _addTtdPengawasRow(
+            nama: t['nama']?.toString() ?? '',
+            jabatan: t['jabatan']?.toString() ?? '',
+            signature: t['signature']?.toString(),
+          );
+        }
+      }
+    } else {
+      final singleNama = r['ttdNama']?.toString() ?? '';
+      final singleJabatan = r['ttdJabatan']?.toString() ?? '';
+      final singleSig = r['ttdSignature']?.toString();
+      _addTtdPengawasRow(
+        nama: singleNama,
+        jabatan: singleJabatan,
+        signature: singleSig,
+      );
     }
-    _ttdSignatureBase64 = r['ttdSignature']?.toString();
 
     // H. Foto
     final fList = r['fotoList'] as List<dynamic>? ?? [];
@@ -396,8 +458,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     }
 
     _instruksiKonsultanController.dispose();
-    _ttdNamaController.dispose();
-    _ttdJabatanController.dispose();
+    for (var item in _ttdPengawasList) {
+      item.dispose();
+    }
+    _ttdPengawasList.clear();
     _jenisMaterialAspalController.dispose();
     _penyediaAmpController.dispose();
     _jarakTempuhController.dispose();
@@ -434,6 +498,100 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
   }
 
   // Row Helpers
+  /// Menghitung volume kumulatif yang sudah terealisasi pada Laporan Harian sebelumnya
+  /// untuk mata pembayaran / uraian pekerjaan tertentu dalam kegiatan yang aktif.
+  double _calcSudahDikerjakan({
+    String? rkkItemId,
+    String? noMataPembayaran,
+    String? uraian,
+  }) {
+    if (_selectedContract == null) return 0.0;
+    final keg = _currentKegiatan;
+    if (keg == null) return 0.0;
+    final reports = (keg['laporans'] as List?) ?? [];
+
+    final currentReportId = widget.editReport?['id'];
+    double total = 0.0;
+
+    for (final r in reports) {
+      if (r is! Map) continue;
+      // Jangan hitung laporan harian saat ini jika sedang dalam mode edit
+      if (currentReportId != null && r['id'] == currentReportId) continue;
+
+      final pList = (r['pekerjaanList'] as List?) ?? [];
+      for (final p in pList) {
+        if (p is! Map) continue;
+        final pId = p['rkkItemId']?.toString().trim();
+        final pNoMata = p['noMataPembayaran']?.toString().trim();
+        final pUraian = (p['uraian'] ?? p['jenis'])?.toString().trim();
+
+        bool match = false;
+        if (rkkItemId != null && rkkItemId.isNotEmpty && pId != null && pId.isNotEmpty) {
+          match = (rkkItemId == pId);
+        }
+        if (!match && noMataPembayaran != null && noMataPembayaran.isNotEmpty && pNoMata != null && pNoMata.isNotEmpty) {
+          match = (noMataPembayaran == pNoMata);
+        }
+        if (!match && uraian != null && uraian.isNotEmpty && pUraian != null && pUraian.isNotEmpty) {
+          match = (uraian.toLowerCase() == pUraian.toLowerCase());
+        }
+
+        if (match) {
+          final volRaw = (p['volume'] ?? '0').toString().trim();
+          final volClean = volRaw.split(' ').first.replaceAll(',', '.');
+          final volVal = double.tryParse(volClean) ?? 0.0;
+          total += volVal;
+        }
+      }
+    }
+    return total;
+  }
+
+  Widget _buildMetricTile({
+    required String label,
+    required String value,
+    required Color textColor,
+    bool isBold = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 9.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
+              color: textColor,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _formatNumber(double n) {
+    if (n == n.roundToDouble()) {
+      return n.toInt().toString();
+    }
+    return n.toStringAsFixed(2);
+  }
+
   void _addPekerjaanRow({
     String jenis = '',
     String volume = '',
@@ -441,6 +599,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     String noMataPembayaran = '',
     String satuan = '',
     String rkkItemId = '',
+    double? targetVolume,
+    double? hargaSatuan,
+    double? nilaiBobot,
     List<Map<String, String>> initialMaterials = const [],
     List<Map<String, String>> initialPeralatans = const [],
     List<Map<String, String>> initialPersonils = const [],
@@ -505,13 +666,21 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         });
       }
 
+      final volController = TextEditingController(text: volume);
+      volController.addListener(() {
+        if (mounted) setState(() {});
+      });
+
       _pekerjaanList.add({
         'jenis': TextEditingController(text: jenis),
-        'volume': TextEditingController(text: volume),
+        'volume': volController,
         'lokasi': TextEditingController(text: lokasi),
         'noMataPembayaran': noMataPembayaran,
         'satuan': satuan,
         'rkkItemId': rkkItemId,
+        'targetVolume': targetVolume,
+        'hargaSatuan': hargaSatuan,
+        'nilaiBobot': nilaiBobot,
         'materials': materialsList,
         'peralatans': peralatansList,
         'personils': personilsList,
@@ -733,6 +902,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       initialDate: initial,
       firstDate: firstDate,
       lastDate: lastDate,
+      locale: const Locale('id', 'ID'),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -792,6 +962,111 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     final String lokasiKegiatan = keg['lokasi'] ?? '-';
     final String sumberDanaKontrak = _selectedContract!.sumberDana;
     final String namaKontraktor = keg['kontraktor'] ?? '-';
+
+    final rkkFlatItems = _getRkkFlatItems();
+
+    // Validasi Kunci Ketat: Blokir jika volume melebihi sisa kontrak sebelum ada Addendum CCO
+    for (int i = 0; i < _pekerjaanList.length; i++) {
+      final p = _pekerjaanList[i];
+      final jenisPek = (p['jenis'] as TextEditingController?)?.text.trim() ?? '';
+      final volText = (p['volume'] as TextEditingController?)?.text.trim().replaceAll(',', '.') ?? '';
+      final inputVol = double.tryParse(volText.split(' ').first) ?? 0.0;
+      final noMata = (p['noMataPembayaran'] ?? '').toString();
+      final satuan = (p['satuan'] ?? '').toString();
+      final rkkId = (p['rkkItemId'] ?? '').toString();
+
+      double targetVol = 0.0;
+      if (p['targetVolume'] != null) {
+        targetVol = (p['targetVolume'] as num).toDouble();
+      } else if (rkkFlatItems.isNotEmpty) {
+        final match = rkkFlatItems.firstWhere(
+          (it) => it['id'] == rkkId || it['uraian'].toString().toLowerCase() == jenisPek.toLowerCase(),
+          orElse: () => {},
+        );
+        if (match.isNotEmpty) {
+          targetVol = double.tryParse((match['volumeCCO'] ?? match['volume'] ?? 0).toString()) ?? 0.0;
+        }
+      }
+
+      if (targetVol > 0) {
+        final sudahDikerjakan = _calcSudahDikerjakan(
+          rkkItemId: rkkId,
+          noMataPembayaran: noMata,
+          uraian: jenisPek,
+        );
+        final akumulasi = sudahDikerjakan + inputVol;
+        final sisa = targetVol - sudahDikerjakan;
+
+        if (akumulasi > targetVol + 0.0001) {
+          final lebih = akumulasi - targetVol;
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: const [
+                  Icon(Icons.block, color: Color(0xFFDC2626), size: 28),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Penyimpanan Dikunci',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Volume pekerjaan "$jenisPek" melebihi batas kuantitas kontrak/CCO.',
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF1F2937)),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFCA5A5)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('• Target Kontrak/CCO: ${_formatNumber(targetVol)} $satuan',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                        Text('• Realisasi Sebelumnya: ${_formatNumber(sudahDikerjakan)} $satuan',
+                            style: const TextStyle(fontSize: 12)),
+                        Text('• Sisa Kontrak: ${_formatNumber(sisa > 0 ? sisa : 0)} $satuan',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF047857))),
+                        Text('• Input Hari Ini: ${_formatNumber(inputVol)} $satuan',
+                            style: const TextStyle(fontSize: 12)),
+                        const Divider(height: 16),
+                        Text('• Akumulasi: ${_formatNumber(akumulasi)} $satuan (Lebih +${_formatNumber(lebih)} $satuan)',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFDC2626))),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Sesuai ketentuan, penambahan volume harus melalui Addendum CCO terlebih dahulu.',
+                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF4B5563)),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Tutup & Perbaiki Volume', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+      }
+    }
 
     // A. Clean Pekerjaan (dengan sub-items Material, Peralatan, Personil)
     final cleanPekerjaan = _pekerjaanList.asMap().entries.map((e) {
@@ -854,11 +1129,15 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       return {
         'no': pIdx.toString(),
         'jenis': jenisPek,
+        'uraian': jenisPek,
         'volume': volPek,
         'lokasi': lokPek,
         'noMataPembayaran': p['noMataPembayaran'] ?? '',
         'satuan': p['satuan'] ?? '',
         'rkkItemId': p['rkkItemId'] ?? '',
+        'targetVolume': p['targetVolume'],
+        'hargaSatuan': p['hargaSatuan'],
+        'nilaiBobot': p['nilaiBobot'],
         'materials': cleanMats,
         'peralatans': cleanAlats,
         'personils': cleanPers,
@@ -1022,6 +1301,19 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       }
     }
 
+    // G. Tanda Tangan (TTD) Digital Pengawas (Bisa lebih dari 1 orang)
+    final cleanTtdList = _ttdPengawasList.map((item) {
+      return {
+        'nama': item.namaController.text.trim(),
+        'jabatan': item.jabatanController.text.trim(),
+        'signature': item.signatureBase64,
+      };
+    }).toList();
+
+    final firstTtd = cleanTtdList.isNotEmpty
+        ? cleanTtdList.first
+        : {'nama': '', 'jabatan': '', 'signature': null};
+
     final Map<String, dynamic> reportData = {
       'id': reportId,
       'tanggal': dateKey,
@@ -1048,9 +1340,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       },
 
       // G. Tanda Tangan (TTD) Digital Pengawas
-      'ttdNama': _ttdNamaController.text.trim(),
-      'ttdJabatan': _ttdJabatanController.text.trim(),
-      'ttdSignature': _ttdSignatureBase64,
+      'ttdPengawasList': cleanTtdList,
+      'ttdNama': firstTtd['nama'] ?? '',
+      'ttdJabatan': firstTtd['jabatan'] ?? '',
+      'ttdSignature': firstTtd['signature'],
 
       // Field Kustom Dinamis
       'customFields': cleanCustomFields,
@@ -1118,6 +1411,38 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     _selectedContract!.kegiatans[_selectedKegiatanIndex!] = keg;
 
     Provider.of<ContractProvider>(context, listen: false).updateContract(_selectedContract!);
+
+    try {
+      final timeline = Provider.of<TimelineProvider>(context, listen: false);
+      final kName = keg['namaKegiatan']?.toString() ?? '';
+      final kontraktor = keg['kontraktor']?.toString() ?? '';
+      final dinas = _selectedContract!.instansiDinas.isNotEmpty
+          ? _selectedContract!.instansiDinas.first
+          : 'DPU-PR Kab. Purbalingga';
+      timeline.logEvent(
+        actorName: 'CV. Tata Saka Consultant',
+        actionType: isEdit ? 'UPDATE' : 'CREATE',
+        entityType: 'LAPORAN_HARIAN',
+        contractId: _selectedContract!.id,
+        contractName: _selectedContract!.namaKontrak,
+        kegiatanName: kName,
+        kontraktorName: kontraktor,
+        dinasName: dinas,
+        customTimestamp: DateTime(
+          _selectedDate.year,
+          _selectedDate.month,
+          _selectedDate.day,
+          DateTime.now().hour,
+          DateTime.now().minute,
+        ),
+        title: isEdit
+            ? 'Pembaruan Laporan Harian: $kName ($dateFormatted)'
+            : 'Pembuatan Laporan Harian: $kName ($dateFormatted)',
+        description:
+            'Buku Harian Standar tanggal $dateFormatted telah ${isEdit ? "diperbarui" : "disusun"} untuk kontraktor $kontraktor.',
+        metadata: {'tanggal': dateFormatted},
+      );
+    } catch (_) {}
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1392,7 +1717,17 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     final idx = _selectedKegiatanIndex ?? 0;
     if (idx < 0 || idx >= _selectedContract!.kegiatans.length) return [];
     final keg = _selectedContract!.kegiatans[idx];
-    final rawRkk = keg['rkkDivisiList'] as List? ?? [];
+
+    // Mengambil RKK yang sedang aktif: dari Addendum CCO terakhir jika ada, atau Kontrak Awal
+    List<dynamic> rawRkk = keg['rkkDivisiList'] as List? ?? [];
+    final addendums = keg['addendums'] as List? ?? [];
+    if (addendums.isNotEmpty) {
+      final latest = addendums.last;
+      final addendumDivList = latest['rkkDivisiList'] as List?;
+      if (addendumDivList != null && addendumDivList.isNotEmpty) {
+        rawRkk = addendumDivList;
+      }
+    }
 
     final List<Map<String, dynamic>> flat = [];
     for (final div in rawRkk) {
@@ -1400,13 +1735,18 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       final namaDiv = div['namaDivisi']?.toString() ?? 'DIVISI';
       final items = div['items'] as List? ?? [];
       for (final it in items) {
+        final vol = it['volumeCCO'] ?? it['volume'];
         flat.add({
           'id': '${romawi}_${it['uraian']}',
           'divisiRomawi': romawi,
           'divisiNama': namaDiv,
+          'noMataPembayaran': it['noMataPembayaran']?.toString() ?? '',
           'uraian': it['uraian']?.toString() ?? '',
           'satuan': it['satuan']?.toString() ?? 'm3',
-          'volumeCCO': it['volumeCCO'],
+          'volume': it['volume'] ?? vol,
+          'volumeCCO': vol,
+          'hargaSatuan': it['hargaSatuan'],
+          'totalHarga': it['totalHarga'],
           'nilaiBobot': it['nilaiBobot'],
         });
       }
@@ -1518,60 +1858,271 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                         DropdownButtonFormField<String>(
                           value: (p['rkkItemId'] != null && rkkFlatItems.any((it) => it['id'] == p['rkkItemId']))
                               ? p['rkkItemId'] as String
-                              : (p['rkkItemId'] == 'manual' ? 'manual' : null),
+                              : (rkkFlatItems.any((it) => it['uraian'].toString().toLowerCase() == jenisPekCtrl.text.toLowerCase())
+                                  ? rkkFlatItems.firstWhere((it) => it['uraian'].toString().toLowerCase() == jenisPekCtrl.text.toLowerCase())['id'] as String
+                                  : (jenisPekCtrl.text.isNotEmpty ? jenisPekCtrl.text : null)),
                           isExpanded: true,
                           decoration: _cleanInputDec('Pilih item pekerjaan dari daftar RKK'),
                           items: [
-                            const DropdownMenuItem<String>(
-                              value: 'manual',
-                              child: Text(
-                                '✏️ Input Manual (Pekerjaan Bebas / Lainnya)',
-                                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF4B5563)),
-                              ),
-                            ),
                             ...rkkFlatItems.map((item) {
                               return DropdownMenuItem<String>(
                                 value: item['id'] as String,
                                 child: Text(
-                                  '${item['uraian']} (${item['divisiRomawi']})',
+                                  item['uraian'] as String,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 12.5),
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                                 ),
                               );
                             }),
+                            if (jenisPekCtrl.text.isNotEmpty &&
+                                !rkkFlatItems.any((it) => it['id'] == p['rkkItemId'] || it['uraian'].toString().toLowerCase() == jenisPekCtrl.text.toLowerCase()))
+                              DropdownMenuItem<String>(
+                                value: jenisPekCtrl.text,
+                                child: Text(
+                                  jenisPekCtrl.text,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                ),
+                              ),
                           ],
                           onChanged: (selectedId) {
                             setState(() {
                               p['rkkItemId'] = selectedId;
-                              if (selectedId != null && selectedId != 'manual') {
-                                final matched = rkkFlatItems.firstWhere((it) => it['id'] == selectedId);
-                                jenisPekCtrl.text = matched['uraian'] ?? '';
-                                p['satuan'] = matched['satuan'] ?? '';
-                                p['volumeCCO'] = matched['volumeCCO'];
-                                p['nilaiBobot'] = matched['nilaiBobot'];
-                              } else {
-                                p['satuan'] = '';
+                              if (selectedId != null) {
+                                final matchedList = rkkFlatItems.where((it) => it['id'] == selectedId);
+                                if (matchedList.isNotEmpty) {
+                                  final matched = matchedList.first;
+                                  jenisPekCtrl.text = matched['uraian'] ?? '';
+                                  p['satuan'] = matched['satuan'] ?? '';
+                                  p['noMataPembayaran'] = matched['noMataPembayaran'] ?? '';
+                                  p['targetVolume'] = double.tryParse((matched['volumeCCO'] ?? matched['volume'] ?? 0).toString()) ?? 0.0;
+                                  p['volumeCCO'] = matched['volumeCCO'];
+                                  p['hargaSatuan'] = matched['hargaSatuan'];
+                                  p['nilaiBobot'] = matched['nilaiBobot'];
+                                }
                               }
                             });
                           },
                         ),
+                        const SizedBox(height: 8),
+
+                        // Badges: Mata Pembayaran & Satuan terkunci
+                        if ((p['satuan'] != null && (p['satuan'] as String).isNotEmpty) ||
+                            (p['noMataPembayaran'] != null && (p['noMataPembayaran'] as String).isNotEmpty)) ...[
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              if (p['noMataPembayaran'] != null && (p['noMataPembayaran'] as String).isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFCBD5E1), width: 0.8),
+                                  ),
+                                  child: Text(
+                                    'Mata Pembayaran: ${p['noMataPembayaran']}',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                                  ),
+                                ),
+                              if (p['satuan'] != null && (p['satuan'] as String).isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEFF6FF),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFBFDBFE), width: 0.8),
+                                  ),
+                                  child: Text(
+                                    'Satuan: ${p['satuan']}',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF1D4ED8)),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                      ] else ...[
+                        _buildField(
+                          controller: jenisPekCtrl,
+                          label: 'Jenis Pekerjaan',
+                          hintText: 'Contoh: Pekerjaan Galian Tanah / Pemasangan U-Ditch',
+                          isBold: true,
+                        ),
                         const SizedBox(height: 10),
                       ],
 
-                      _buildField(
-                        controller: jenisPekCtrl,
-                        label: 'Jenis Pekerjaan',
-                        hintText: 'Contoh: Pekerjaan Galian Tanah / Pemasangan U-Ditch',
-                        isBold: true,
-                      ),
-                      const SizedBox(height: 10),
+                      // Volume Input
                       _buildField(
                         controller: volPekCtrl,
-                        label: 'Volume',
+                        label: 'Volume Realisasi Hari Ini *',
                         hintText: (p['satuan'] != null && (p['satuan'] as String).isNotEmpty)
-                            ? 'Contoh: 35.00 ${p['satuan']} (Vol CCO: ${p['volumeCCO'] ?? '-'})'
-                            : 'Contoh: 35 m³ / 120 m²',
+                            ? 'Contoh: 0.30 (${p['satuan']})'
+                            : 'Contoh: 0.30',
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        suffixText: (p['satuan'] != null && (p['satuan'] as String).isNotEmpty) ? p['satuan'] as String : null,
                       ),
+
+                      // Status Card Target & Akumulasi Realisasi
+                      () {
+                        final String satuan = (p['satuan'] ?? '').toString();
+                        final String noMata = (p['noMataPembayaran'] ?? '').toString();
+                        final String rkkId = (p['rkkItemId'] ?? '').toString();
+                        final String jenisStr = jenisPekCtrl.text.trim();
+
+                        double targetVol = 0.0;
+                        if (p['targetVolume'] != null) {
+                          targetVol = (p['targetVolume'] as num).toDouble();
+                        } else if (rkkFlatItems.isNotEmpty) {
+                          final match = rkkFlatItems.firstWhere(
+                            (it) => it['id'] == rkkId || it['uraian'].toString().toLowerCase() == jenisStr.toLowerCase(),
+                            orElse: () => {},
+                          );
+                          if (match.isNotEmpty) {
+                            targetVol = double.tryParse((match['volumeCCO'] ?? match['volume'] ?? 0).toString()) ?? 0.0;
+                          }
+                        }
+
+                        if (targetVol <= 0) return const SizedBox.shrink();
+
+                        final sudahDikerjakan = _calcSudahDikerjakan(
+                          rkkItemId: rkkId,
+                          noMataPembayaran: noMata,
+                          uraian: jenisStr,
+                        );
+
+                        final inputVolStr = volPekCtrl.text.trim().replaceAll(',', '.');
+                        final inputVol = double.tryParse(inputVolStr.split(' ').first) ?? 0.0;
+
+                        final sisaSebelumHariIni = (targetVol - sudahDikerjakan);
+                        final akumulasiTotal = sudahDikerjakan + inputVol;
+                        final persenAkumulasi = targetVol > 0 ? (akumulasiTotal / targetVol) * 100 : 0.0;
+                        final bool isOver = targetVol > 0 && akumulasiTotal > (targetVol + 0.0001);
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 10),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isOver ? const Color(0xFFFEF2F2) : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isOver ? const Color(0xFFF87171) : const Color(0xFFE2E8F0),
+                                  width: isOver ? 1.2 : 1.0,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Status Target & Akumulasi Pekerjaan',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: isOver ? const Color(0xFFB91C1C) : const Color(0xFF334155),
+                                        ),
+                                      ),
+                                      Text(
+                                        '${persenAkumulasi.toStringAsFixed(1)}%',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                          color: isOver ? const Color(0xFFDC2626) : const Color(0xFF0F766E),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: LinearProgressIndicator(
+                                      value: targetVol > 0 ? (akumulasiTotal / targetVol).clamp(0.0, 1.0) : 0.0,
+                                      backgroundColor: const Color(0xFFE2E8F0),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        isOver ? const Color(0xFFDC2626) : const Color(0xFF10B981),
+                                      ),
+                                      minHeight: 6,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _buildMetricTile(
+                                          label: 'Target Kontrak',
+                                          value: '${_formatNumber(targetVol)} $satuan',
+                                          textColor: const Color(0xFF1E293B),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: _buildMetricTile(
+                                          label: 'Sudah Dikerjakan',
+                                          value: '${_formatNumber(sudahDikerjakan)} $satuan',
+                                          textColor: const Color(0xFF475569),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _buildMetricTile(
+                                          label: 'Sisa Target',
+                                          value: '${_formatNumber(sisaSebelumHariIni > 0 ? sisaSebelumHariIni : 0)} $satuan',
+                                          textColor: const Color(0xFF0D9488),
+                                          isBold: true,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: _buildMetricTile(
+                                          label: 'Akumulasi Realisasi',
+                                          value: '${_formatNumber(akumulasiTotal)} $satuan',
+                                          textColor: isOver ? const Color(0xFFDC2626) : const Color(0xFF1E293B),
+                                          isBold: true,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (isOver) ...[
+                                    const SizedBox(height: 10),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFEE2E2),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: const Color(0xFFFCA5A5)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.error_outline, color: Color(0xFFDC2626), size: 16),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              '⛔ Melebihi target kontrak sebesar +${_formatNumber(akumulasiTotal - targetVol)} $satuan. '
+                                              'Penyimpanan dikunci sebelum Addendum CCO diterbitkan.',
+                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF991B1B), height: 1.2),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      }(),
+
                       const SizedBox(height: 10),
                       _buildField(
                         controller: lokPekCtrl,
@@ -1873,9 +2424,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF4B5563)),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF4B5563)),
+                ),
               ),
               InkWell(
                 onTap: onDelete,
@@ -2052,15 +2605,101 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
   Widget _buildSectionG_TandaTangan() {
     return _buildCard(
       title: 'G. TANDA TANGAN PENGAWAS (TTD)',
-      badge: 'Pengesahan',
+      badge: '${_ttdPengawasList.length} Pengawas',
       children: [
-        SignaturePadWidget(
-          nameController: _ttdNamaController,
-          roleController: _ttdJabatanController,
-          initialSignatureBase64: _ttdSignatureBase64,
-          onSignatureChanged: (b64) {
-            _ttdSignatureBase64 = b64;
-          },
+        ..._ttdPengawasList.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final item = entry.value;
+
+          return Container(
+            key: ValueKey(item.id),
+            margin: const EdgeInsets.only(bottom: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF9FAFB),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
+                    border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.navySlate,
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Text(
+                          'Pengawas #${idx + 1}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      if (_ttdPengawasList.length > 1)
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Color(0xFFDC2626), size: 20),
+                          tooltip: 'Hapus Penandatangan #${idx + 1}',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () => _removeTtdPengawasRow(idx),
+                        ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: SignaturePadWidget(
+                    nameController: item.namaController,
+                    roleController: item.jabatanController,
+                    initialSignatureBase64: item.signatureBase64,
+                    onSignatureChanged: (b64) {
+                      item.signatureBase64 = b64;
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+        const SizedBox(height: 4),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => _addTtdPengawasRow(nama: '', jabatan: ''),
+            icon: const Icon(Icons.add, size: 16, color: AppColors.navySlate),
+            label: const Text(
+              'Tambah Penandatangan Pengawas',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.navySlate,
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              side: const BorderSide(color: AppColors.navySlate, width: 1.2),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
         ),
       ],
     );
@@ -3338,6 +3977,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     ValueChanged<String>? onChanged,
+    String? suffixText,
   }) {
     return CleanTextFormField(
       controller: controller,
@@ -3348,6 +3988,15 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       maxLines: maxLines,
       keyboardType: keyboardType,
       onChanged: onChanged,
+      suffixIcon: suffixText != null
+          ? Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: Text(
+                suffixText,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.slate),
+              ),
+            )
+          : null,
     );
   }
 

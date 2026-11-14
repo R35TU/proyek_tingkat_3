@@ -35,4 +35,29 @@ class AppColors {
   static const Color primaryRed = Color(0xFFDC2626);     // Danger / Delete / Error
   static const Color successGreen = Color(0xFF10B981);  // Success / Selesai / Positive
   static const Color warningOrange = Color(0xFFF59E0B); // Warning / Pending
+
+  // ─── DYNAMIC THEME HELPERS ───
+  static bool isDark(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark;
+
+  static Color getBackground(BuildContext context) =>
+      isDark(context) ? const Color(0xFF0F172A) : softGray;
+
+  static Color getCardBackground(BuildContext context) =>
+      isDark(context) ? const Color(0xFF1E293B) : Colors.white;
+
+  static Color getTextDark(BuildContext context) =>
+      isDark(context) ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
+
+  static Color getTextLight(BuildContext context) =>
+      isDark(context) ? const Color(0xFF94A3B8) : slate;
+
+  static Color getBorder(BuildContext context) =>
+      isDark(context) ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+
+  static Color getSurfaceLighter(BuildContext context) =>
+      isDark(context) ? const Color(0xFF243046) : const Color(0xFFF1F5F9);
+
+  static Color getPrimary(BuildContext context) =>
+      isDark(context) ? const Color(0xFF38BDF8) : navySlate;
 }

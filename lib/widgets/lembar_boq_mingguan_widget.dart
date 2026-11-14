@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:tata_saka_app/models/kegiatan_model.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
 
 class LembarBoqMingguanWidget extends StatelessWidget {
@@ -64,6 +63,17 @@ class LembarBoqMingguanWidget extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (onDownloadPdf != null) ...[
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: onDownloadPdf,
+                  icon: const Icon(Icons.picture_as_pdf, size: 14, color: Color(0xFF1E3A8A)),
+                  label: const Text('Export PDF BoQ 8-Kolom', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+                ),
+              ),
+              const SizedBox(height: 6),
+            ],
             // 1. JUDUL RESMI
             Center(
               child: Column(
@@ -135,14 +145,29 @@ class LembarBoqMingguanWidget extends StatelessWidget {
       return report.boqProgressList!;
     }
 
-    // Check if kegiatan has rkkDivisiList
-    final rawRkk = (kegiatan?['rkkDivisiList'] as List?) ?? [];
+    // Prioritaskan rkkDivisiList dari addendum terakhir jika ada, jika tidak gunakan rkkDivisiList Kontrak Awal
+    List rawRkk = [];
+    if (kegiatan != null) {
+      final adds = (kegiatan!['addendums'] as List?) ?? [];
+      if (adds.isNotEmpty) {
+        final latest = adds.last;
+        final divList = (latest['rkkDivisiList'] as List?);
+        if (divList != null && divList.isNotEmpty) {
+          rawRkk = divList;
+        }
+      }
+      if (rawRkk.isEmpty) {
+        rawRkk = (kegiatan!['rkkDivisiList'] as List?) ?? [];
+      }
+    }
 
     // Map each division and calculate / attach weekly volumes
     final List<Map<String, dynamic>> calculated = [];
 
     // Extract all daily reports in kegiatan to compute actual cumulative progress
     final dailyReports = (kegiatan?['laporans'] as List?) ?? [];
+    final startDt = WeeklyReportModel.parseIndonesianDate(report.periodeAwal);
+    final endDt = WeeklyReportModel.parseIndonesianDate(report.periodeAkhir);
 
     for (final rawDiv in rawRkk) {
       final div = Map<String, dynamic>.from(rawDiv);
@@ -152,8 +177,8 @@ class LembarBoqMingguanWidget extends StatelessWidget {
       for (final rawIt in rawItems) {
         final it = Map<String, dynamic>.from(rawIt);
         final noMata = (it['noMataPembayaran'] ?? '').toString();
-        final volCCO = (it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
-        final bbtCCO = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
+        final volKontrak = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
+        final bbtKontrak = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
 
         // Calculate volumes from daily reports if available
         double volMingguIni = 0.0;
@@ -161,28 +186,55 @@ class LembarBoqMingguanWidget extends StatelessWidget {
 
         for (final rep in dailyReports) {
           if (rep is Map) {
+            DateTime? repDate;
+            final repTglStr = rep['tanggal']?.toString() ?? '';
+            if (repTglStr.isNotEmpty) {
+              repDate = WeeklyReportModel.parseIndonesianDate(repTglStr) ?? DateTime.tryParse(repTglStr);
+            }
+
+            bool isMingguIni = false;
+            bool isMingguLalu = false;
+
+            if (startDt != null && endDt != null && repDate != null) {
+              final repDayOnly = DateTime(repDate.year, repDate.month, repDate.day);
+              final startDayOnly = DateTime(startDt.year, startDt.month, startDt.day);
+              final endDayOnly = DateTime(endDt.year, endDt.month, endDt.day);
+
+              if (repDayOnly.isBefore(startDayOnly)) {
+                isMingguLalu = true;
+              } else if (!repDayOnly.isAfter(endDayOnly)) {
+                isMingguIni = true;
+              }
+            } else {
+              isMingguIni = true;
+            }
+
             final pList = (rep['pekerjaanList'] as List?) ?? [];
             for (final p in pList) {
               if (p is Map) {
-                final matchNoMata = p['noMataPembayaran']?.toString().trim() == noMata.trim();
-                final matchUraian = p['jenis']?.toString().trim() == it['uraian']?.toString().trim();
+                final matchNoMata = p['noMataPembayaran']?.toString().trim() == noMata.trim() && noMata.isNotEmpty;
+                final matchUraian = p['jenis']?.toString().trim().toLowerCase() == it['uraian']?.toString().trim().toLowerCase() ||
+                    p['uraian']?.toString().trim().toLowerCase() == it['uraian']?.toString().trim().toLowerCase();
                 if (matchNoMata || matchUraian) {
                   final vStr = (p['volume'] ?? '').toString();
-                  final vNum = double.tryParse(vStr.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
-                  // If report date is within this week:
-                  volMingguIni += vNum;
+                  final vNum = double.tryParse(vStr.split(' ').first.replaceAll(',', '.')) ?? 0.0;
+                  if (isMingguIni) {
+                    volMingguIni += vNum;
+                  } else if (isMingguLalu) {
+                    volMingguLalu += vNum;
+                  }
                 }
               }
             }
           }
         }
 
-        final bbtMingguLalu = volCCO > 0 ? (volMingguLalu / volCCO) * bbtCCO : 0.0;
-        final bbtMingguIni = volCCO > 0 ? (volMingguIni / volCCO) * bbtCCO : 0.0;
+        final bbtMingguLalu = volKontrak > 0 ? (volMingguLalu / volKontrak) * bbtKontrak : 0.0;
+        final bbtMingguIni = volKontrak > 0 ? (volMingguIni / volKontrak) * bbtKontrak : 0.0;
         final volSdMingguIni = volMingguLalu + volMingguIni;
         final bbtSdMingguIni = bbtMingguLalu + bbtMingguIni;
-        final volSisa = (volCCO - volSdMingguIni).clamp(0.0, volCCO);
-        final bbtSisa = (bbtCCO - bbtSdMingguIni).clamp(0.0, bbtCCO);
+        final volSisa = (volKontrak - volSdMingguIni).clamp(0.0, volKontrak);
+        final bbtSisa = (bbtKontrak - bbtSdMingguIni).clamp(0.0, bbtKontrak);
 
         it['mingguLaluVolume'] = volMingguLalu;
         it['mingguLaluBobot'] = bbtMingguLalu;
@@ -261,7 +313,7 @@ class LembarBoqMingguanWidget extends StatelessWidget {
         0: FixedColumnWidth(36),  // NO
         1: FlexColumnWidth(3.5),  // URAIAN
         2: FixedColumnWidth(48),  // Satuan
-        3: FixedColumnWidth(64),  // Vol CCO
+        3: FixedColumnWidth(64),  // Vol Kontrak
         4: FixedColumnWidth(58),  // Nilai Bobot
         5: FixedColumnWidth(54),  // Mgg Lalu Vol
         6: FixedColumnWidth(52),  // Mgg Lalu Bobot
@@ -281,7 +333,7 @@ class LembarBoqMingguanWidget extends StatelessWidget {
             _th('NO.', height: 42),
             _th('URAIAN'),
             _th('Satuan'),
-            _th('Volume\nCCO'),
+            _th('Volume\nKontrak'),
             _th('Nilai\nBobot\n%'),
             _th('MINGGU LALU\nVol'),
             _th('MINGGU LALU\n%'),
@@ -330,8 +382,8 @@ class LembarBoqMingguanWidget extends StatelessWidget {
 
               final uraian = (it['uraian'] ?? '').toString();
               final satuan = (it['satuan'] ?? '').toString();
-              final volCCO = (it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
-              final bbtCCO = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
+              final volKontrak = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
+              final bbtKontrak = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
 
               final mlVol = (it['mingguLaluVolume'] as num?)?.toDouble() ?? 0.0;
               final mlBbt = (it['mingguLaluBobot'] as num?)?.toDouble() ?? 0.0;
@@ -347,8 +399,8 @@ class LembarBoqMingguanWidget extends StatelessWidget {
                   _tdText('$idx', align: TextAlign.center),
                   _tdText(uraian),
                   _tdText(satuan, align: TextAlign.center),
-                  _tdText(volCCO > 0 ? _fmtNum(volCCO) : '-', align: TextAlign.right),
-                  _tdText(bbtCCO > 0 ? _fmtNum(bbtCCO, dec: 3) : '-', align: TextAlign.right),
+                  _tdText(volKontrak > 0 ? _fmtNum(volKontrak) : '-', align: TextAlign.right),
+                  _tdText(bbtKontrak > 0 ? _fmtNum(bbtKontrak, dec: 3) : '-', align: TextAlign.right),
                   _tdText(mlVol > 0 ? _fmtNum(mlVol) : '-', align: TextAlign.right),
                   _tdText(mlBbt > 0 ? _fmtNum(mlBbt, dec: 2) : '-', align: TextAlign.right),
                   _tdText(miVol > 0 ? _fmtNum(miVol) : '-', align: TextAlign.right),
@@ -434,7 +486,7 @@ class LembarBoqMingguanWidget extends StatelessWidget {
     );
   }
 
-  Widget _th(String text, {double? height, int colSpan = 1}) {
+  Widget _th(String text, {double? height}) {
     return Container(
       height: height,
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),

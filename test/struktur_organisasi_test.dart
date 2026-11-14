@@ -71,7 +71,7 @@ void main() {
   });
 
   group('DetailKontrakScreen UI Tests', () {
-    testWidgets('DetailKontrakScreen renders Struktur Anggota Konsultan below Spesifikasi Kontrak', (WidgetTester tester) async {
+    testWidgets('DetailKontrakScreen renders Struktur Personel Konsultan below Spesifikasi Kontrak', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(400, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -119,12 +119,12 @@ void main() {
       // Verify Spesifikasi Kontrak exists
       expect(find.text('Spesifikasi Kontrak'), findsOneWidget);
 
-      // Scroll down to see Struktur Anggota Konsultan
+      // Scroll down to see Struktur Personel Konsultan
       await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -350));
       await tester.pumpAndSettle();
 
-      // Verify Struktur Anggota Konsultan exists right below Spesifikasi Kontrak
-      expect(find.text('Struktur Anggota Konsultan'), findsOneWidget);
+      // Verify Struktur Personel Konsultan exists right below Spesifikasi Kontrak
+      expect(find.text('Struktur Personel Konsultan'), findsOneWidget);
       expect(find.text('Site Engineer'), findsOneWidget);
       expect(find.text('SENDAYU GALIH KUSUMA, ST'), findsOneWidget);
       expect(find.text('Inspektor'), findsOneWidget);
@@ -157,11 +157,11 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Scroll down to Struktur Anggota Konsultan in form
+      // Scroll down to Struktur Personel Konsultan in form
       await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -600));
       await tester.pumpAndSettle();
 
-      expect(find.text('Struktur Anggota Konsultan'), findsOneWidget);
+      expect(find.text('Struktur Personel Konsultan'), findsOneWidget);
       expect(find.text('Site Engineer'), findsOneWidget);
       expect(find.text('Inspektor'), findsOneWidget);
       expect(find.text('Administrasi'), findsOneWidget);
