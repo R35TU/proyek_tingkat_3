@@ -46,6 +46,25 @@ class KegiatanModel {
 
   // Master Data Rincian Kuantitas & Bobot Pekerjaan (RKK / BoQ Kontrak)
   List<Map<String, dynamic>> rkkDivisiList;
+  List<Map<String, dynamic>> rkkKontrakAwal;
+  List<Map<String, dynamic>> addendums;
+
+  List<Map<String, dynamic>> get activeRkkDivisiList {
+    if (addendums.isNotEmpty) {
+      final divisiList = addendums.last['rkkDivisiList'] as List?;
+      if (divisiList != null && divisiList.isNotEmpty) {
+        return divisiList
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      }
+    }
+    return rkkKontrakAwal.isNotEmpty ? rkkKontrakAwal : rkkDivisiList;
+  }
+
+  bool get hasAddendum => addendums.isNotEmpty;
+  int get totalAddendumCount => addendums.length;
+  Map<String, dynamic>? get latestAddendum =>
+      addendums.isNotEmpty ? addendums.last : null;
 
   KegiatanModel({
     required this.namaKegiatan,
@@ -79,6 +98,8 @@ class KegiatanModel {
     List<dynamic>? laporans,
     List<dynamic>? laporanMingguan,
     List<Map<String, dynamic>>? rkkDivisiList,
+    List<Map<String, dynamic>>? rkkKontrakAwal,
+    List<Map<String, dynamic>>? addendums,
   })  : folders = folders ?? [
           {'name': 'Laporan Harian', 'isExpanded': false, 'documents': []},
           {'name': 'Laporan Mingguan', 'isExpanded': false, 'documents': []},
@@ -86,7 +107,12 @@ class KegiatanModel {
         ],
         laporans = laporans ?? [],
         laporanMingguan = laporanMingguan ?? [],
-        rkkDivisiList = rkkDivisiList ?? [];
+        rkkDivisiList = rkkDivisiList ?? [],
+        rkkKontrakAwal = rkkKontrakAwal ??
+            (rkkDivisiList != null
+                ? List<Map<String, dynamic>>.from(rkkDivisiList)
+                : []),
+        addendums = addendums ?? [];
 
   /// Menghitung Waktu yang Telah Berjalan secara dinamis berdasarkan Awal Pelaksanaan vs Hari ini
   static String calculateWaktuBerjalan(String awalPelaksanaanStr) {
@@ -295,6 +321,14 @@ class KegiatanModel {
           ? List<Map<String, dynamic>>.from(
               (json['rkkDivisiList'] as List).map((e) => Map<String, dynamic>.from(e)))
           : null,
+      rkkKontrakAwal: json['rkkKontrakAwal'] != null
+          ? List<Map<String, dynamic>>.from(
+              (json['rkkKontrakAwal'] as List).map((e) => Map<String, dynamic>.from(e)))
+          : null,
+      addendums: json['addendums'] != null
+          ? List<Map<String, dynamic>>.from(
+              (json['addendums'] as List).map((e) => Map<String, dynamic>.from(e)))
+          : null,
     );
   }
 
@@ -343,6 +377,9 @@ class KegiatanModel {
       'laporans': laporans,
       'laporanMingguan': laporanMingguan,
       'rkkDivisiList': rkkDivisiList,
+      'rkkKontrakAwal':
+          rkkKontrakAwal.isNotEmpty ? rkkKontrakAwal : rkkDivisiList,
+      'addendums': addendums,
     };
   }
 
