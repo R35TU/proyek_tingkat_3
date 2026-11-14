@@ -56,7 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final success = userProf.login(username, password, roleHint: selectedRole);
 
     if (success) {
-      Navigator.pushReplacementNamed(context, '/main');
+      Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

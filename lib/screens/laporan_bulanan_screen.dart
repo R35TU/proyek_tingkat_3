@@ -324,7 +324,13 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+            }
+          },
         ),
         actions: [
           IconButton(

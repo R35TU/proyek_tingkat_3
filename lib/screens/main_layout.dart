@@ -26,7 +26,9 @@ class _MainLayoutState extends State<MainLayout> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final navBg = isDark ? const Color(0xFF1E293B) : Colors.white;
     final navBorder = isDark ? const Color(0xFF334155) : AppColors.border;
-    final selectedColor = isDark ? const Color(0xFF38BDF8) : AppColors.navySlate;
+    final selectedColor = isDark
+        ? const Color(0xFF38BDF8)
+        : AppColors.navySlate;
     final unselectedColor = isDark ? const Color(0xFF94A3B8) : AppColors.slate;
 
     final lblDashboard = userProf.tr('nav_dashboard');
@@ -108,32 +110,40 @@ class _MainLayoutState extends State<MainLayout> {
       _currentIndex = 0;
     }
 
+    final bool isWeb = MediaQuery.of(context).size.width >= 900;
+
     return Scaffold(
       body: screens[_currentIndex],
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: navBg,
-          border: Border(
-            top: BorderSide(color: navBorder, width: 0.8),
-          ),
-        ),
-        child: BottomNavigationBar(
-          elevation: 0,
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: navBg,
-          selectedItemColor: selectedColor,
-          unselectedItemColor: unselectedColor,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
-          items: navItems,
-        ),
-      ),
+      bottomNavigationBar: isWeb
+          ? null
+          : Container(
+              decoration: BoxDecoration(
+                color: navBg,
+                border: Border(top: BorderSide(color: navBorder, width: 0.8)),
+              ),
+              child: BottomNavigationBar(
+                elevation: 0,
+                currentIndex: _currentIndex,
+                onTap: (index) {
+                  setState(() {
+                    _currentIndex = index;
+                  });
+                },
+                type: BottomNavigationBarType.fixed,
+                backgroundColor: navBg,
+                selectedItemColor: selectedColor,
+                unselectedItemColor: unselectedColor,
+                selectedLabelStyle: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 12,
+                ),
+                items: navItems,
+              ),
+            ),
     );
   }
 }

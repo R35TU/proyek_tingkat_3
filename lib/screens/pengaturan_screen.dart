@@ -397,7 +397,13 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: AppColors.getTextDark(context)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+            }
+          },
         ),
         title: Consumer<UserProfileProvider>(
           builder: (context, userProf, child) => Text(

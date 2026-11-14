@@ -4,6 +4,7 @@ import 'package:tata_saka_app/screens/data_laporan_screen.dart';
 import 'package:tata_saka_app/screens/buat_laporan_screen.dart';
 import 'package:tata_saka_app/screens/buat_laporan_mingguan_screen.dart';
 import 'package:tata_saka_app/screens/laporan_bulanan_screen.dart';
+import 'package:tata_saka_app/screens/dashboard_screen.dart';
 
 class LaporanScreen extends StatelessWidget {
   const LaporanScreen({super.key});
@@ -16,8 +17,18 @@ class LaporanScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.menu, color: AppColors.textDark),
-          onPressed: () {},
+          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                '/main',
+                (route) => false,
+              );
+            }
+          },
         ),
         title: const Text(
           'Laporan Proyek',
@@ -30,7 +41,10 @@ class LaporanScreen extends StatelessWidget {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none, color: AppColors.textDark),
+            icon: const Icon(
+              Icons.notifications_none,
+              color: AppColors.textDark,
+            ),
             onPressed: () {},
           ),
         ],
@@ -146,11 +160,7 @@ class LaporanScreen extends StatelessWidget {
                     color: iconBgColor,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    icon,
-                    color: iconColor,
-                    size: 28,
-                  ),
+                  child: Icon(icon, color: iconColor, size: 28),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -176,10 +186,7 @@ class LaporanScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right,
-                  color: AppColors.textLight,
-                ),
+                const Icon(Icons.chevron_right, color: AppColors.textLight),
               ],
             ),
           ),

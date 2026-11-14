@@ -1,13 +1,18 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
+import 'package:tata_saka_app/screens/buat_laporan_screen.dart';
 import 'package:tata_saka_app/screens/detail_kegiatan_screen.dart';
 import 'package:tata_saka_app/screens/detail_kontrak_screen.dart';
 import 'package:tata_saka_app/screens/kontrak_screen.dart';
 import 'package:tata_saka_app/screens/laporan_screen.dart';
 import 'package:tata_saka_app/screens/data_laporan_screen.dart';
+
+import 'buat_laporan_mingguan_screen.dart';
+
 import 'package:tata_saka_app/screens/laporan_bulanan_screen.dart';
 import 'package:tata_saka_app/screens/timeline_screen.dart';
 import 'package:tata_saka_app/screens/pengaturan_screen.dart';
@@ -40,7 +45,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
       if (_pageController.hasClients) {
-        final contractCount = Provider.of<ContractProvider>(context, listen: false).contracts.length;
+        final contractCount = Provider.of<ContractProvider>(
+          context,
+          listen: false,
+        ).contracts.length;
         if (contractCount > 1) {
           int nextPage = _currentPage + 1;
           if (nextPage >= contractCount) {
@@ -91,214 +99,283 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (safeUserProf.isDinas) {
       final agency = safeUserProf.companyOrAgency.toLowerCase();
       contracts = allContracts.where((c) {
-        return c.instansiDinas.any((d) =>
-            d.toLowerCase().contains(agency) ||
-            agency.contains(d.toLowerCase()) ||
-            d.toLowerCase().contains('dpu') ||
-            agency.contains('dpu'));
+        return c.instansiDinas.any(
+          (d) =>
+              d.toLowerCase().contains(agency) ||
+              agency.contains(d.toLowerCase()) ||
+              d.toLowerCase().contains('dpu') ||
+              agency.contains('dpu'),
+        );
       }).toList();
     } else {
       contracts = allContracts;
     }
-    
+
     final int totalKontrak = contracts.length;
-    final int kontrakAktif = contracts.where((c) => c.status != 'Selesai').length;
-    final int kontrakSelesai = contracts.where((c) => c.status == 'Selesai').length;
+    final int kontrakAktif = contracts
+        .where((c) => c.status != 'Selesai')
+        .length;
+    final int kontrakSelesai = contracts
+        .where((c) => c.status == 'Selesai')
+        .length;
 
     final bool isWeb = MediaQuery.of(context).size.width >= 900;
 
     final Widget mainBody = SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
       child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Welcome Section with Dynamic Branding
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        safeUserProf.tr('dash_welcome'),
-                        style: TextStyle(color: AppColors.getTextLight(context), fontSize: 13, fontWeight: FontWeight.w600),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Welcome Section with Dynamic Branding
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      safeUserProf.tr('dash_welcome'),
+                      style: TextStyle(
+                        color: AppColors.getTextLight(context),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        safeUserProf.namaLengkap,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: AppColors.getTextDark(context),
-                          fontSize: 21,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.4,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        safeUserProf.isDinas
-                            ? safeUserProf.tr('dash_subtitle_dinas')
-                            : safeUserProf.tr('dash_subtitle_konsultan'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: AppColors.getTextLight(context), fontSize: 12.5, fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  width: 52,
-                  height: 52,
-                  padding: const EdgeInsets.all(5),
-                  decoration: BoxDecoration(
-                    color: AppColors.getCardBackground(context),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.getBorder(context), width: 1),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Image.asset(
-                    'assets/images/logoRev.png',
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => Icon(
-                      Icons.business,
-                      color: AppColors.getTextDark(context),
-                      size: 26,
                     ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // 3 Grid Stats (Corporate Slate harmonized)
-            Row(
-              children: [
-                Expanded(child: _buildStatCard(safeUserProf.tr('dash_total_kontrak'), totalKontrak.toString(), Icons.folder_outlined, AppColors.slateLighter, AppColors.navySlate)),
-                const SizedBox(width: 12),
-                Expanded(child: _buildStatCard(safeUserProf.tr('dash_kontrak_aktif'), kontrakAktif.toString(), Icons.trending_up, const Color(0xFFE6F4EA), AppColors.successGreen)),
-                const SizedBox(width: 12),
-                Expanded(child: _buildStatCard(safeUserProf.tr('dash_kontrak_selesai'), kontrakSelesai.toString(), Icons.check_circle_outline, AppColors.slateLighter, AppColors.slate)),
-              ],
-            ),
-            
-            const SizedBox(height: 28),
-
-            // Carousel Section
-            if (contracts.isNotEmpty) ...[
-              SizedBox(
-                height: 200,
-                child: PageView.builder(
-                  controller: _pageController,
-                  onPageChanged: (index) {
-                    setState(() {
-                      _currentPage = index;
-                    });
-                  },
-                  itemCount: contracts.length,
-                  itemBuilder: (context, index) {
-                    final contract = contracts[index];
-                    return _buildCarouselCard(contract);
-                  },
+                    const SizedBox(height: 2),
+                    Text(
+                      safeUserProf.namaLengkap,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.getTextDark(context),
+                        fontSize: 21,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      safeUserProf.isDinas
+                          ? safeUserProf.tr('dash_subtitle_dinas')
+                          : safeUserProf.tr('dash_subtitle_konsultan'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.getTextLight(context),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
-              // Carousel Dots
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  contracts.length,
-                  (index) => Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: _currentPage == index ? 24 : 8,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: _currentPage == index ? AppColors.navySlate : const Color(0xFFCBD5E1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ),
-              ),
-            ] else ...[
+              const SizedBox(width: 12),
               Container(
-                padding: const EdgeInsets.all(24),
+                width: 52,
+                height: 52,
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: AppColors.getCardBackground(context),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.getBorder(context),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Image.asset(
+                  'assets/images/logoRev.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => Icon(
+                    Icons.business,
+                    color: AppColors.getTextDark(context),
+                    size: 26,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // 3 Grid Stats (Corporate Slate harmonized)
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  safeUserProf.tr('dash_total_kontrak'),
+                  totalKontrak.toString(),
+                  Icons.folder_outlined,
+                  AppColors.slateLighter,
+                  AppColors.navySlate,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatCard(
+                  safeUserProf.tr('dash_kontrak_aktif'),
+                  kontrakAktif.toString(),
+                  Icons.trending_up,
+                  const Color(0xFFE6F4EA),
+                  AppColors.successGreen,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatCard(
+                  safeUserProf.tr('dash_kontrak_selesai'),
+                  kontrakSelesai.toString(),
+                  Icons.check_circle_outline,
+                  AppColors.slateLighter,
+                  AppColors.slate,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 28),
+
+          // Carousel Section
+          if (contracts.isNotEmpty) ...[
+            SizedBox(
+              height: 200,
+              child: PageView.builder(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentPage = index;
+                  });
+                },
+                itemCount: contracts.length,
+                itemBuilder: (context, index) {
+                  final contract = contracts[index];
+                  return _buildCarouselCard(contract);
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Carousel Dots
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                contracts.length,
+                (index) => Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: _currentPage == index ? 24 : 8,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _currentPage == index
+                        ? AppColors.navySlate
+                        : const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(24),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: const Column(
+                children: [
+                  Icon(Icons.inbox, size: 48, color: AppColors.textLight),
+                  SizedBox(height: 12),
+                  Text(
+                    'Belum ada kontrak',
+                    style: TextStyle(
+                      color: AppColors.textLight,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 32),
+          // Aktivitas Terkini
+          const Text(
+            'Aktivitas Terkini',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: AppColors.textDark,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Builder(
+            builder: (context) {
+              final activities = _extractRecentActivities(contracts);
+              if (activities.isNotEmpty) {
+                return Column(
+                  children: activities
+                      .take(5)
+                      .map(
+                        (act) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _buildActivityItem(
+                            act['title']!,
+                            act['desc']!,
+                            act['time']!,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                );
+              }
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 24,
+                  horizontal: 16,
+                ),
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: AppColors.border, width: 0.8),
                 ),
                 child: const Column(
                   children: [
-                    Icon(Icons.inbox, size: 48, color: AppColors.textLight),
-                    SizedBox(height: 12),
-                    Text('Belum ada kontrak', style: TextStyle(color: AppColors.textLight, fontWeight: FontWeight.bold)),
+                    Icon(
+                      Icons.history_toggle_off,
+                      size: 40,
+                      color: AppColors.slate,
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      'Belum Ada Aktivitas Terkini',
+                      style: TextStyle(
+                        color: AppColors.navySlate,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Aktivitas pembuatan laporan dan dokumen akan tercatat di sini secara otomatis.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.slate, fontSize: 11.5),
+                    ),
                   ],
                 ),
-              ),
-            ],
-
-            const SizedBox(height: 32),
-            // Aktivitas Terkini
-            const Text(
-              'Aktivitas Terkini',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: AppColors.textDark,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Builder(
-              builder: (context) {
-                final activities = _extractRecentActivities(contracts);
-                if (activities.isNotEmpty) {
-                  return Column(
-                    children: activities.take(5).map((act) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _buildActivityItem(act['title']!, act['desc']!, act['time']!),
-                    )).toList(),
-                  );
-                }
-                return Container(
-                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.border, width: 0.8),
-                  ),
-                  child: const Column(
-                    children: [
-                      Icon(Icons.history_toggle_off, size: 40, color: AppColors.slate),
-                      SizedBox(height: 10),
-                      Text(
-                        'Belum Ada Aktivitas Terkini',
-                        style: TextStyle(color: AppColors.navySlate, fontWeight: FontWeight.bold, fontSize: 13.5),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Aktivitas pembuatan laporan dan dokumen akan tercatat di sini secara otomatis.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: AppColors.slate, fontSize: 11.5),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      );
+              );
+            },
+          ),
+        ],
+      ),
+    );
 
     return Scaffold(
       backgroundColor: AppColors.getBackground(context),
@@ -338,18 +415,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: Icon(Icons.notifications_none, color: AppColors.getTextDark(context)),
+            icon: Icon(
+              Icons.notifications_none,
+              color: AppColors.getTextDark(context),
+            ),
             onPressed: () {},
           ),
         ],
       ),
       drawer: isWeb
           ? null
-          : _buildWebSidebar(
-              context,
-              userProf: safeUserProf,
-              isDrawer: true,
-            ),
+          : _buildWebSidebar(context, userProf: safeUserProf, isDrawer: true),
       body: isWeb
           ? Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -360,7 +436,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   isCollapsed: !_isWebSidebarOpen,
                   isDrawer: false,
                 ),
-                const VerticalDivider(width: 1, thickness: 1, color: Color(0xFF1E293B)),
+                const VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: Color(0xFF1E293B),
+                ),
                 Expanded(child: mainBody),
               ],
             )
@@ -368,7 +448,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  List<Map<String, String>> _extractRecentActivities(List<ContractModel> contracts) {
+  List<Map<String, String>> _extractRecentActivities(
+    List<ContractModel> contracts,
+  ) {
     final List<Map<String, String>> list = [];
     for (final c in contracts) {
       for (final keg in c.kegiatans) {
@@ -377,7 +459,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (rep is Map) {
             list.add({
               'title': 'Laporan Harian Ditambahkan',
-              'desc': '${rep['tanggalFormatted'] ?? rep['tanggal'] ?? 'Laporan'} - ${keg['namaKegiatan'] ?? c.namaKontrak}',
+              'desc':
+                  '${rep['tanggalFormatted'] ?? rep['tanggal'] ?? 'Laporan'} - ${keg['namaKegiatan'] ?? c.namaKontrak}',
               'time': (rep['jam'] ?? 'Hari ini').toString(),
             });
           }
@@ -387,7 +470,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (m is Map) {
             list.add({
               'title': 'Laporan Mingguan Dibuat',
-              'desc': 'Minggu ke-${m['mingguKe']} - ${keg['namaKegiatan'] ?? c.namaKontrak}',
+              'desc':
+                  'Minggu ke-${m['mingguKe']} - ${keg['namaKegiatan'] ?? c.namaKontrak}',
               'time': (m['periodeAkhir'] ?? 'Minggu ini').toString(),
             });
           }
@@ -415,11 +499,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildCarouselCard(ContractModel contract) {
     int totalKegiatan = contract.kegiatans.length;
 
-    bool isPengawasan = contract.jenisKegiatan.toLowerCase().contains('pengawasan');
-    
+    bool isPengawasan = contract.jenisKegiatan.toLowerCase().contains(
+      'pengawasan',
+    );
+
     // Harmonized badge color in Corporate Slate
-    Color badgeBgColor = isPengawasan ? AppColors.slateLighter : const Color(0xFFFEF3C7);
-    Color badgeTextColor = isPengawasan ? AppColors.navySlate : const Color(0xFFB45309);
+    Color badgeBgColor = isPengawasan
+        ? AppColors.slateLighter
+        : const Color(0xFFFEF3C7);
+    Color badgeTextColor = isPengawasan
+        ? AppColors.navySlate
+        : const Color(0xFFB45309);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -457,7 +547,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: badgeBgColor,
                   borderRadius: BorderRadius.circular(8),
@@ -488,7 +581,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       value: contract.progressFisik,
                       strokeWidth: 8,
                       backgroundColor: AppColors.slateLighter,
-                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.navySlate),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppColors.navySlate,
+                      ),
                     ),
                   ),
                   Column(
@@ -511,7 +606,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                     ],
-                  )
+                  ),
                 ],
               ),
               const SizedBox(width: 24),
@@ -565,7 +660,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color bgColor, Color iconColor) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color bgColor,
+    Color iconColor,
+  ) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -604,11 +705,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   color: bgColor,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: 16,
-                ),
+                child: Icon(icon, color: iconColor, size: 16),
               ),
             ],
           ),
@@ -650,10 +747,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: AppColors.slateLighter,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.folder,
-              color: AppColors.navySlate,
-            ),
+            child: const Icon(Icons.folder, color: AppColors.navySlate),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -729,11 +823,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         bool isMine = false;
         if (kKontraktor.isNotEmpty) {
-          if (kKontraktor.contains(contractorName) || contractorName.contains(kKontraktor)) {
+          if (kKontraktor.contains(contractorName) ||
+              contractorName.contains(kKontraktor)) {
             isMine = true;
-          } else if (contractorName.contains('divan') && kKontraktor.contains('divan')) {
+          } else if (contractorName.contains('divan') &&
+              kKontraktor.contains('divan')) {
             isMine = true;
-          } else if (contractorName.contains('langgeng') && kKontraktor.contains('langgeng')) {
+          } else if (contractorName.contains('langgeng') &&
+              kKontraktor.contains('langgeng')) {
             isMine = true;
           }
         }
@@ -749,294 +846,349 @@ class _DashboardScreenState extends State<DashboardScreen> {
     for (final k in myKegiatans) {
       sumProgress += _calcKegiatanProgress(k);
     }
-    final double avgProgress = myKegiatans.isNotEmpty ? (sumProgress / myKegiatans.length) : 0.0;
+    final double avgProgress = myKegiatans.isNotEmpty
+        ? (sumProgress / myKegiatans.length)
+        : 0.0;
 
     final bool isWeb = MediaQuery.of(context).size.width >= 900;
 
     final Widget contractorBody = SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
       child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Welcome Section
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Welcome Section
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Selamat Datang,',
+                        style: TextStyle(
+                          color: AppColors.slate,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        userProf.namaLengkap,
+                        style: const TextStyle(
+                          color: AppColors.navySlate,
+                          fontSize: 18.5,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFDBEAFE)),
+                        ),
+                        child: const Text(
+                          'Penyedia Jasa / Kontraktor Pelaksana',
+                          style: TextStyle(
+                            color: Color(0xFF1D4ED8),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                  ),
+                  child: const Icon(
+                    Icons.engineering_outlined,
+                    color: Color(0xFF2563EB),
+                    size: 26,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // 3 Stat Cards Khusus Kegiatan
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  'Kegiatan Saya',
+                  myKegiatans.length.toString(),
+                  Icons.assignment_outlined,
+                  AppColors.slateLighter,
+                  AppColors.navySlate,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatCard(
+                  'Rata-rata Progres',
+                  '${avgProgress.toStringAsFixed(1)}%',
+                  Icons.trending_up,
+                  const Color(0xFFE6F4EA),
+                  AppColors.successGreen,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatCard(
+                  'Status',
+                  'Aktif',
+                  Icons.check_circle_outline,
+                  AppColors.slateLighter,
+                  AppColors.slate,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 26),
+
+          // Daftar Kegiatan Pelaksanaan Saya
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Kegiatan Pelaksanaan Saya',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: AppColors.textDark,
+                ),
+              ),
+              Text(
+                '${myKegiatans.length} Kegiatan',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.slate,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          if (myKegiatans.isEmpty)
             Container(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+              width: double.infinity,
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppColors.border),
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Selamat Datang,',
-                          style: TextStyle(color: AppColors.slate, fontSize: 12.5, fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          userProf.namaLengkap,
-                          style: const TextStyle(
-                            color: AppColors.navySlate,
-                            fontSize: 18.5,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEFF6FF),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFFDBEAFE)),
-                          ),
-                          child: const Text(
-                            'Penyedia Jasa / Kontraktor Pelaksana',
-                            style: TextStyle(
-                              color: Color(0xFF1D4ED8),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
+                  const Icon(
+                    Icons.assignment_late_outlined,
+                    size: 48,
+                    color: AppColors.slate,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Belum Ada Kegiatan Ditugaskan',
+                    style: TextStyle(
+                      color: AppColors.navySlate,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
                     ),
                   ),
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Kegiatan pelaksanaan yang ditugaskan kepada ${userProf.namaLengkap} akan tampil di sini.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.slate,
+                      fontSize: 12,
                     ),
-                    child: const Icon(Icons.engineering_outlined, color: Color(0xFF2563EB), size: 26),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 20),
+            )
+          else
+            Column(
+              children: List.generate(myKegiatans.length, (idx) {
+                final k = myKegiatans[idx];
+                final parentContract = parentContracts[idx];
+                final kIndex = kegIndices[idx];
+                final prog = _calcKegiatanProgress(k);
 
-            // 3 Stat Cards Khusus Kegiatan
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    'Kegiatan Saya',
-                    myKegiatans.length.toString(),
-                    Icons.assignment_outlined,
-                    AppColors.slateLighter,
-                    AppColors.navySlate,
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.02),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    'Rata-rata Progres',
-                    '${avgProgress.toStringAsFixed(1)}%',
-                    Icons.trending_up,
-                    const Color(0xFFE6F4EA),
-                    AppColors.successGreen,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    'Status',
-                    'Aktif',
-                    Icons.check_circle_outline,
-                    AppColors.slateLighter,
-                    AppColors.slate,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 26),
-
-            // Daftar Kegiatan Pelaksanaan Saya
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Kegiatan Pelaksanaan Saya',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: AppColors.textDark,
-                  ),
-                ),
-                Text(
-                  '${myKegiatans.length} Kegiatan',
-                  style: const TextStyle(fontSize: 12, color: AppColors.slate, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-
-            if (myKegiatans.isEmpty)
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  children: [
-                    const Icon(Icons.assignment_late_outlined, size: 48, color: AppColors.slate),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Belum Ada Kegiatan Ditugaskan',
-                      style: TextStyle(color: AppColors.navySlate, fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Kegiatan pelaksanaan yang ditugaskan kepada ${userProf.namaLengkap} akan tampil di sini.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppColors.slate, fontSize: 12),
-                    ),
-                  ],
-                ),
-              )
-            else
-              Column(
-                children: List.generate(myKegiatans.length, (idx) {
-                  final k = myKegiatans[idx];
-                  final parentContract = parentContracts[idx];
-                  final kIndex = kegIndices[idx];
-                  final prog = _calcKegiatanProgress(k);
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 14),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.02),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEFF6FF),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(Icons.assignment, color: Color(0xFF2563EB), size: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    k['namaKegiatan'] ?? 'Nama Kegiatan',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14.5,
-                                      color: AppColors.navySlate,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    '${k['lokasi'] ?? '-'} • ${k['sumberDana'] ?? 'APBD'}',
-                                    style: const TextStyle(fontSize: 12, color: AppColors.slate),
-                                  ),
-                                ],
-                              ),
+                            child: const Icon(
+                              Icons.assignment,
+                              color: Color(0xFF2563EB),
+                              size: 20,
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Nilai Kontrak Kegiatan:', style: TextStyle(fontSize: 11.5, color: AppColors.slate)),
-                            Text(
-                              (k['nilaiKontrak'] ?? '-').toString(),
-                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.navySlate),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        // Progress Bar
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(6),
-                                child: LinearProgressIndicator(
-                                  value: prog / 100.0,
-                                  minHeight: 8,
-                                  backgroundColor: const Color(0xFFF1F5F9),
-                                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.navySlate),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              '${prog.toStringAsFixed(1)}%',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.navySlate),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                        const SizedBox(height: 10),
-                        InkWell(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => DetailKegiatanScreen(
-                                  contract: parentContract,
-                                  kegiatanIndex: kIndex,
-                                ),
-                              ),
-                            );
-                          },
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: const [
-                              Text(
-                                'Lihat Detail Kegiatan',
-                                style: TextStyle(
-                                  color: Color(0xFF2563EB),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12.5,
-                                ),
-                              ),
-                              SizedBox(width: 4),
-                              Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFF2563EB)),
-                            ],
                           ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  k['namaKegiatan'] ?? 'Nama Kegiatan',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14.5,
+                                    color: AppColors.navySlate,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '${k['lokasi'] ?? '-'} • ${k['sumberDana'] ?? 'APBD'}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.slate,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Nilai Kontrak Kegiatan:',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: AppColors.slate,
+                            ),
+                          ),
+                          Text(
+                            (k['nilaiKontrak'] ?? '-').toString(),
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.navySlate,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      // Progress Bar
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: LinearProgressIndicator(
+                                value: prog / 100.0,
+                                minHeight: 8,
+                                backgroundColor: const Color(0xFFF1F5F9),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  AppColors.navySlate,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            '${prog.toStringAsFixed(1)}%',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: AppColors.navySlate,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                      const SizedBox(height: 10),
+                      InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => DetailKegiatanScreen(
+                                contract: parentContract,
+                                kegiatanIndex: kIndex,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: const [
+                            Text(
+                              'Lihat Detail Kegiatan',
+                              style: TextStyle(
+                                color: Color(0xFF2563EB),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                            SizedBox(width: 4),
+                            Icon(
+                              Icons.arrow_forward_ios,
+                              size: 12,
+                              color: Color(0xFF2563EB),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  );
-                }),
-              ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      );
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -1077,10 +1229,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             Text(
               userProf.namaLengkap,
-              style: const TextStyle(
-                color: AppColors.slate,
-                fontSize: 11,
-              ),
+              style: const TextStyle(color: AppColors.slate, fontSize: 11),
             ),
           ],
         ),
@@ -1088,11 +1237,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       drawer: isWeb
           ? null
-          : _buildWebSidebar(
-              context,
-              userProf: userProf,
-              isDrawer: true,
-            ),
+          : _buildWebSidebar(context, userProf: userProf, isDrawer: true),
       body: isWeb
           ? Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1103,7 +1248,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   isCollapsed: !_isWebSidebarOpen,
                   isDrawer: false,
                 ),
-                const VerticalDivider(width: 1, thickness: 1, color: Color(0xFF1E293B)),
+                const VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: Color(0xFF1E293B),
+                ),
                 Expanded(child: contractorBody),
               ],
             )
@@ -1123,10 +1272,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         for (final p in pList) {
           if (p is! Map) continue;
           final volStr = (p['volume'] ?? '').toString();
-          final vol = double.tryParse(volStr.split(' ').first.replaceAll(',', '.')) ?? 0.0;
+          final vol =
+              double.tryParse(volStr.split(' ').first.replaceAll(',', '.')) ??
+              0.0;
           final itId = (p['rkkItemId'] ?? '').toString().trim();
           final noMata = (p['noMataPembayaran'] ?? '').toString().trim();
-          final jenis = (p['uraian'] ?? p['jenisPekerjaan'] ?? '').toString().trim().toLowerCase();
+          final jenis = (p['uraian'] ?? p['jenisPekerjaan'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase();
 
           for (final div in activeRkk) {
             for (final it in (div['items'] as List? ?? [])) {
@@ -1134,12 +1288,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
               final bNo = (it['noMataPembayaran'] ?? '').toString().trim();
               final bUr = (it['uraian'] ?? '').toString().trim().toLowerCase();
 
-              final match = (itId.isNotEmpty && bId.isNotEmpty && itId == bId) ||
+              final match =
+                  (itId.isNotEmpty && bId.isNotEmpty && itId == bId) ||
                   (noMata.isNotEmpty && bNo.isNotEmpty && noMata == bNo) ||
                   (jenis.isNotEmpty && (bUr == jenis || bUr.contains(jenis)));
 
               if (match) {
-                final targetVol = (it['volumeCCO'] ?? it['volume'] as num?)?.toDouble() ?? 0.0;
+                final targetVol =
+                    (it['volumeCCO'] ?? it['volume'] as num?)?.toDouble() ??
+                    0.0;
                 final bobotItem = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
                 if (targetVol > 0) {
                   totalRealisasiBobot += (vol / targetVol) * bobotItem;
@@ -1214,7 +1371,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         const SizedBox(height: 10),
                         IconButton(
-                          icon: const Icon(Icons.chevron_right, color: Color(0xFF94A3B8), size: 20),
+                          icon: const Icon(
+                            Icons.chevron_right,
+                            color: Color(0xFF94A3B8),
+                            size: 20,
+                          ),
                           tooltip: 'Buka Sidebar',
                           onPressed: () {
                             setState(() {
@@ -1279,7 +1440,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         if (!isDrawer)
                           IconButton(
-                            icon: const Icon(Icons.chevron_left, color: Color(0xFF94A3B8), size: 22),
+                            icon: const Icon(
+                              Icons.chevron_left,
+                              color: Color(0xFF94A3B8),
+                              size: 22,
+                            ),
                             tooltip: 'Ciutkan Sidebar',
                             onPressed: () {
                               setState(() {
@@ -1299,7 +1464,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 decoration: BoxDecoration(
                   color: const Color(0xFF1E293B),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF334155), width: 0.8),
+                  border: Border.all(
+                    color: const Color(0xFF334155),
+                    width: 0.8,
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -1307,7 +1475,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       radius: 18,
                       backgroundColor: const Color(0xFF38BDF8).withOpacity(0.2),
                       child: Text(
-                        userProf.namaLengkap.isNotEmpty ? userProf.namaLengkap[0].toUpperCase() : 'U',
+                        userProf.namaLengkap.isNotEmpty
+                            ? userProf.namaLengkap[0].toUpperCase()
+                            : 'U',
                         style: const TextStyle(
                           color: Color(0xFF38BDF8),
                           fontWeight: FontWeight.bold,
@@ -1332,11 +1502,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                           const SizedBox(height: 3),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: userProf.isKontraktor
                                   ? const Color(0xFFFEF3C7)
-                                  : (userProf.isDinas ? const Color(0xFFDCFCE7) : const Color(0xFFDBEAFE)),
+                                  : (userProf.isDinas
+                                        ? const Color(0xFFDCFCE7)
+                                        : const Color(0xFFDBEAFE)),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -1344,7 +1519,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               style: TextStyle(
                                 color: userProf.isKontraktor
                                     ? const Color(0xFFB45309)
-                                    : (userProf.isDinas ? const Color(0xFF15803D) : const Color(0xFF1D4ED8)),
+                                    : (userProf.isDinas
+                                          ? const Color(0xFF15803D)
+                                          : const Color(0xFF1D4ED8)),
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0.3,
@@ -1366,7 +1543,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     radius: 18,
                     backgroundColor: const Color(0xFF1E293B),
                     child: Text(
-                      userProf.namaLengkap.isNotEmpty ? userProf.namaLengkap[0].toUpperCase() : 'U',
+                      userProf.namaLengkap.isNotEmpty
+                          ? userProf.namaLengkap[0].toUpperCase()
+                          : 'U',
                       style: const TextStyle(
                         color: Color(0xFF38BDF8),
                         fontWeight: FontWeight.bold,
@@ -1380,7 +1559,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // ─── Scrollable Menu Categories ───
             Expanded(
               child: ListView(
-                padding: EdgeInsets.symmetric(horizontal: isCollapsed ? 8 : 12, vertical: 8),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isCollapsed ? 8 : 12,
+                  vertical: 8,
+                ),
                 children: [
                   // 1. KATEGORI UTAMA
                   _buildSidebarCategory('UTAMA', isCollapsed),
@@ -1397,14 +1579,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   _buildSidebarItem(
                     key: 'kegiatan',
-                    label: userProf.isKontraktor ? userProf.tr('nav_kegiatan_saya') : 'Data Proyek / Kegiatan',
+                    label: userProf.isKontraktor
+                        ? userProf.tr('nav_kegiatan_saya')
+                        : 'Data Proyek / Kegiatan',
                     icon: Icons.assignment_rounded,
                     isActive: _activeWebMenu == 'kegiatan',
                     isCollapsed: isCollapsed,
                     onTap: () {
                       if (isDrawer) Navigator.pop(context);
                       setState(() => _activeWebMenu = 'kegiatan');
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const KontrakScreen()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const KontrakScreen(),
+                        ),
+                      );
                     },
                   ),
                   if (!userProf.isKontraktor)
@@ -1417,7 +1606,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       onTap: () {
                         if (isDrawer) Navigator.pop(context);
                         setState(() => _activeWebMenu = 'kontrak');
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const KontrakScreen()));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const KontrakScreen(),
+                          ),
+                        );
                       },
                     ),
 
@@ -1434,16 +1628,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onTap: () {
                       if (isDrawer) Navigator.pop(context);
                       setState(() => _activeWebMenu = 'rab');
-                      final prov = Provider.of<ContractProvider>(context, listen: false);
+                      final prov = Provider.of<ContractProvider>(
+                        context,
+                        listen: false,
+                      );
                       if (prov.contracts.isNotEmpty) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => DetailKontrakScreen(contract: prov.contracts.first),
+                            builder: (_) => DetailKontrakScreen(
+                              contract: prov.contracts.first,
+                            ),
                           ),
                         );
                       } else {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const KontrakScreen()));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const KontrakScreen(),
+                          ),
+                        );
                       }
                     },
                   ),
@@ -1456,7 +1660,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onTap: () {
                       if (isDrawer) Navigator.pop(context);
                       setState(() => _activeWebMenu = 'addendum');
-                      final prov = Provider.of<ContractProvider>(context, listen: false);
+                      final prov = Provider.of<ContractProvider>(
+                        context,
+                        listen: false,
+                      );
                       if (prov.contracts.isNotEmpty) {
                         final c = prov.contracts.first;
                         Navigator.push(
@@ -1469,7 +1676,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         );
                       } else {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const KontrakScreen()));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const KontrakScreen(),
+                          ),
+                        );
                       }
                     },
                   ),
@@ -1479,6 +1691,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(height: 14),
                     _buildSidebarCategory('PELAPORAN', isCollapsed),
                     _buildSidebarItem(
+                      key: 'data_laporan',
+                      label: 'Data Laporan',
+                      icon: Icons.folder_outlined,
+                      isActive: _activeWebMenu == 'data_laporan',
+                      isCollapsed: isCollapsed,
+                      onTap: () {
+                        if (isDrawer) Navigator.pop(context);
+                        setState(() => _activeWebMenu = 'data_laporan');
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const DataLaporanScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildSidebarItem(
                       key: 'laporan_harian',
                       label: 'Laporan Harian',
                       icon: Icons.today_rounded,
@@ -1487,7 +1716,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       onTap: () {
                         if (isDrawer) Navigator.pop(context);
                         setState(() => _activeWebMenu = 'laporan_harian');
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const DataLaporanScreen()));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const BuatLaporanScreen(),
+                          ),
+                        );
                       },
                     ),
                     _buildSidebarItem(
@@ -1499,7 +1733,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       onTap: () {
                         if (isDrawer) Navigator.pop(context);
                         setState(() => _activeWebMenu = 'laporan_mingguan');
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const LaporanScreen()));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const BuatLaporanMingguanScreen(),
+                          ),
+                        );
                       },
                     ),
                     _buildSidebarItem(
@@ -1511,7 +1750,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       onTap: () {
                         if (isDrawer) Navigator.pop(context);
                         setState(() => _activeWebMenu = 'laporan_bulanan');
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const LaporanBulananScreen()));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const LaporanBulananScreen(),
+                          ),
+                        );
                       },
                     ),
                   ],
@@ -1529,16 +1773,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onTap: () {
                       if (isDrawer) Navigator.pop(context);
                       setState(() => _activeWebMenu = 'dokumen');
-                      final prov = Provider.of<ContractProvider>(context, listen: false);
+                      final prov = Provider.of<ContractProvider>(
+                        context,
+                        listen: false,
+                      );
                       if (prov.contracts.isNotEmpty) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => DetailKontrakScreen(contract: prov.contracts.first),
+                            builder: (_) => DetailKontrakScreen(
+                              contract: prov.contracts.first,
+                            ),
                           ),
                         );
                       } else {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const KontrakScreen()));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const KontrakScreen(),
+                          ),
+                        );
                       }
                     },
                   ),
@@ -1551,7 +1805,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onTap: () {
                       if (isDrawer) Navigator.pop(context);
                       setState(() => _activeWebMenu = 'timeline');
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const TimelineScreen()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const TimelineScreen(),
+                        ),
+                      );
                     },
                   ),
 
@@ -1568,7 +1827,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onTap: () {
                       if (isDrawer) Navigator.pop(context);
                       setState(() => _activeWebMenu = 'pengaturan');
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const PengaturanScreen()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PengaturanScreen(),
+                        ),
+                      );
                     },
                   ),
                   _buildSidebarItem(
@@ -1580,7 +1844,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onTap: () {
                       if (isDrawer) Navigator.pop(context);
                       setState(() => _activeWebMenu = 'keamanan');
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const KeamananScreen()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const KeamananScreen(),
+                        ),
+                      );
                     },
                   ),
                   _buildSidebarItem(
@@ -1592,7 +1861,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onTap: () {
                       if (isDrawer) Navigator.pop(context);
                       setState(() => _activeWebMenu = 'edit_profil');
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfilScreen()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const EditProfilScreen(),
+                        ),
+                      );
                     },
                   ),
 
@@ -1657,7 +1931,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               decoration: BoxDecoration(
                 color: isActive ? activeBg : Colors.transparent,
                 borderRadius: BorderRadius.circular(10),
-                border: isActive ? Border.all(color: activeBorder, width: 1) : null,
+                border: isActive
+                    ? Border.all(color: activeBorder, width: 1)
+                    : null,
               ),
               child: Icon(
                 icon,
@@ -1680,7 +1956,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           decoration: BoxDecoration(
             color: isActive ? activeBg : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
-            border: isActive ? Border.all(color: activeBorder.withOpacity(0.6), width: 1) : null,
+            border: isActive
+                ? Border.all(color: activeBorder.withOpacity(0.6), width: 1)
+                : null,
           ),
           child: Row(
             children: [
