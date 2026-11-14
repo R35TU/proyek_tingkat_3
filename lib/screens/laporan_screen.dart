@@ -3,6 +3,7 @@ import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/screens/data_laporan_screen.dart';
 import 'package:tata_saka_app/screens/buat_laporan_screen.dart';
 import 'package:tata_saka_app/screens/buat_laporan_mingguan_screen.dart';
+import 'package:tata_saka_app/screens/laporan_bulanan_screen.dart';
 
 class LaporanScreen extends StatelessWidget {
   const LaporanScreen({super.key});
@@ -34,13 +35,13 @@ class LaporanScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
             _buildMenuCard(
               title: 'Data Laporan',
-              description: 'Lihat daftar proyek dan semua data\nlaporan harian & mingguan tersedia',
+              description: 'Lihat daftar proyek dan semua data\nlaporan harian & mingguan',
               icon: Icons.folder_outlined,
               iconBgColor: AppColors.blueLight,
               iconColor: AppColors.primaryBlue,
@@ -85,6 +86,23 @@ class LaporanScreen extends StatelessWidget {
                 );
               },
             ),
+            const SizedBox(height: 16),
+            _buildMenuCard(
+              title: 'Laporan Bulanan',
+              description: 'Rekapitulasi Fisik Bulanan (Otomatis per 4 minggu,\nkemajuan fisik CCO, bulan lalu, bulan ini & sisa)',
+              icon: Icons.calendar_month_outlined,
+              iconBgColor: const Color(0xFFEDE9FE),
+              iconColor: const Color(0xFF7C3AED),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const LaporanBulananScreen(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),

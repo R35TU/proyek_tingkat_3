@@ -23,8 +23,7 @@ class LembarTambahKurangWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final nomorAddendum = addendumData['nomorAddendum']?.toString() ?? '01';
-    final addendumDivisiList =
-        (addendumData['rkkDivisiList'] as List?)
+    final addendumDivisiList = (addendumData['rkkDivisiList'] as List?)
             ?.map((e) => Map<String, dynamic>.from(e))
             .toList() ??
         [];
@@ -61,19 +60,8 @@ class LembarTambahKurangWidget extends StatelessWidget {
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
                   onPressed: onDownloadPdf,
-                  icon: const Icon(
-                    Icons.picture_as_pdf,
-                    size: 14,
-                    color: Color(0xFF1E3A8A),
-                  ),
-                  label: const Text(
-                    'Export PDF Tambah Kurang (18-Kolom)',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E3A8A),
-                    ),
-                  ),
+                  icon: const Icon(Icons.picture_as_pdf, size: 14, color: Color(0xFF1E3A8A)),
+                  label: const Text('Export PDF Tambah Kurang (18-Kolom)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
                 ),
               ),
               const SizedBox(height: 6),
@@ -125,18 +113,8 @@ class LembarTambahKurangWidget extends StatelessWidget {
               children: [
                 _buildMetaRow('Kegiatan', kegiatan.namaKegiatan),
                 _buildMetaRow('Pekerjaan', kegiatan.namaKegiatan),
-                _buildMetaRow(
-                  'Lokasi',
-                  kegiatan.lokasi.isNotEmpty
-                      ? kegiatan.lokasi
-                      : 'Kab. Purbalingga',
-                ),
-                _buildMetaRow(
-                  'Sumber Dana',
-                  kegiatan.sumberDana.isNotEmpty
-                      ? kegiatan.sumberDana
-                      : 'APBD Kab. Purbalingga',
-                ),
+                _buildMetaRow('Lokasi', kegiatan.lokasi.isNotEmpty ? kegiatan.lokasi : 'Kab. Purbalingga'),
+                _buildMetaRow('Sumber Dana', kegiatan.sumberDana.isNotEmpty ? kegiatan.sumberDana : 'APBD Kab. Purbalingga'),
               ],
             ),
           ),
@@ -145,28 +123,10 @@ class LembarTambahKurangWidget extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildMetaRow(
-                  'Pelaksana Kontraktor',
-                  kegiatan.kontraktor.isNotEmpty ? kegiatan.kontraktor : '-',
-                ),
-                _buildMetaRow(
-                  'No Kontrak',
-                  kegiatan.suratPesananFull.isNotEmpty
-                      ? kegiatan.suratPesananFull
-                      : '-',
-                ),
-                _buildMetaRow(
-                  'Pengawas',
-                  kegiatan.konsultanPengawas.isNotEmpty
-                      ? kegiatan.konsultanPengawas
-                      : 'CV. TATA SAKA CONSULTANT',
-                ),
-                _buildMetaRow(
-                  'No Kontrak Pengawasan',
-                  kegiatan.spkKonsultanFull.isNotEmpty
-                      ? kegiatan.spkKonsultanFull
-                      : '-',
-                ),
+                _buildMetaRow('Pelaksana Kontraktor', kegiatan.kontraktor.isNotEmpty ? kegiatan.kontraktor : '-'),
+                _buildMetaRow('No Kontrak', kegiatan.suratPesananFull.isNotEmpty ? kegiatan.suratPesananFull : '-'),
+                _buildMetaRow('Pengawas', kegiatan.konsultanPengawas.isNotEmpty ? kegiatan.konsultanPengawas : 'CV. TATA SAKA CONSULTANT'),
+                _buildMetaRow('No Kontrak Pengawasan', kegiatan.spkKonsultanFull.isNotEmpty ? kegiatan.spkKonsultanFull : '-'),
               ],
             ),
           ),
@@ -185,21 +145,10 @@ class LembarTambahKurangWidget extends StatelessWidget {
             width: 145,
             child: Text(
               label,
-              style: const TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
+              style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.black87),
             ),
           ),
-          const Text(
-            ' :  ',
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
+          const Text(' :  ', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.black)),
           Expanded(
             child: Text(
               value,
@@ -211,34 +160,31 @@ class LembarTambahKurangWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildTambahKurangTable(
-    String nomorAddendum,
-    TambahKurangReportResult report,
-  ) {
+  Widget _buildTambahKurangTable(String nomorAddendum, TambahKurangReportResult report) {
     const colWidths = <int, TableColumnWidth>{
-      0: FixedColumnWidth(30), // No
-      1: FixedColumnWidth(75), // No Mata Pembayaran
-      2: FixedColumnWidth(230), // Uraian
-      3: FixedColumnWidth(40), // Satuan
-      4: FixedColumnWidth(95), // Harga Satuan
+      0: FixedColumnWidth(30),   // No
+      1: FixedColumnWidth(75),   // No Mata Pembayaran
+      2: FixedColumnWidth(230),  // Uraian
+      3: FixedColumnWidth(40),   // Satuan
+      4: FixedColumnWidth(95),   // Harga Satuan
       // KONTRAK AWAL
-      5: FixedColumnWidth(55), // Vol
-      6: FixedColumnWidth(95), // Total
-      7: FixedColumnWidth(52), // Bobot
+      5: FixedColumnWidth(55),   // Vol
+      6: FixedColumnWidth(95),   // Total
+      7: FixedColumnWidth(52),   // Bobot
       // ADDENDUM KE - N
-      8: FixedColumnWidth(55), // Vol
-      9: FixedColumnWidth(95), // Total
-      10: FixedColumnWidth(52), // Bobot
+      8: FixedColumnWidth(55),   // Vol
+      9: FixedColumnWidth(95),   // Total
+      10: FixedColumnWidth(52),  // Bobot
       // PEKERJAAN TAMBAH
-      11: FixedColumnWidth(55), // Vol
-      12: FixedColumnWidth(95), // Total
-      13: FixedColumnWidth(52), // Bobot
+      11: FixedColumnWidth(55),  // Vol
+      12: FixedColumnWidth(95),  // Total
+      13: FixedColumnWidth(52),  // Bobot
       // PEKERJAAN KURANG
-      14: FixedColumnWidth(55), // Vol
-      15: FixedColumnWidth(95), // Total
-      16: FixedColumnWidth(52), // Bobot
+      14: FixedColumnWidth(55),  // Vol
+      15: FixedColumnWidth(95),  // Total
+      16: FixedColumnWidth(52),  // Bobot
       // KET
-      17: FixedColumnWidth(52), // Ket
+      17: FixedColumnWidth(52),  // Ket
     };
 
     return Table(
@@ -333,89 +279,30 @@ class LembarTambahKurangWidget extends StatelessWidget {
               return TableRow(
                 children: [
                   _tdText(it.no, align: TextAlign.center),
-                  _tdText(
-                    it.noMataPembayaran,
-                    align: TextAlign.center,
-                    isBold: true,
-                  ),
+                  _tdText(it.noMataPembayaran, align: TextAlign.center, isBold: true),
                   _tdText(it.uraian),
                   _tdText(it.satuan, align: TextAlign.center),
-                  _tdText(
-                    _fmtRupiahNoPrefix(it.hargaSatuan),
-                    align: TextAlign.right,
-                  ),
+                  _tdText(_fmtRupiahNoPrefix(it.hargaSatuan), align: TextAlign.right),
 
                   // Kontrak Awal
-                  _tdText(
-                    it.baselineVolume > 0 ? _fmtVol(it.baselineVolume) : '-',
-                    align: TextAlign.right,
-                  ),
-                  _tdText(
-                    it.baselineTotalHarga > 0
-                        ? _fmtRupiahNoPrefix(it.baselineTotalHarga)
-                        : '-',
-                    align: TextAlign.right,
-                  ),
-                  _tdText(
-                    it.baselineBobot > 0
-                        ? it.baselineBobot.toStringAsFixed(3)
-                        : '-',
-                    align: TextAlign.right,
-                  ),
+                  _tdText(it.baselineVolume > 0 ? _fmtVol(it.baselineVolume) : '-', align: TextAlign.right),
+                  _tdText(it.baselineTotalHarga > 0 ? _fmtRupiahNoPrefix(it.baselineTotalHarga) : '-', align: TextAlign.right),
+                  _tdText(it.baselineBobot > 0 ? it.baselineBobot.toStringAsFixed(3) : '-', align: TextAlign.right),
 
                   // Addendum
-                  _tdText(
-                    it.addendumVolume > 0 ? _fmtVol(it.addendumVolume) : '-',
-                    align: TextAlign.right,
-                  ),
-                  _tdText(
-                    it.addendumTotalHarga > 0
-                        ? _fmtRupiahNoPrefix(it.addendumTotalHarga)
-                        : '-',
-                    align: TextAlign.right,
-                  ),
-                  _tdText(
-                    it.addendumBobot > 0
-                        ? it.addendumBobot.toStringAsFixed(3)
-                        : '-',
-                    align: TextAlign.right,
-                  ),
+                  _tdText(it.addendumVolume > 0 ? _fmtVol(it.addendumVolume) : '-', align: TextAlign.right),
+                  _tdText(it.addendumTotalHarga > 0 ? _fmtRupiahNoPrefix(it.addendumTotalHarga) : '-', align: TextAlign.right),
+                  _tdText(it.addendumBobot > 0 ? it.addendumBobot.toStringAsFixed(3) : '-', align: TextAlign.right),
 
                   // Tambah
-                  _tdText(
-                    it.tambahVolume > 0 ? _fmtVol(it.tambahVolume) : '-',
-                    align: TextAlign.right,
-                  ),
-                  _tdText(
-                    it.tambahTotalHarga > 0
-                        ? _fmtRupiahNoPrefix(it.tambahTotalHarga)
-                        : '-',
-                    align: TextAlign.right,
-                  ),
-                  _tdText(
-                    it.tambahBobot > 0
-                        ? it.tambahBobot.toStringAsFixed(3)
-                        : '-',
-                    align: TextAlign.right,
-                  ),
+                  _tdText(it.tambahVolume > 0 ? _fmtVol(it.tambahVolume) : '-', align: TextAlign.right),
+                  _tdText(it.tambahTotalHarga > 0 ? _fmtRupiahNoPrefix(it.tambahTotalHarga) : '-', align: TextAlign.right),
+                  _tdText(it.tambahBobot > 0 ? it.tambahBobot.toStringAsFixed(3) : '-', align: TextAlign.right),
 
                   // Kurang
-                  _tdText(
-                    it.kurangVolume > 0 ? _fmtVol(it.kurangVolume) : '-',
-                    align: TextAlign.right,
-                  ),
-                  _tdText(
-                    it.kurangTotalHarga > 0
-                        ? _fmtRupiahNoPrefix(it.kurangTotalHarga)
-                        : '-',
-                    align: TextAlign.right,
-                  ),
-                  _tdText(
-                    it.kurangBobot > 0
-                        ? it.kurangBobot.toStringAsFixed(3)
-                        : '-',
-                    align: TextAlign.right,
-                  ),
+                  _tdText(it.kurangVolume > 0 ? _fmtVol(it.kurangVolume) : '-', align: TextAlign.right),
+                  _tdText(it.kurangTotalHarga > 0 ? _fmtRupiahNoPrefix(it.kurangTotalHarga) : '-', align: TextAlign.right),
+                  _tdText(it.kurangBobot > 0 ? it.kurangBobot.toStringAsFixed(3) : '-', align: TextAlign.right),
 
                   // Ket
                   _tdText(
@@ -424,9 +311,7 @@ class LembarTambahKurangWidget extends StatelessWidget {
                     isBold: it.keterangan != 'Tetap',
                     color: it.keterangan == 'Tambah'
                         ? const Color(0xFF047857)
-                        : (it.keterangan == 'Kurang'
-                              ? const Color(0xFFB45309)
-                              : Colors.black),
+                        : (it.keterangan == 'Kurang' ? const Color(0xFFB45309) : Colors.black),
                   ),
                 ],
               );
@@ -440,66 +325,25 @@ class LembarTambahKurangWidget extends StatelessWidget {
           children: [
             _tdText(''),
             _tdText(''),
-            _tdText(
-              'Jumlah Harga Pekerjaan ( Termasuk Biaya umum, Keuntungan dan ( Pajak )',
-              isBold: true,
-            ),
+            _tdText('Jumlah Harga Pekerjaan ( Termasuk Biaya umum, Keuntungan dan ( Pajak )', isBold: true),
             _tdText(''),
             _tdText(''),
             // Baseline
             _tdText(''),
-            _tdText(
-              _fmtRupiahNoPrefix(
-                report.totalBaselineHarga,
-                forceDecimals: true,
-              ),
-              align: TextAlign.right,
-              isBold: true,
-            ),
-            _tdText(
-              report.totalBaselineBobot.toStringAsFixed(3),
-              align: TextAlign.right,
-              isBold: true,
-            ),
+            _tdText(_fmtRupiahNoPrefix(report.totalBaselineHarga, forceDecimals: true), align: TextAlign.right, isBold: true),
+            _tdText(report.totalBaselineBobot.toStringAsFixed(3), align: TextAlign.right, isBold: true),
             // Addendum
             _tdText(''),
-            _tdText(
-              _fmtRupiahNoPrefix(
-                report.totalAddendumHarga,
-                forceDecimals: true,
-              ),
-              align: TextAlign.right,
-              isBold: true,
-            ),
-            _tdText(
-              report.totalAddendumBobot.toStringAsFixed(3),
-              align: TextAlign.right,
-              isBold: true,
-            ),
+            _tdText(_fmtRupiahNoPrefix(report.totalAddendumHarga, forceDecimals: true), align: TextAlign.right, isBold: true),
+            _tdText(report.totalAddendumBobot.toStringAsFixed(3), align: TextAlign.right, isBold: true),
             // Tambah
             _tdText(''),
-            _tdText(
-              _fmtRupiahNoPrefix(report.totalTambahHarga, forceDecimals: true),
-              align: TextAlign.right,
-              isBold: true,
-            ),
-            _tdText(
-              report.totalTambahBobot.toStringAsFixed(3),
-              align: TextAlign.right,
-              isBold: true,
-            ),
+            _tdText(_fmtRupiahNoPrefix(report.totalTambahHarga, forceDecimals: true), align: TextAlign.right, isBold: true),
+            _tdText(report.totalTambahBobot.toStringAsFixed(3), align: TextAlign.right, isBold: true),
             // Kurang
             _tdText(''),
-            _tdText(
-              _fmtRupiahNoPrefix(report.totalKurangHarga, forceDecimals: true),
-              align: TextAlign.right,
-              isBold: true,
-            ),
-            _tdText(
-              report.totalKurangBobot.toStringAsFixed(3),
-              align: TextAlign.right,
-              isBold: true,
-            ),
+            _tdText(_fmtRupiahNoPrefix(report.totalKurangHarga, forceDecimals: true), align: TextAlign.right, isBold: true),
+            _tdText(report.totalKurangBobot.toStringAsFixed(3), align: TextAlign.right, isBold: true),
             _tdText(''),
           ],
         ),
@@ -510,27 +354,16 @@ class LembarTambahKurangWidget extends StatelessWidget {
           children: [
             _tdText(''),
             _tdText(''),
-            _tdText(
-              'Jumlah Total Harga Pekerjaan ( Dibulatkan )',
-              isBold: true,
-            ),
+            _tdText('Jumlah Total Harga Pekerjaan ( Dibulatkan )', isBold: true),
             _tdText(''),
             _tdText(''),
             // Baseline (Kontrak Awal Dibulatkan)
             _tdText(''),
-            _tdText(
-              _fmtRupiahNoPrefix(report.totalDibulatkan, forceDecimals: true),
-              align: TextAlign.right,
-              isBold: true,
-            ),
+            _tdText(_fmtRupiahNoPrefix(report.totalDibulatkan, forceDecimals: true), align: TextAlign.right, isBold: true),
             _tdText(''),
             // Addendum (Addendum Dibulatkan)
             _tdText(''),
-            _tdText(
-              _fmtRupiahNoPrefix(report.totalDibulatkan, forceDecimals: true),
-              align: TextAlign.right,
-              isBold: true,
-            ),
+            _tdText(_fmtRupiahNoPrefix(report.totalDibulatkan, forceDecimals: true), align: TextAlign.right, isBold: true),
             _tdText(''),
             // Tambah
             _tdText(''),
@@ -548,8 +381,7 @@ class LembarTambahKurangWidget extends StatelessWidget {
   }
 
   Widget _buildSignatureSection() {
-    final tglStr =
-        addendumData['tanggalAddendum']?.toString().isNotEmpty == true
+    final tglStr = addendumData['tanggalAddendum']?.toString().isNotEmpty == true
         ? addendumData['tanggalAddendum']
         : 'Agustus 2026';
 
@@ -561,11 +393,7 @@ class LembarTambahKurangWidget extends StatelessWidget {
             padding: const EdgeInsets.only(right: 60),
             child: Text(
               'Purbalingga, $tglStr',
-              style: const TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w600,
-                color: Colors.black,
-              ),
+              style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Colors.black),
             ),
           ),
         ),
@@ -579,32 +407,14 @@ class LembarTambahKurangWidget extends StatelessWidget {
               padding: const EdgeInsets.only(left: 40),
               child: Column(
                 children: [
-                  const Text(
-                    'Kepala DPU-PR Kabupaten Purbalingga',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Text(
-                    'Selaku Pejabat Penandatanganan Kontrak',
-                    style: TextStyle(fontSize: 10, color: Colors.black87),
-                  ),
+                  const Text('Kepala DPU-PR Kabupaten Purbalingga', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                  const Text('Selaku Pejabat Penandatanganan Kontrak', style: TextStyle(fontSize: 10, color: Colors.black87)),
                   const SizedBox(height: 54),
                   Text(
-                    kegiatan.penggunaAnggaran.isNotEmpty
-                        ? kegiatan.penggunaAnggaran
-                        : 'DRAJAT UJI WAKHYONO, S.T., M.T',
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w900,
-                      decoration: TextDecoration.underline,
-                    ),
+                    kegiatan.penggunaAnggaran.isNotEmpty ? kegiatan.penggunaAnggaran : 'DRAJAT UJI WAKHYONO, S.T., M.T',
+                    style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, decoration: TextDecoration.underline),
                   ),
-                  const Text(
-                    'NIP. 19711111 199803 1 008',
-                    style: TextStyle(fontSize: 9.5),
-                  ),
+                  const Text('NIP. 19711111 199803 1 008', style: TextStyle(fontSize: 9.5)),
                 ],
               ),
             ),
@@ -614,29 +424,15 @@ class LembarTambahKurangWidget extends StatelessWidget {
               padding: const EdgeInsets.only(right: 40),
               child: Column(
                 children: [
-                  const Text(
-                    'Kontraktor Pelaksana',
-                    style: TextStyle(fontSize: 10.5, color: Colors.black87),
-                  ),
+                  const Text('Kontraktor Pelaksana', style: TextStyle(fontSize: 10.5, color: Colors.black87)),
                   Text(
-                    kegiatan.kontraktor.isNotEmpty
-                        ? kegiatan.kontraktor
-                        : 'CV. DIVAN INSAN CEMERLANG',
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    kegiatan.kontraktor.isNotEmpty ? kegiatan.kontraktor : 'CV. DIVAN INSAN CEMERLANG',
+                    style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 54),
                   Text(
-                    kegiatan.direkturPenyedia.isNotEmpty
-                        ? kegiatan.direkturPenyedia
-                        : 'NURKHOLIS WIDIANTO',
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w900,
-                      decoration: TextDecoration.underline,
-                    ),
+                    kegiatan.direkturPenyedia.isNotEmpty ? kegiatan.direkturPenyedia : 'NURKHOLIS WIDIANTO',
+                    style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, decoration: TextDecoration.underline),
                   ),
                   const Text('Direktur', style: TextStyle(fontSize: 9.5)),
                 ],

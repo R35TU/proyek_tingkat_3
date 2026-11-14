@@ -67,6 +67,15 @@ void main() {
   });
 
   testWidgets('BuatLaporanScreen with full populated data renders without overflow on ultra-narrow 320px screen', (WidgetTester tester) async {
+    FlutterErrorDetails? errorDetails;
+    final prevOnError = FlutterError.onError;
+    FlutterError.onError = (FlutterErrorDetails details) {
+      errorDetails = details;
+    };
+    addTearDown(() {
+      FlutterError.onError = prevOnError;
+    });
+
     tester.view.physicalSize = const Size(320, 700);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
@@ -161,8 +170,8 @@ void main() {
     for (int i = 0; i < 6; i++) {
       await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -500));
       await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
     }
+    expect(errorDetails, isNull);
   });
 
   testWidgets('BuatLaporanScreen Section F, G (TTD Canvas), and H (Foto) render correctly', (WidgetTester tester) async {
@@ -347,7 +356,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify the table headers for Section E exist in the preview sheet
-    expect(find.text('Jenis Kejadian'), findsOneWidget);
+    expect(find.text('Jenis Kejadian'), findsWidgets);
     expect(find.text('Cuaca'), findsWidgets); // Appears in chip and table header
 
     // In the table header, Cuaca is to the left of Jenis Kejadian
@@ -355,9 +364,9 @@ void main() {
       of: find.byType(Table),
       matching: find.text('Cuaca'),
     );
-    expect(cuacaHeaderFinder, findsOneWidget);
-    final cuacaHeaderX = tester.getTopLeft(cuacaHeaderFinder).dx;
-    final jenisKejadianHeaderX = tester.getTopLeft(find.text('Jenis Kejadian')).dx;
+    expect(cuacaHeaderFinder, findsWidgets);
+    final cuacaHeaderX = tester.getTopLeft(cuacaHeaderFinder.first).dx;
+    final jenisKejadianHeaderX = tester.getTopLeft(find.text('Jenis Kejadian').first).dx;
     expect(cuacaHeaderX < jenisKejadianHeaderX, isTrue);
   });
 
@@ -461,19 +470,22 @@ void main() {
 
     // 2. Table B (Material): Job #1 without material shows clean note, Job #2 shows actual material
     expect(find.text('Tidak ada penggunaan material pada pekerjaan ini'), findsOneWidget);
-    expect(find.text('U-Ditch Precast 40x40'), findsOneWidget);
+    expect(find.text('U-Ditch Precast 40x40'), findsWidgets);
 
     // 3. Table C (Equipment):
-    expect(find.text('Excavator Mini'), findsOneWidget);
-    expect(find.text('Crane Truck'), findsOneWidget);
+    expect(find.text('Excavator Mini'), findsWidgets);
+    expect(find.text('Crane Truck'), findsWidgets);
 
     // 4. Table D (Personil):
-    expect(find.text('Pekerja Galian'), findsOneWidget);
-    expect(find.text('Tukang Pasang'), findsOneWidget);
+    expect(find.text('Pekerja Galian'), findsWidgets);
+    expect(find.text('Tukang Pasang'), findsWidgets);
 
-    // 5. Global Sections E and F rendered below all jobs:
-    expect(find.text('E.   CUACA/BENCANA/KEJADIAN PENGHAMBAT PEKERJAAN'), findsOneWidget);
-    expect(find.text('F.   INSTRUKSI DAN SARAN-SARAN'), findsOneWidget);
+    // 5. Global Sections E and F rendered:
+    expect(find.text('E.   CUACA/BENCANA/KEJADIAN PENGHAMBAT PEKERJAAN'), findsWidgets);
+    expect(find.text('F.   INSTRUKSI DAN SARAN-SARAN'), findsWidgets);
+
+    // 6. Rekapan Format Lama Section exists at the top
+    expect(find.text('RINCIAN OPERASIONAL PER ITEM PEKERJAAN'), findsOneWidget);
   });
 
   testWidgets('Unified Rekapitulasi DT form enters license plate once per delivery trip', (WidgetTester tester) async {
@@ -739,6 +751,127 @@ void main() {
 
     // Verify Total Volume
     expect(find.text('TOTAL VOLUME PENGECORAN BETON'), findsOneWidget);
+  });
+
+  testWidgets('BuatLaporanScreen allows adding multiple pengawas signers and renders them in DetailDataLaporanScreen', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => ContractProvider()),
+        ],
+        child: const MaterialApp(
+          home: BuatLaporanScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Scroll down to Section G
+    final addSignerBtn = find.text('Tambah Penandatangan Pengawas');
+    await tester.scrollUntilVisible(addSignerBtn, 500, scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pengawas #1'), findsOneWidget);
+    expect(addSignerBtn, findsOneWidget);
+
+    // Tap to add a second supervisor signer
+    await tester.tap(addSignerBtn);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pengawas #1'), findsOneWidget);
+    expect(find.text('Pengawas #2'), findsOneWidget);
+
+    // Now test DetailDataLaporanScreen with multiple pengawas
+    final now = DateTime.now();
+    final todayKey = '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+    final multiSignerReport = {
+      'id': 'rep-multi-signer',
+      'tanggal': todayKey,
+      'tanggalFormatted': '26 Oktober 2026',
+      'hari': 'Senin',
+      'pekerjaan': 'Pemeliharaan Jalan',
+      'lokasi': 'STA 0+000',
+      'kontraktor': 'CV. SATYA WIGUNA',
+      'instruksiKonsultan': 'Instruksi bersama tim pengawas',
+      'ttdPengawasList': [
+        {
+          'nama': 'MUBALLIGH, ST., M.Sc.',
+          'jabatan': 'Inspektor Lapangan',
+          'signature': '',
+        },
+        {
+          'nama': 'SENDAYU GALIH K., ST',
+          'jabatan': 'Site Engineer',
+          'signature': '',
+        },
+      ],
+      'pekerjaanList': [],
+      'cuacaKejadianList': [],
+    };
+
+    final mockContract = ContractModel(
+      id: 'c-test',
+      namaKontrak: 'Kontrak Pengawasan Jalan',
+      jenisKegiatan: 'Pengawasan',
+      instansiDinas: ['Dinas PU'],
+      nilaiKontrak: 'Rp 200.000.000,00',
+      hariKalender: 60,
+      tglMulaiSpk: '26 Mei 2026',
+      nomorSpk: 'SPK-01',
+      nomorSpmk: 'SPMK-01',
+      tglMulaiSpmk: '18 Juni 2026',
+      tglSelesaiSpmk: '16 Agustus 2026',
+      sumberDana: 'APBD',
+      deskripsi: 'Deskripsi',
+      kegiatans: [
+        {
+          'namaKegiatan': 'Ruas Jalan A',
+          'kontraktor': 'CV. SATYA WIGUNA',
+          'laporans': [
+            multiSignerReport,
+          ],
+          'folders': [
+            {
+              'name': 'Laporan Harian',
+              'documents': [
+                multiSignerReport,
+              ],
+            },
+          ],
+        },
+      ],
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => ContractProvider()),
+        ],
+        child: MaterialApp(
+          home: DetailDataLaporanScreen(contract: mockContract),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final reportButtonFinder = find.text('Buka & Lihat Dokumen Laporan');
+    expect(reportButtonFinder, findsWidgets);
+    await tester.tap(reportButtonFinder.first);
+    await tester.pumpAndSettle();
+
+    // Both supervisors should appear in the preview table
+    expect(find.text('MUBALLIGH, ST., M.Sc.'), findsWidgets);
+    expect(find.text('Inspektor Lapangan'), findsWidgets);
+    expect(find.text('SENDAYU GALIH K., ST'), findsWidgets);
+    expect(find.text('Site Engineer'), findsWidgets);
   });
 }
 

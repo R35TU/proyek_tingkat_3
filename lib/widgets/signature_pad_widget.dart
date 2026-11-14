@@ -168,12 +168,15 @@ class SignaturePadWidgetState extends State<SignaturePadWidget> {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  Text(
-                    hasSignature ? 'Tersedia' : 'Belum Ditandatangani',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: hasSignature ? const Color(0xFF047857) : const Color(0xFF6B7280),
+                  Flexible(
+                    child: Text(
+                      hasSignature ? 'Tersedia' : 'Belum TTD',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: hasSignature ? const Color(0xFF047857) : const Color(0xFF6B7280),
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],

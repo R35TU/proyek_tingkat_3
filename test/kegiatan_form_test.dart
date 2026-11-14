@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/kegiatan_model.dart';
+import 'package:tata_saka_app/models/weekly_report_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/screens/form_kegiatan_screen.dart';
 import 'package:tata_saka_app/screens/detail_kegiatan_screen.dart';
@@ -119,6 +120,25 @@ void main() {
       expect(keg.akhirPelaksanaan, '16 Agustus 2026');
       expect(keg.masaPelaksanaan, '60 (Enam Puluh) hari kalender');
       expect(keg.jangkaWaktu, '60 (Enam Puluh) hari kalender');
+      expect(keg.tglSuratPesanan, '26 Mei 2026');
+      expect(keg.tglSpmkKontraktor, '18 Juni 2026');
+    });
+
+    test('parseIndonesianDate parses varied date formats and prefixes', () {
+      final d1 = WeeklyReportModel.parseIndonesianDate('20 April 2026');
+      expect(d1, DateTime(2026, 4, 20));
+
+      final d2 = WeeklyReportModel.parseIndonesianDate('Tanggal 20 April 2026');
+      expect(d2, DateTime(2026, 4, 20));
+
+      final d3 = WeeklyReportModel.parseIndonesianDate('Tgl 20 April 2026');
+      expect(d3, DateTime(2026, 4, 20));
+
+      final d4 = WeeklyReportModel.parseIndonesianDate('20-04-2026');
+      expect(d4, DateTime(2026, 4, 20));
+
+      final d5 = WeeklyReportModel.parseIndonesianDate('20/04/2026');
+      expect(d5, DateTime(2026, 4, 20));
     });
   });
 
@@ -234,21 +254,24 @@ void main() {
       // Section PENYEDIA JASA / KONTRAKTOR PELAKSANA
       expect(find.text('PENYEDIA JASA / KONTRAKTOR PELAKSANA'), findsOneWidget);
       expect(find.text('CV. SATYA WIGUNA'), findsOneWidget);
+      expect(find.text('No. Surat Pesanan/tanggal'), findsOneWidget);
+      expect(find.text('No. SPMK/tanggal'), findsWidgets);
       expect(find.text('Rp 1.723.985.515,00 (Termasuk PPN+PPH)'), findsOneWidget);
 
       // Section STRUKTUR ORGANISASI KEGIATAN
       expect(find.text('STRUKTUR ORGANISASI KEGIATAN'), findsOneWidget);
       expect(find.text('DRAJAT UJI WAKHYONO, S.T., M.T.'), findsOneWidget);
       expect(find.text('MUBALLIGH, ST., M.Sc. & BILAL A.Md'), findsOneWidget);
-      expect(find.text('SENDAYU GALIH K., ST'), findsOneWidget);
+      expect(find.text('Direktur Penyedia Jasa'), findsOneWidget);
 
       // Section STRUKTUR ORGANISASI PENYEDIA JASA
       expect(find.text('STRUKTUR ORGANISASI PENYEDIA JASA'), findsOneWidget);
+      expect(find.text('Direktur'), findsOneWidget);
       expect(find.text('GALIH WAHYU UTAMA'), findsOneWidget);
       expect(find.text('IQBAL ZAINUL ARIFIN'), findsOneWidget);
 
-      // Quick Action Button
-      expect(find.text('Edit'), findsOneWidget);
+      // Quick Action Button: Pen icon edit in header
+      expect(find.byIcon(Icons.edit_outlined), findsWidgets);
     });
   });
 }

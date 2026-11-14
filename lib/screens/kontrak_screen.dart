@@ -1,46 +1,120 @@
 import 'package:flutter/material.dart';
-import 'package:tata_saka_app/theme/app_colors.dart';
-import 'package:tata_saka_app/screens/tambah_kontrak_screen.dart';
-import 'package:tata_saka_app/screens/detail_kontrak_screen.dart';
-import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:provider/provider.dart';
+import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
+import 'package:tata_saka_app/providers/user_profile_provider.dart';
+import 'package:tata_saka_app/screens/detail_kegiatan_screen.dart';
+import 'package:tata_saka_app/screens/detail_kontrak_screen.dart';
+import 'package:tata_saka_app/screens/tambah_kontrak_screen.dart';
+import 'package:tata_saka_app/theme/app_colors.dart';
 
-class KontrakScreen extends StatelessWidget {
+class KontrakScreen extends StatefulWidget {
   const KontrakScreen({super.key});
 
   @override
+  State<KontrakScreen> createState() => _KontrakScreenState();
+}
+
+class _KontrakScreenState extends State<KontrakScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  double _calcKegiatanProgress(Map<String, dynamic> keg) {
+    final activeRkk = (keg['rkkDivisiList'] as List? ?? []);
+    final laporans = (keg['laporans'] as List? ?? []);
+
+    if (activeRkk.isNotEmpty && laporans.isNotEmpty) {
+      double totalRealisasiBobot = 0.0;
+      for (final rep in laporans) {
+        if (rep is! Map) continue;
+        final pList = (rep['pekerjaanList'] as List? ?? []);
+        for (final p in pList) {
+          if (p is! Map) continue;
+          final volStr = (p['volume'] ?? '').toString();
+          final vol = double.tryParse(volStr.split(' ').first.replaceAll(',', '.')) ?? 0.0;
+          final itId = (p['rkkItemId'] ?? '').toString().trim();
+          final noMata = (p['noMataPembayaran'] ?? '').toString().trim();
+          final jenis = (p['uraian'] ?? p['jenisPekerjaan'] ?? '').toString().trim().toLowerCase();
+
+          for (final div in activeRkk) {
+            for (final it in (div['items'] as List? ?? [])) {
+              final bId = (it['id'] ?? '').toString().trim();
+              final bNo = (it['noMataPembayaran'] ?? '').toString().trim();
+              final bUr = (it['uraian'] ?? '').toString().trim().toLowerCase();
+
+              final match = (itId.isNotEmpty && bId.isNotEmpty && itId == bId) ||
+                  (noMata.isNotEmpty && bNo.isNotEmpty && noMata == bNo) ||
+                  (jenis.isNotEmpty && (bUr == jenis || bUr.contains(jenis)));
+
+              if (match) {
+                final targetVol = (it['volumeCCO'] ?? it['volume'] as num?)?.toDouble() ?? 0.0;
+                final bobotItem = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
+                if (targetVol > 0) {
+                  totalRealisasiBobot += (vol / targetVol) * bobotItem;
+                }
+                break;
+              }
+            }
+          }
+        }
+      }
+      return totalRealisasiBobot.clamp(0.0, 100.0);
+    }
+
+    final weekly = (keg['laporanMingguan'] as List? ?? []);
+    if (weekly.isNotEmpty && weekly.last is Map) {
+      final lastW = weekly.last as Map;
+      return (lastW['realisasiPersen'] as num?)?.toDouble() ?? 0.0;
+    }
+
+    return 0.0;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    UserProfileProvider? userProf;
+    try {
+      userProf = Provider.of<UserProfileProvider>(context);
+    } catch (_) {
+      userProf = null;
+    }
+    final safeUserProf = userProf ?? UserProfileProvider();
+    final contractProv = Provider.of<ContractProvider>(context);
+    final allContracts = contractProv.contracts;
+
+    final isKontraktor = safeUserProf.isKontraktor;
+    final isDinas = safeUserProf.isDinas;
+    final isKonsultan = safeUserProf.isKonsultan;
+
+    final String titleText = isKontraktor ? 'Kegiatan Saya' : 'Daftar Kontrak';
+    final String hintSearch = isKontraktor ? 'Cari Kegiatan...' : 'Cari Kontrak...';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.menu, color: AppColors.textDark),
-          onPressed: () {},
-        ),
-        title: const Text(
-          'Daftar Kontrak',
-          style: TextStyle(
+        surfaceTintColor: Colors.transparent,
+        title: Text(
+          titleText,
+          style: const TextStyle(
             color: AppColors.textDark,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: AppColors.textDark),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
-            // Search and Filter
+            // Search Box
             Row(
               children: [
                 Expanded(
@@ -50,187 +124,404 @@ class KontrakScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: AppColors.border),
                     ),
-                    child: const TextField(
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
-                        hintText: 'Cari Kontrak..',
-                        hintStyle: TextStyle(color: AppColors.textLight),
-                        prefixIcon: Icon(Icons.search, color: AppColors.textLight),
+                        hintText: hintSearch,
+                        hintStyle: const TextStyle(color: AppColors.textLight, fontSize: 13.5),
+                        prefixIcon: const Icon(Icons.search, color: AppColors.textLight),
                         border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.filter_alt_outlined, color: AppColors.primaryBlue),
-                    onPressed: () {},
-                  ),
-                ),
               ],
             ),
-            const SizedBox(height: 20),
 
-            // Tambah Kontrak Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const TambahKontrakScreen(),
+            // Tombol Tambah Kontrak Baru: HANYA DITAMPILKAN UNTUK KONSULTAN
+            if (isKonsultan) ...[
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const TambahKontrakScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Tambah Kontrak Baru'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryBlue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  );
-                },
-                icon: const Icon(Icons.add),
-                label: const Text('Tambah Kontrak Baru'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryBlue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    elevation: 0,
                   ),
-                  elevation: 0,
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
+            ],
+            const SizedBox(height: 18),
 
-            // Contract List
+            // Content List
             Expanded(
-              child: Consumer<ContractProvider>(
-                builder: (context, provider, child) {
-                  if (provider.contracts.isEmpty) {
-                    return const Center(child: Text('Belum ada kontrak.'));
-                  }
-                  return ListView.builder(
-                    itemCount: provider.contracts.length,
-                    itemBuilder: (context, index) {
-                      final contract = provider.contracts[index];
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          borderRadius: BorderRadius.circular(16),
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => DetailKontrakScreen(contract: contract),
-                                ),
-                              );
-                            },
-                            onLongPress: () {
-                              _showContractOptions(context, contract);
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.all(20),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          contract.namaKontrak,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.textDark,
-                                          ),
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.more_vert, size: 20, color: AppColors.textLight),
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(),
-                                        onPressed: () => _showContractOptions(context, contract),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    contract.nomorSpk.isNotEmpty ? contract.nomorSpk : '-',
-                                    style: const TextStyle(
-                                      color: AppColors.textLight,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFE6F4EA), // Light green
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(Icons.circle, size: 8, color: AppColors.successGreen),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              contract.status == 'Selesai' ? 'Selesai' : 'Progres',
-                                              style: const TextStyle(
-                                                color: AppColors.successGreen,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Text(
-                                        '${contract.kegiatans.length} Kegiatan',
-                                        style: const TextStyle(
-                                          color: AppColors.textLight,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
+              child: isKontraktor
+                  ? _buildContractorKegiatanList(context, safeUserProf, allContracts)
+                  : _buildContractList(context, isKonsultan, isDinas, safeUserProf, allContracts),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  // ─── TAMPILAN KHUSUS KONTRAKTOR: HANYA KEGIATAN MEREKA ───
+  Widget _buildContractorKegiatanList(
+    BuildContext context,
+    UserProfileProvider userProf,
+    List<ContractModel> allContracts,
+  ) {
+    final contractorName = userProf.namaLengkap.toLowerCase();
+    final searchQuery = _searchController.text.trim().toLowerCase();
+
+    final List<Map<String, dynamic>> myKegiatans = [];
+    final List<int> kegIndices = [];
+    final List<ContractModel> parentContracts = [];
+
+    for (final c in allContracts) {
+      for (int i = 0; i < c.kegiatans.length; i++) {
+        final k = c.kegiatans[i];
+        final kKontraktor = (k['kontraktor'] ?? '').toString().toLowerCase();
+        final kNama = (k['namaKegiatan'] ?? '').toString().toLowerCase();
+
+        bool isMine = false;
+        if (kKontraktor.isNotEmpty) {
+          if (kKontraktor.contains(contractorName) || contractorName.contains(kKontraktor)) {
+            isMine = true;
+          } else if (contractorName.contains('divan') && kKontraktor.contains('divan')) {
+            isMine = true;
+          } else if (contractorName.contains('langgeng') && kKontraktor.contains('langgeng')) {
+            isMine = true;
+          }
+        }
+
+        if (isMine) {
+          if (searchQuery.isEmpty || kNama.contains(searchQuery)) {
+            myKegiatans.add(k);
+            kegIndices.add(i);
+            parentContracts.add(c);
+          }
+        }
+      }
+    }
+
+    if (myKegiatans.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.assignment_late_outlined, size: 52, color: AppColors.slate),
+            const SizedBox(height: 12),
+            const Text(
+              'Belum Ada Kegiatan Ditugaskan',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.navySlate),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Kegiatan yang ditugaskan kepada ${userProf.namaLengkap} akan tampil di sini.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.slate, fontSize: 12.5),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: myKegiatans.length,
+      itemBuilder: (context, idx) {
+        final k = myKegiatans[idx];
+        final parentContract = parentContracts[idx];
+        final kIndex = kegIndices[idx];
+        final prog = _calcKegiatanProgress(k);
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => DetailKegiatanScreen(
+                      contract: parentContract,
+                      kegiatanIndex: kIndex,
+                    ),
+                  ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.assignment, color: Color(0xFF2563EB), size: 22),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                k['namaKegiatan'] ?? 'Nama Kegiatan',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textDark,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${k['lokasi'] ?? '-'} • ${k['sumberDana'] ?? 'APBD'}',
+                                style: const TextStyle(color: AppColors.textLight, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right, color: AppColors.textLight),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Nilai Kontrak Kegiatan:', style: TextStyle(fontSize: 12, color: AppColors.textLight)),
+                        Text(
+                          (k['nilaiKontrak'] ?? '-').toString(),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.navySlate),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: LinearProgressIndicator(
+                              value: prog / 100.0,
+                              minHeight: 8,
+                              backgroundColor: const Color(0xFFF1F5F9),
+                              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.navySlate),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          '${prog.toStringAsFixed(1)}%',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.navySlate),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ─── TAMPILAN DAFTAR KONTRAK UNTUK KONSULTAN DAN DINAS ───
+  Widget _buildContractList(
+    BuildContext context,
+    bool isKonsultan,
+    bool isDinas,
+    UserProfileProvider userProf,
+    List<ContractModel> allContracts,
+  ) {
+    final searchQuery = _searchController.text.trim().toLowerCase();
+
+    List<ContractModel> filteredContracts = allContracts;
+    if (isDinas) {
+      final agency = userProf.companyOrAgency.toLowerCase();
+      filteredContracts = filteredContracts.where((c) {
+        return c.instansiDinas.any((d) =>
+            d.toLowerCase().contains(agency) ||
+            agency.contains(d.toLowerCase()) ||
+            d.toLowerCase().contains('dpu') ||
+            agency.contains('dpu'));
+      }).toList();
+    }
+
+    if (searchQuery.isNotEmpty) {
+      filteredContracts = filteredContracts.where((c) {
+        return c.namaKontrak.toLowerCase().contains(searchQuery) ||
+            c.nomorSpk.toLowerCase().contains(searchQuery);
+      }).toList();
+    }
+
+    if (filteredContracts.isEmpty) {
+      return const Center(child: Text('Belum ada kontrak yang sesuai.'));
+    }
+
+    return ListView.builder(
+      itemCount: filteredContracts.length,
+      itemBuilder: (context, index) {
+        final contract = filteredContracts[index];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => DetailKontrakScreen(contract: contract),
+                  ),
+                );
+              },
+              onLongPress: isKonsultan ? () => _showContractOptions(context, contract) : null,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            contract.namaKontrak,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                        ),
+                        // Opsi Menu Edit/Hapus Kontrak HANYA untuk Konsultan
+                        if (isKonsultan)
+                          IconButton(
+                            icon: const Icon(Icons.more_vert, size: 20, color: AppColors.textLight),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () => _showContractOptions(context, contract),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      contract.nomorSpk.isNotEmpty ? contract.nomorSpk : '-',
+                      style: const TextStyle(
+                        color: AppColors.textLight,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE6F4EA),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.circle, size: 8, color: AppColors.successGreen),
+                              const SizedBox(width: 6),
+                              Text(
+                                contract.status == 'Selesai' ? 'Selesai' : 'Progres',
+                                style: const TextStyle(
+                                  color: AppColors.successGreen,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          '${(contract.progressFisik * 100).toStringAsFixed(1)}%',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: contract.progressFisik,
+                        backgroundColor: AppColors.inputBackground,
+                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
+                        minHeight: 6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -242,33 +533,10 @@ class KontrakScreen extends StatelessWidget {
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.symmetric(vertical: 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                child: Text(
-                  contract.namaKontrak,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: AppColors.textDark,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const Divider(),
               ListTile(
                 leading: const Icon(Icons.edit_outlined, color: AppColors.primaryBlue),
                 title: const Text('Edit Kontrak', style: TextStyle(fontWeight: FontWeight.w600)),

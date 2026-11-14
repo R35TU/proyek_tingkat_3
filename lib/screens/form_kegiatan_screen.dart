@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/kegiatan_model.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
+import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/utils/indonesian_terbilang.dart';
 import 'package:flutter/services.dart';
@@ -55,11 +56,12 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
   late TextEditingController _penggunaAnggaranCtrl;
   late TextEditingController _stafTeknis1Ctrl;
   late TextEditingController _stafTeknis2Ctrl;
-  late TextEditingController _siteEngineerKegiatanCtrl;
-  late TextEditingController _direkturPenyediaCtrl;
 
-  // 5. STRUKTUR ORGANISASI PENYEDIA JASA
-  late TextEditingController _direkturKontraktorCtrl;
+  // 5. STRUKTUR ORGANISASI KONSULTAN
+  late TextEditingController _direkturKonsultanCtrl;
+  late TextEditingController _siteEngineerKegiatanCtrl;
+
+  // 6. STRUKTUR ORGANISASI PENYEDIA JASA
   late TextEditingController _pelaksanaLapanganCtrl;
   late TextEditingController _petugasK3Ctrl;
 
@@ -137,9 +139,17 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
     // 3. Penyedia Jasa / Kontraktor
     _kontraktorCtrl = TextEditingController(text: init?['kontraktor'] ?? '');
     _noSuratPesananCtrl = TextEditingController(text: init?['noSuratPesanan'] ?? '');
-    _tglSuratPesananCtrl = TextEditingController(text: init?['tglSuratPesanan'] ?? '');
+    _tglSuratPesananCtrl = TextEditingController(
+      text: (init?['tglSuratPesanan']?.toString().isNotEmpty == true)
+          ? init!['tglSuratPesanan']
+          : c.tglMulaiSpk,
+    );
     _noSpmkKontraktorCtrl = TextEditingController(text: init?['noSpmkKontraktor'] ?? '');
-    _tglSpmkKontraktorCtrl = TextEditingController(text: init?['tglSpmkKontraktor'] ?? '');
+    _tglSpmkKontraktorCtrl = TextEditingController(
+      text: (init?['tglSpmkKontraktor']?.toString().isNotEmpty == true)
+          ? init!['tglSpmkKontraktor']
+          : c.tglMulaiSpmk,
+    );
     _nilaiKontrakCtrl = TextEditingController(text: RupiahUtil.formatString(init?['nilaiKontrak'] ?? ''));
     _jangkaWaktuCtrl = TextEditingController(
       text: (init?['jangkaWaktu']?.toString().isNotEmpty == true)
@@ -171,23 +181,28 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
             ? init!['siteEngineer']
             : ((init?['strukturOrganisasiKegiatan']?['siteEngineer']?.toString().isNotEmpty == true)
                 ? init!['strukturOrganisasiKegiatan']['siteEngineer']
-                : c.siteEngineer));
+                : ((init?['strukturOrganisasiKonsultan']?['siteEngineer']?.toString().isNotEmpty == true)
+                    ? init!['strukturOrganisasiKonsultan']['siteEngineer']
+                    : c.siteEngineer)));
     _siteEngineerKegiatanCtrl = TextEditingController(text: initialSiteEngineer);
-    _direkturPenyediaCtrl = TextEditingController(
-      text: init?['direkturPenyedia'] ??
-          init?['strukturOrganisasiKegiatan']?['direkturPenyedia'] ??
-          init?['direkturKontraktor'] ??
-          init?['direktur'] ??
-          '',
-    );
 
-    // 5. Struktur Organisasi Penyedia Jasa
-    _direkturKontraktorCtrl = TextEditingController(
-      text: init?['direkturKontraktor'] ??
-          init?['direktur'] ??
-          init?['strukturPenyediaJasa']?['direktur'] ??
-          _direkturPenyediaCtrl.text,
-    );
+    // 5. Struktur Organisasi Konsultan (Hanya 1 input Direktur Konsultan)
+    final String initialDirektur = (init?['direkturKonsultan']?.toString().isNotEmpty == true)
+        ? init!['direkturKonsultan']
+        : ((init?['direkturPenyedia']?.toString().isNotEmpty == true)
+            ? init!['direkturPenyedia']
+            : ((init?['direkturKontraktor']?.toString().isNotEmpty == true)
+                ? init!['direkturKontraktor']
+                : ((init?['direktur']?.toString().isNotEmpty == true)
+                    ? init!['direktur']
+                    : ((init?['strukturOrganisasiKonsultan']?['direkturKonsultan']?.toString().isNotEmpty == true)
+                        ? init!['strukturOrganisasiKonsultan']['direkturKonsultan']
+                        : ((init?['strukturOrganisasiKegiatan']?['direkturPenyedia']?.toString().isNotEmpty == true)
+                            ? init!['strukturOrganisasiKegiatan']['direkturPenyedia']
+                            : '')))));
+    _direkturKonsultanCtrl = TextEditingController(text: initialDirektur);
+
+    // 6. Struktur Organisasi Penyedia Jasa
     _pelaksanaLapanganCtrl = TextEditingController(
       text: init?['pelaksanaLapangan'] ??
           init?['strukturPenyediaJasa']?['pelaksanaLapangan'] ??
@@ -239,9 +254,8 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
     _penggunaAnggaranCtrl.dispose();
     _stafTeknis1Ctrl.dispose();
     _stafTeknis2Ctrl.dispose();
+    _direkturKonsultanCtrl.dispose();
     _siteEngineerKegiatanCtrl.dispose();
-    _direkturPenyediaCtrl.dispose();
-    _direkturKontraktorCtrl.dispose();
     _pelaksanaLapanganCtrl.dispose();
     _petugasK3Ctrl.dispose();
     super.dispose();
@@ -330,20 +344,22 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
       'penggunaAnggaran': _penggunaAnggaranCtrl.text.trim(),
       'stafTeknis1': _stafTeknis1Ctrl.text.trim(),
       'stafTeknis2': _stafTeknis2Ctrl.text.trim(),
+      'direkturKonsultan': _direkturKonsultanCtrl.text.trim(),
+      'direkturPenyedia': _direkturKonsultanCtrl.text.trim(),
+      'direkturKontraktor': _direkturKonsultanCtrl.text.trim(),
       'siteEngineerKegiatan': _siteEngineerKegiatanCtrl.text.trim(),
-      'direkturPenyedia': _direkturPenyediaCtrl.text.trim(),
-      'direkturKontraktor': _direkturKontraktorCtrl.text.trim(),
       'pelaksanaLapangan': _pelaksanaLapanganCtrl.text.trim(),
       'petugasK3': _petugasK3Ctrl.text.trim(),
       'strukturOrganisasiKegiatan': {
         'penggunaAnggaran': _penggunaAnggaranCtrl.text.trim(),
         'stafTeknis1': _stafTeknis1Ctrl.text.trim(),
         'stafTeknis2': _stafTeknis2Ctrl.text.trim(),
+      },
+      'strukturOrganisasiKonsultan': {
+        'direkturKonsultan': _direkturKonsultanCtrl.text.trim(),
         'siteEngineer': _siteEngineerKegiatanCtrl.text.trim(),
-        'direkturPenyedia': _direkturPenyediaCtrl.text.trim(),
       },
       'strukturPenyediaJasa': {
-        'direktur': _direkturKontraktorCtrl.text.trim(),
         'pelaksanaLapangan': _pelaksanaLapanganCtrl.text.trim(),
         'petugasK3': _petugasK3Ctrl.text.trim(),
       },
@@ -419,7 +435,7 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
               const SizedBox(height: 16),
 
               // 5. STRUKTUR ORGANISASI PENYEDIA JASA
-              _buildSection5StrukturPenyedia(),
+              _buildSection5StrukturPenyediaJasa(),
               const SizedBox(height: 28),
 
               // TOMBOL SIMPAN
@@ -510,6 +526,8 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
                 controller: _awalPelaksanaanCtrl,
                 label: 'Awal Pelaksanaan',
                 fontSize: 12,
+                readOnly: true,
+                onTap: () => _pickDateFor(_awalPelaksanaanCtrl, updateWaktuBerjalan: true),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.calendar_month, color: Color(0xFF6B7280), size: 18),
                   onPressed: () => _pickDateFor(_awalPelaksanaanCtrl, updateWaktuBerjalan: true),
@@ -522,6 +540,8 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
                 controller: _akhirPelaksanaanCtrl,
                 label: 'Akhir Pelaksanaan',
                 fontSize: 12,
+                readOnly: true,
+                onTap: () => _pickDateFor(_akhirPelaksanaanCtrl),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.calendar_month, color: Color(0xFF6B7280), size: 18),
                   onPressed: () => _pickDateFor(_akhirPelaksanaanCtrl),
@@ -551,6 +571,38 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
           label: 'Kontraktor Pelaksana *',
           isBold: true,
           validator: (val) => val == null || val.trim().isEmpty ? 'Kontraktor pelaksana wajib diisi' : null,
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: UserProfileProvider.registeredContractors.map((company) {
+            final isSelected = _kontraktorCtrl.text.trim().toLowerCase() == company.toLowerCase();
+            return ActionChip(
+              avatar: Icon(
+                isSelected ? Icons.check_circle : Icons.business,
+                size: 14,
+                color: isSelected ? Colors.white : AppColors.primaryBlue,
+              ),
+              label: Text(
+                company,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected ? Colors.white : AppColors.textDark,
+                ),
+              ),
+              backgroundColor: isSelected ? AppColors.primaryBlue : AppColors.cardBackground,
+              side: BorderSide(
+                color: isSelected ? AppColors.primaryBlue : AppColors.border,
+              ),
+              onPressed: () {
+                setState(() {
+                  _kontraktorCtrl.text = company;
+                });
+              },
+            );
+          }).toList(),
         ),
         const SizedBox(height: 14),
 
@@ -610,28 +662,18 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
           controller: _stafTeknis2Ctrl,
           label: 'Staf Teknis 2 DPU-PR',
         ),
-        const SizedBox(height: 14),
-        _buildField(
-          controller: _siteEngineerKegiatanCtrl,
-          label: 'Site Engineer (CV. Tata Saka Consultant)',
-        ),
-        const SizedBox(height: 14),
-        _buildField(
-          controller: _direkturPenyediaCtrl,
-          label: 'Direktur Penyedia Jasa',
-        ),
       ],
     );
   }
 
   // 5. STRUKTUR ORGANISASI PENYEDIA JASA
-  Widget _buildSection5StrukturPenyedia() {
+  Widget _buildSection5StrukturPenyediaJasa() {
     return _buildCard(
       title: 'Struktur Organisasi Penyedia Jasa',
       children: [
         _buildField(
-          controller: _direkturKontraktorCtrl,
-          label: 'Direktur',
+          controller: _direkturKonsultanCtrl,
+          label: 'Direktur Penyedia Jasa',
         ),
         const SizedBox(height: 14),
         _buildField(
@@ -689,8 +731,11 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
         const SizedBox(height: 8),
         TextFormField(
           controller: dateController,
+          readOnly: true,
+          onTap: () => _pickDateFor(dateController),
           decoration: InputDecoration(
             labelText: 'Tanggal',
+            hintText: 'Pilih tanggal...',
             isDense: true,
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -721,6 +766,8 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
     required String label,
     int maxLines = 1,
     bool isBold = false,
+    bool readOnly = false,
+    VoidCallback? onTap,
     double fontSize = 13,
     String? prefixText,
     TextInputType? keyboardType,
@@ -731,6 +778,8 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
+      readOnly: readOnly,
+      onTap: onTap,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
       validator: validator,

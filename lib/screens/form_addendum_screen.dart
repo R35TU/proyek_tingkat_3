@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/kegiatan_model.dart';
-import 'package:tata_saka_app/services/pdf_report_service.dart';
+import 'package:tata_saka_app/screens/kelola_rkk_screen.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 
 class FormAddendumScreen extends StatefulWidget {
@@ -364,7 +365,7 @@ class _FormAddendumScreenState extends State<FormAddendumScreen> {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          PdfReportService.formatRupiah(newTotal),
+                          KelolaRkkScreen.formatRupiah(newTotal),
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white),
                         ),
                       ],
@@ -405,7 +406,7 @@ class _FormAddendumScreenState extends State<FormAddendumScreen> {
                           const Text('Pekerjaan Tambah', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
                           const SizedBox(height: 2),
                           Text(
-                            PdfReportService.formatRupiah(tambahTotal),
+                            KelolaRkkScreen.formatRupiah(tambahTotal),
                             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF34D399)),
                           ),
                           Text('+${tambahBobot.toStringAsFixed(3)}%', style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8))),
@@ -420,7 +421,7 @@ class _FormAddendumScreenState extends State<FormAddendumScreen> {
                           const Text('Pekerjaan Kurang', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
                           const SizedBox(height: 2),
                           Text(
-                            PdfReportService.formatRupiah(kurangTotal),
+                            KelolaRkkScreen.formatRupiah(kurangTotal),
                             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFF87171)),
                           ),
                           Text('-${kurangBobot.toStringAsFixed(3)}%', style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8))),
@@ -563,7 +564,7 @@ class _FormAddendumScreenState extends State<FormAddendumScreen> {
                                         ),
                                         if (hs > 0)
                                           Text(
-                                            PdfReportService.formatRupiah(hs),
+                                            KelolaRkkScreen.formatRupiah(hs),
                                             style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
                                           ),
                                       ],
@@ -607,8 +608,8 @@ class _FormAddendumScreenState extends State<FormAddendumScreen> {
                                   const SizedBox(width: 4),
                                   Text(
                                     delta > 0
-                                        ? '+ Tambah ${delta.toStringAsFixed(2)} $satuan (+${PdfReportService.formatRupiah(delta * hs)})'
-                                        : '- Kurang ${delta.abs().toStringAsFixed(2)} $satuan (-${PdfReportService.formatRupiah(delta.abs() * hs)})',
+                                        ? '+ Tambah ${delta.toStringAsFixed(2)} $satuan (+${KelolaRkkScreen.formatRupiah(delta * hs)})'
+                                        : '- Kurang ${delta.abs().toStringAsFixed(2)} $satuan (-${KelolaRkkScreen.formatRupiah(delta.abs() * hs)})',
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,

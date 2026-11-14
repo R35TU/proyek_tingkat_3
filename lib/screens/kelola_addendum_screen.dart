@@ -6,9 +6,11 @@ import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/screens/form_addendum_screen.dart';
+import 'package:tata_saka_app/screens/kelola_rkk_screen.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/widgets/lembar_tambah_kurang_widget.dart';
 import 'package:pdf/pdf.dart';
+import 'package:tata_saka_app/models/addendum_model.dart';
 import 'package:tata_saka_app/screens/pdf_viewer_screen.dart';
 import 'package:tata_saka_app/services/pdf_report_service.dart';
 
@@ -40,13 +42,8 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
   }
 
   void _loadData() {
-    _kegiatanMap = Map<String, dynamic>.from(
-      widget.contract.kegiatans[widget.kegiatanIndex],
-    );
-    _kegiatan = KegiatanModel.fromJson(
-      _kegiatanMap,
-      fallbackContract: widget.contract,
-    );
+    _kegiatanMap = Map<String, dynamic>.from(widget.contract.kegiatans[widget.kegiatanIndex]);
+    _kegiatan = KegiatanModel.fromJson(_kegiatanMap, fallbackContract: widget.contract);
   }
 
   void _saveToProvider() {
@@ -63,31 +60,24 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
         final items = div['items'] as List? ?? [];
         for (final it in items) {
           final hs = (it['hargaSatuan'] as num?)?.toDouble() ?? 0.0;
-          final vol =
-              (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
+          final vol = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
           tot += (it['totalHarga'] as num?)?.toDouble() ?? (hs * vol);
         }
       }
       if (tot > 0) {
-        _kegiatanMap['nilaiKontrak'] = PdfReportService.formatRupiah(tot);
+        _kegiatanMap['nilaiKontrak'] = KelolaRkkScreen.formatRupiah(tot);
       }
     }
 
     widget.contract.kegiatans[widget.kegiatanIndex] = _kegiatanMap;
-    Provider.of<ContractProvider>(
-      context,
-      listen: false,
-    ).updateContract(widget.contract);
+    Provider.of<ContractProvider>(context, listen: false).updateContract(widget.contract);
     _isModified = true;
     setState(() {
       _loadData();
     });
   }
 
-  void _bukaLembarTambahKurang(
-    Map<String, dynamic> addendumData,
-    int addendumIdx,
-  ) {
+  void _bukaLembarTambahKurang(Map<String, dynamic> addendumData, int addendumIdx) {
     // Tentukan baseline
     List<Map<String, dynamic>> baselineList;
     if (addendumIdx == 0) {
@@ -95,10 +85,9 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
           ? _kegiatan.rkkKontrakAwal
           : _kegiatan.rkkDivisiList;
     } else {
-      baselineList =
-          (_kegiatan.addendums[addendumIdx - 1]['rkkDivisiList'] as List)
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList();
+      baselineList = (_kegiatan.addendums[addendumIdx - 1]['rkkDivisiList'] as List)
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
     }
 
     showModalBottomSheet(
@@ -121,10 +110,7 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
               child: Container(
                 width: 38,
                 height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
               ),
             ),
             Padding(
@@ -135,11 +121,7 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
                   Expanded(
                     child: Text(
                       'Lembar Perhitungan Tambah Kurang (${addendumData['nomorAddendum'] ?? '01'})',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Color(0xFF0F172A),
-                      ),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -150,37 +132,24 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => PdfViewerScreen(
-                            title:
-                                'Daftar Tambah Kurang - Addendum ${addendumData['nomorAddendum'] ?? '01'}',
-                            fileName:
-                                'Daftar_Tambah_Kurang_Addendum_${addendumData['nomorAddendum'] ?? '01'}.pdf',
+                            title: 'Daftar Tambah Kurang - Addendum ${addendumData['nomorAddendum'] ?? '01'}',
+                            fileName: 'Daftar_Tambah_Kurang_Addendum_${addendumData['nomorAddendum'] ?? '01'}.pdf',
                             pageFormat: PdfPageFormat.a4.landscape,
-                            buildPdf: () =>
-                                PdfReportService.generateLembarTambahKurangPdf(
-                                  addendumData: addendumData,
-                                  kegiatan: _kegiatan,
-                                  contract: widget.contract,
-                                  baselineDivisiList: baselineList,
-                                ),
+                            buildPdf: () => PdfReportService.generateLembarTambahKurangPdf(
+                              addendumData: addendumData,
+                              kegiatan: _kegiatan,
+                              contract: widget.contract,
+                              baselineDivisiList: baselineList,
+                            ),
                           ),
                         ),
                       );
                     },
-                    icon: const Icon(
-                      Icons.picture_as_pdf,
-                      size: 14,
-                      color: Colors.white,
-                    ),
-                    label: const Text(
-                      'Export PDF',
-                      style: TextStyle(fontSize: 12, color: Colors.white),
-                    ),
+                    icon: const Icon(Icons.picture_as_pdf, size: 14, color: Colors.white),
+                    label: const Text('Export PDF', style: TextStyle(fontSize: 12, color: Colors.white)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryBlue,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -205,18 +174,15 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (context) => PdfViewerScreen(
-                          title:
-                              'Daftar Tambah Kurang - Addendum ${addendumData['nomorAddendum'] ?? '01'}',
-                          fileName:
-                              'Daftar_Tambah_Kurang_Addendum_${addendumData['nomorAddendum'] ?? '01'}.pdf',
+                          title: 'Daftar Tambah Kurang - Addendum ${addendumData['nomorAddendum'] ?? '01'}',
+                          fileName: 'Daftar_Tambah_Kurang_Addendum_${addendumData['nomorAddendum'] ?? '01'}.pdf',
                           pageFormat: PdfPageFormat.a4.landscape,
-                          buildPdf: () =>
-                              PdfReportService.generateLembarTambahKurangPdf(
-                                addendumData: addendumData,
-                                kegiatan: _kegiatan,
-                                contract: widget.contract,
-                                baselineDivisiList: baselineList,
-                              ),
+                          buildPdf: () => PdfReportService.generateLembarTambahKurangPdf(
+                            addendumData: addendumData,
+                            kegiatan: _kegiatan,
+                            contract: widget.contract,
+                            baselineDivisiList: baselineList,
+                          ),
                         ),
                       ),
                     );
@@ -268,11 +234,7 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
         );
       } catch (_) {}
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Addendum ${result['nomorAddendum']} berhasil disimpan dan disahkan.',
-          ),
-        ),
+        SnackBar(content: Text('Addendum ${result['nomorAddendum']} berhasil disimpan dan disahkan.')),
       );
     }
   }
@@ -316,29 +278,21 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
         );
       } catch (_) {}
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Perubahan Addendum ${result['nomorAddendum']} disimpan.',
-          ),
-        ),
+        SnackBar(content: Text('Perubahan Addendum ${result['nomorAddendum']} disimpan.')),
       );
     }
   }
 
-  List<Map<String, String>> _extractAddendumDiff(
-    Map<String, dynamic> addendumMap,
-  ) {
+  List<Map<String, String>> _extractAddendumDiff(Map<String, dynamic> addendumMap) {
     final List<Map<String, String>> diffChanges = [];
     final newDivList = addendumMap['rkkDivisiList'] as List? ?? [];
     for (final div in newDivList) {
       final items = div['items'] as List? ?? [];
       for (final it in items) {
-        final oldV =
-            (it['volumeAwal'] as num?)?.toDouble() ??
+        final oldV = (it['volumeAwal'] as num?)?.toDouble() ??
             (it['volumeKontrak'] as num?)?.toDouble() ??
             0.0;
-        final newV =
-            (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
+        final newV = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
         final sat = it['satuan']?.toString() ?? '';
         final code = it['nomorMataPembayaran']?.toString() ?? '';
         final uraian = it['uraianPekerjaan']?.toString() ?? '';
@@ -369,25 +323,16 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
           'Addendum ini akan dihapus dan versi RKK aktif akan kembali ke versi sebelumnya.',
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white),
             onPressed: () {
               Navigator.pop(ctx);
               final nomor = add['nomorAddendum'];
               _kegiatan.addendums.removeAt(index);
               _saveToProvider();
               try {
-                final timeline = Provider.of<TimelineProvider>(
-                  context,
-                  listen: false,
-                );
+                final timeline = Provider.of<TimelineProvider>(context, listen: false);
                 final dinas = widget.contract.instansiDinas.isNotEmpty
                     ? widget.contract.instansiDinas.first
                     : 'DPU-PR Kab. Purbalingga';
@@ -434,11 +379,7 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            color: Color(0xFF0F172A),
-            size: 18,
-          ),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0F172A), size: 18),
           onPressed: () => Navigator.pop(context, _isModified),
         ),
         title: Column(
@@ -446,11 +387,7 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
           children: [
             const Text(
               'Addendum & Perhitungan Tambah Kurang',
-              style: TextStyle(
-                color: Color(0xFF0F172A),
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold),
             ),
             Text(
               _kegiatan.namaKegiatan,
@@ -487,11 +424,7 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
                     color: AppColors.primaryBlue.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
-                    Icons.history_toggle_off,
-                    color: AppColors.primaryBlue,
-                    size: 24,
-                  ),
+                  child: const Icon(Icons.history_toggle_off, color: AppColors.primaryBlue, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -500,29 +433,17 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
                     children: [
                       const Text(
                         'VERSI ACUAN FISIK SAAT INI',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF64748B),
-                          letterSpacing: 0.5,
-                        ),
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B), letterSpacing: 0.5),
                       ),
                       const SizedBox(height: 3),
                       Text(
                         activeVersionTitle,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
-                        ),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         'Digunakan sebagai acuan volume opname harian, mingguan (BoQ), & bulanan.',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF64748B),
-                        ),
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                       ),
                     ],
                   ),
@@ -535,12 +456,7 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
           // ─── 2. RIWAYAT KONTRAK AWAL ───
           const Text(
             'KONTRAK AWAL (BASELINE)',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF475569),
-              letterSpacing: 0.6,
-            ),
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569), letterSpacing: 0.6),
           ),
           const SizedBox(height: 8),
           Container(
@@ -560,14 +476,7 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
                     color: const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text(
-                    '00',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                      color: Color(0xFF475569),
-                    ),
-                  ),
+                  child: const Text('00', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569))),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -576,39 +485,25 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
                     children: [
                       const Text(
                         'RAB Kontrak Awal',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: Color(0xFF0F172A),
-                        ),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         'Nilai Kontrak: ${_kegiatan.nilaiKontrak.isNotEmpty ? _kegiatan.nilaiKontrak : '-'}',
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          color: Color(0xFF64748B),
-                        ),
+                        style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: const Text(
                     'Asli / Baseline',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF475569),
-                    ),
+                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
                   ),
                 ),
               ],
@@ -622,12 +517,7 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
             children: [
               Text(
                 'DAFTAR ADDENDUM (${_kegiatan.addendums.length})',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF475569),
-                  letterSpacing: 0.6,
-                ),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569), letterSpacing: 0.6),
               ),
               if (!isReadOnly)
                 TextButton.icon(
@@ -639,10 +529,7 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
                   ),
                   onPressed: _tambahAddendumBaru,
                   icon: const Icon(Icons.add_circle_outline, size: 16),
-                  label: const Text(
-                    'Buat Addendum Baru',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
+                  label: const Text('Buat Addendum Baru', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
             ],
           ),
@@ -658,21 +545,11 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
               ),
               child: Column(
                 children: [
-                  Icon(
-                    Icons.change_circle_outlined,
-                    size: 36,
-                    color: Colors.grey.shade400,
-                  ),
+                  Icon(Icons.change_circle_outlined, size: 36, color: Colors.grey.shade400),
                   const SizedBox(height: 10),
                   Text(
-                    isReadOnly
-                        ? 'Belum Ada Addendum / CCO'
-                        : 'Belum Ada Addendum / CCO',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: Color(0xFF0F172A),
-                    ),
+                    isReadOnly ? 'Belum Ada Addendum / CCO' : 'Belum Ada Addendum / CCO',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -680,11 +557,7 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
                         ? 'Kegiatan ini saat ini berjalan murni sesuai acuan Kontrak Awal (RAB Original).'
                         : 'Jika terdapat perubahan volume hasil inspeksi ulang rekayasa lapangan, tambahkan Addendum 01 untuk menghitung daftar tambah kurang.',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      color: Color(0xFF64748B),
-                      height: 1.4,
-                    ),
+                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B), height: 1.4),
                   ),
                   if (!isReadOnly) ...[
                     const SizedBox(height: 16),
@@ -692,23 +565,12 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0F172A),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       ),
                       onPressed: _tambahAddendumBaru,
                       icon: const Icon(Icons.add, size: 16),
-                      label: const Text(
-                        'Buat Addendum 01 (CCO)',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      label: const Text('Buat Addendum 01 (CCO)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ],
@@ -730,9 +592,7 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: isLatest
-                        ? AppColors.primaryBlue.withOpacity(0.5)
-                        : const Color(0xFFE2E8F0),
+                    color: isLatest ? AppColors.primaryBlue.withOpacity(0.5) : const Color(0xFFE2E8F0),
                     width: isLatest ? 1.5 : 1.0,
                   ),
                   boxShadow: [
@@ -750,23 +610,14 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: isLatest
-                                ? AppColors.primaryBlue
-                                : const Color(0xFF0F172A),
+                            color: isLatest ? AppColors.primaryBlue : const Color(0xFF0F172A),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             'ADD $noAdd',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 11,
-                            ),
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -775,45 +626,27 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                add['judul'] ??
-                                    'Daftar Perhitungan Tambah Kurang Ke - $noAdd',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: Color(0xFF0F172A),
-                                ),
+                                add['judul'] ?? 'Daftar Perhitungan Tambah Kurang Ke - $noAdd',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
                               ),
                               Text(
                                 'Disahkan: $tgl${noSpk != '-' ? ' • No. SPK: $noSpk' : ''}',
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  color: Color(0xFF64748B),
-                                ),
+                                style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
                               ),
                             ],
                           ),
                         ),
                         if (isLatest)
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: const Color(0xFFECFDF5),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: const Color(0xFFA7F3D0),
-                                width: 0.8,
-                              ),
+                              border: Border.all(color: const Color(0xFFA7F3D0), width: 0.8),
                             ),
                             child: const Text(
                               'Versi Aktif',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF059669),
-                              ),
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
                             ),
                           ),
                       ],
@@ -822,11 +655,7 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
                       const SizedBox(height: 8),
                       Text(
                         'Keterangan: $ket',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontStyle: FontStyle.italic,
-                          color: Color(0xFF64748B),
-                        ),
+                        style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Color(0xFF64748B)),
                       ),
                     ],
                     const SizedBox(height: 12),
@@ -840,47 +669,25 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
                           child: OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.primaryBlue,
-                              side: const BorderSide(
-                                color: AppColors.primaryBlue,
-                                width: 1,
-                              ),
+                              side: const BorderSide(color: AppColors.primaryBlue, width: 1),
                               padding: const EdgeInsets.symmetric(vertical: 8),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
                             onPressed: () => _bukaLembarTambahKurang(add, idx),
-                            icon: const Icon(
-                              Icons.table_chart_outlined,
-                              size: 15,
-                            ),
-                            label: const Text(
-                              'Buka Lembar Tambah Kurang',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            icon: const Icon(Icons.table_chart_outlined, size: 15),
+                            label: const Text('Buka Lembar Tambah Kurang', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
                           ),
                         ),
                         if (!isReadOnly) ...[
                           const SizedBox(width: 8),
                           IconButton(
-                            icon: const Icon(
-                              Icons.edit_outlined,
-                              size: 18,
-                              color: Color(0xFF64748B),
-                            ),
+                            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
                             tooltip: 'Edit Volume Addendum',
                             onPressed: () => _editAddendum(idx),
                           ),
                           if (isLatest)
                             IconButton(
-                              icon: const Icon(
-                                Icons.delete_outline,
-                                size: 18,
-                                color: Color(0xFFEF4444),
-                              ),
+                              icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
                               tooltip: 'Hapus Addendum',
                               onPressed: () => _confirmDeleteAddendum(idx),
                             ),
