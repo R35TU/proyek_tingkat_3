@@ -1483,7 +1483,13 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF111827)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+            }
+          },
         ),
         title: Text(
           widget.editReport != null ? 'Edit Buku Harian Standar' : 'Form Buku Harian Standar',

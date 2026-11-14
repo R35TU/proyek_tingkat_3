@@ -896,7 +896,13 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF111827)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+            }
+          },
         ),
         title: Text(
           widget.editReport != null ? 'Edit Ringkasan Laporan Mingguan' : 'Ringkasan Laporan Mingguan',
