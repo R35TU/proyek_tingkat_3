@@ -24,7 +24,7 @@ class ContractModel {
   // Kegiatans langsung di bawah Kontrak
   List<Map<String, dynamic>> kegiatans;
 
-  // Struktur Organisasi Anggota Konsultan (Site Engineer, Inspektor 1-4, Administrasi)
+  // Struktur Organisasi Personel Konsultan (Site Engineer, Inspektor 1-4, Administrasi)
   Map<String, dynamic>? strukturOrganisasi;
 
   String get siteEngineer => strukturOrganisasi?['siteEngineer']?.toString() ?? '';

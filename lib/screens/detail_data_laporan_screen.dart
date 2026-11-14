@@ -4,12 +4,17 @@ import 'package:provider/provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
+import 'package:tata_saka_app/providers/user_profile_provider.dart';
+import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/screens/buat_laporan_screen.dart';
 import 'package:tata_saka_app/screens/buat_laporan_mingguan_screen.dart';
 import 'package:tata_saka_app/widgets/lembar_laporan_mingguan_widget.dart';
 import 'package:tata_saka_app/widgets/lembar_boq_mingguan_widget.dart';
 import 'package:tata_saka_app/utils/plat_nomor_util.dart';
+import 'package:pdf/pdf.dart';
+import 'package:tata_saka_app/screens/pdf_viewer_screen.dart';
+import 'package:tata_saka_app/services/pdf_report_service.dart';
 
 class DetailDataLaporanScreen extends StatefulWidget {
   final ContractModel contract;
@@ -74,9 +79,32 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
     _currentKegiatanIndex = widget.kegiatanIndex;
     _selectedTab = widget.initialTab;
 
-    // Default to today
-    final now = DateTime.now();
-    _selectedDate = DateTime(now.year, now.month, now.day);
+    // Check if contract has existing reports to set initial selected date
+    DateTime initialDate = DateTime.now();
+    if (widget.contract.kegiatans.isNotEmpty &&
+        _currentKegiatanIndex < widget.contract.kegiatans.length) {
+      final keg = widget.contract.kegiatans[_currentKegiatanIndex];
+      final List<dynamic> reports = (keg['laporans'] as List<dynamic>?) ?? [];
+      if (reports.isNotEmpty) {
+        DateTime? latestDate;
+        for (final r in reports) {
+          final dStr = r['tanggal']?.toString() ?? r['createdAt']?.toString();
+          if (dStr != null) {
+            final p = DateTime.tryParse(dStr);
+            if (p != null) {
+              if (latestDate == null || p.isAfter(latestDate)) {
+                latestDate = p;
+              }
+            }
+          }
+        }
+        if (latestDate != null) {
+          initialDate = latestDate;
+        }
+      }
+    }
+
+    _selectedDate = DateTime(initialDate.year, initialDate.month, initialDate.day);
     _currentWeekMonday = _getMondayOfWeek(_selectedDate);
   }
 
@@ -359,13 +387,35 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
     return '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
   }
 
+  bool _matchReportDate(dynamic r, DateTime targetDate) {
+    if (r == null) return false;
+    final targetKey = _formatDateKey(targetDate);
+    final String? rawDate = r['tanggal']?.toString();
+    if (rawDate != null) {
+      if (rawDate == targetKey || rawDate.startsWith(targetKey)) {
+        return true;
+      }
+      final parsed = DateTime.tryParse(rawDate);
+      if (parsed != null && _isSameDay(parsed, targetDate)) {
+        return true;
+      }
+    }
+    final String? createdAt = r['createdAt']?.toString();
+    if (createdAt != null) {
+      final parsed = DateTime.tryParse(createdAt);
+      if (parsed != null && _isSameDay(parsed, targetDate)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   List<Map<String, dynamic>> _getReportsForDate(DateTime d) {
     final keg = _currentKegiatan;
     if (keg == null) return [];
     final rawReports = keg['laporans'] as List<dynamic>? ?? [];
-    final key = _formatDateKey(d);
     return rawReports
-        .where((r) => r['tanggal'] == key)
+        .where((r) => _matchReportDate(r, d))
         .map((r) => Map<String, dynamic>.from(r))
         .toList();
   }
@@ -388,10 +438,23 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
     });
   }
 
+  ContractModel get _liveContract {
+    try {
+      final contractProvider = Provider.of<ContractProvider>(context, listen: false);
+      return contractProvider.contracts.firstWhere(
+        (c) => c.id == widget.contract.id,
+        orElse: () => widget.contract,
+      );
+    } catch (_) {
+      return widget.contract;
+    }
+  }
+
   Map<String, dynamic>? get _currentKegiatan {
-    if (widget.contract.kegiatans.isNotEmpty &&
-        _currentKegiatanIndex < widget.contract.kegiatans.length) {
-      return widget.contract.kegiatans[_currentKegiatanIndex];
+    final live = _liveContract;
+    if (live.kegiatans.isNotEmpty &&
+        _currentKegiatanIndex < live.kegiatans.length) {
+      return live.kegiatans[_currentKegiatanIndex];
     }
     return null;
   }
@@ -401,7 +464,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => BuatLaporanScreen(
-          initialContract: widget.contract,
+          initialContract: _liveContract,
           initialKegiatanIndex: _currentKegiatanIndex,
           initialDate: _selectedDate,
           editReport: report,
@@ -428,13 +491,32 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () {
+              final live = _liveContract;
               final keg = _currentKegiatan;
               if (keg != null) {
                 final List<dynamic> reports = List.from(keg['laporans'] ?? []);
                 reports.removeWhere((r) => r['id'] == reportId);
                 keg['laporans'] = reports;
-                widget.contract.kegiatans[_currentKegiatanIndex] = keg;
-                Provider.of<ContractProvider>(context, listen: false).updateContract(widget.contract);
+                live.kegiatans[_currentKegiatanIndex] = keg;
+                Provider.of<ContractProvider>(context, listen: false).updateContract(live);
+                try {
+                  final timeline = Provider.of<TimelineProvider>(context, listen: false);
+                  final kName = keg['namaKegiatan']?.toString() ?? '';
+                  final kontraktor = keg['kontraktor']?.toString() ?? '';
+                  final dinas = live.instansiDinas.isNotEmpty ? live.instansiDinas.first : 'DPU-PR Kab. Purbalingga';
+                  timeline.logEvent(
+                    actorName: 'CV. Tata Saka Consultant',
+                    actionType: 'DELETE',
+                    entityType: 'LAPORAN_HARIAN',
+                    contractId: live.id,
+                    contractName: live.namaKontrak,
+                    kegiatanName: kName,
+                    kontraktorName: kontraktor,
+                    dinasName: dinas,
+                    title: 'Penghapusan Laporan Harian: $kName',
+                    description: 'Dokumen Buku Harian Standar telah dihapus dari sistem.',
+                  );
+                } catch (_) {}
               }
               Navigator.pop(ctx);
               setState(() {});
@@ -538,19 +620,27 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
             report['hasRekapitulasiAspal'] == true) ||
         (hasRekapSuhuLapangan && hasRekapSuhuAmp);
 
-    int totalPages = 1;
+    int totalPages = 2;
     if (hasRekapSuhuLapangan) totalPages++;
     if (hasRekapSuhuAmp) totalPages++;
     if (hasRekapTonaseAspal) totalPages++;
     if (hasDataPerjalananDt) totalPages++;
     if (hasRekapBeton) totalPages++;
 
-    int pageCounter = 1;
+    int pageCounter = 2;
     final int suhuLapPage = hasRekapSuhuLapangan ? ++pageCounter : 0;
     final int suhuAmpPage = hasRekapSuhuAmp ? ++pageCounter : 0;
     final int tonasePage = hasRekapTonaseAspal ? ++pageCounter : 0;
     final int perjalananDtPage = hasDataPerjalananDt ? ++pageCounter : 0;
     final int betonPage = hasRekapBeton ? ++pageCounter : 0;
+
+    UserProfileProvider? userProf;
+    try {
+      userProf = Provider.of<UserProfileProvider>(context, listen: false);
+    } catch (_) {
+      userProf = null;
+    }
+    final isKonsultan = userProf?.isKonsultan ?? true;
 
     showModalBottomSheet(
       context: context,
@@ -585,35 +675,50 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textDark),
                         ),
                         Text(
-                          totalPages > 1
-                              ? '$totalPages Lembar Dokumen (Termasuk Lampiran Rekapitulasi)'
-                              : '1 Lembar Dokumen Utama',
+                          totalPages > 2
+                              ? '$totalPages Lembar Dokumen (Lembar Rekapan PU, Rincian, & Lampiran)'
+                              : '2 Lembar Dokumen Utama',
                           style: const TextStyle(fontSize: 11, color: AppColors.textLight),
                         ),
                       ],
                     ),
                   ),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _editReport(report);
-                    },
-                    icon: const Icon(Icons.edit, size: 14),
-                    label: const Text('Edit', style: TextStyle(fontSize: 12)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primaryBlue,
-                      side: const BorderSide(color: AppColors.primaryBlue),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  if (isKonsultan) ...[
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _editReport(report);
+                      },
+                      icon: const Icon(Icons.edit, size: 14),
+                      label: const Text('Edit', style: TextStyle(fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primaryBlue,
+                        side: const BorderSide(color: AppColors.primaryBlue),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
+                    const SizedBox(width: 8),
+                  ],
                   ElevatedButton.icon(
                     onPressed: () {
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Mengunduh Buku Harian Standar (${report['tanggalFormatted']}).pdf...'),
-                          backgroundColor: AppColors.primaryBlue,
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PdfViewerScreen(
+                            title: 'Buku Harian Standar - ${report['tanggalFormatted'] ?? report['tanggal'] ?? ''}',
+                            fileName: 'Buku_Harian_${(report['tanggalFormatted'] ?? report['tanggal'] ?? 'Laporan').toString().replaceAll(' ', '_')}.pdf',
+                            pageFormat: PdfPageFormat.a4,
+                            buildPdf: () => PdfReportService.generateLaporanHarianPdf(
+                              report: report,
+                              namaKegiatan: namaKegiatan,
+                              lokasi: lokasi,
+                              dana: dana,
+                              kontraktor: kontraktor,
+                              konsultan: 'CV. TATA SAKA CONSULTANT',
+                              normalizedPekerjaanList: normalizedPekerjaanList,
+                              cuacaKejadianList: cuacaKejadianList.map((e) => Map<String, dynamic>.from(e is Map ? e : {})).toList(),
+                            ),
+                          ),
                         ),
                       );
                     },
@@ -682,8 +787,115 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                         _buildDocMetaRow('Dana', ':  $dana'),
                         const SizedBox(height: 14),
 
-                        // SEKAT PER PEKERJAAN (MASING-MASING MEMILIKI A, B, C, D)
-                        ...normalizedPekerjaanList.asMap().entries.map((entry) {
+                        // ═══════════════════════════════════════════════════════
+                        // 1. REKAPAN FORMAT LAMA (RINGKASAN BUKU HARIAN STANDAR)
+                        // Persis seperti dokumen fisik acuan: A, B, C, D, E
+                        // ═══════════════════════════════════════════════════════
+                        _buildRekapanFormatLamaSection(
+                          normalizedPekerjaanList: normalizedPekerjaanList,
+                          cuacaKejadianList: cuacaKejadianList,
+                          defaultLokasi: lokasi,
+                        ),
+                        const SizedBox(height: 14),
+
+                        // F. INSTRUKSI DAN SARAN-SARAN (LEMBAR 1 DENGAN TTD RESMI KONSULTAN)
+                        _buildDocSectionLabel('F.   INSTRUKSI DAN SARAN-SARAN'),
+                        const SizedBox(height: 4),
+                        _buildDocTableSectionF(report, kontraktor),
+
+                        // Footer Lembar 1
+                        const SizedBox(height: 16),
+                        const Divider(height: 1, color: Colors.black26),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('BUKU HARIAN STANDAR • CATATAN HARIAN', style: TextStyle(fontSize: 9, color: Colors.black54)),
+                            Text('Halaman 1 dari $totalPages', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black87)),
+                          ],
+                        ),
+                            ],
+                          ),
+                        ),
+
+                        // PEMISAH HALAMAN LEMBAR 1 KE LEMBAR 2
+                        _buildPageSeparator('RINCIAN OPERASIONAL ITEM PEKERJAAN', 2, totalPages),
+
+                        // ═══════════════════════════════════════════════════════
+                        // LEMBAR 2: RINCIAN OPERASIONAL PER ITEM PEKERJAAN (FORMAT BARU)
+                        // ═══════════════════════════════════════════════════════
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border.all(color: Colors.black45, width: 1.0),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.08),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // KOP DOKUMEN LEMBAR 2
+                              const Center(
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      'BUKU HARIAN STANDAR',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black, decoration: TextDecoration.underline, letterSpacing: 0.5),
+                                    ),
+                                    SizedBox(height: 3),
+                                    Text(
+                                      'Rincian Operasional Item Pekerjaan',
+                                      style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.black87),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              // INFORMASI IDENTITAS PROYEK
+                              _buildDocMetaRow('Hari / Tanggal', ':  ${report['tanggalFormatted'] ?? report['tanggal']}'),
+                              _buildDocMetaRow('Nama Kegiatan', ':  $namaKegiatan'),
+                              _buildDocMetaRow('Lokasi', ':  $lokasi'),
+                              _buildDocMetaRow('Dana', ':  $dana'),
+                              const SizedBox(height: 14),
+
+                              // SUB-BANNER RINCIAN OPERASIONAL
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: Colors.black26, width: 0.8),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.view_agenda_outlined, size: 14, color: Colors.black87),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'RINCIAN OPERASIONAL PER ITEM PEKERJAAN',
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black,
+                                          letterSpacing: 0.4,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+
+                              // 2. FORMAT STANDAR OPERASIONAL: SEKAT PER PEKERJAAN
+                              // (MASING-MASING MEMILIKI A, B, C, D)
+                              ...normalizedPekerjaanList.asMap().entries.map((entry) {
                           final index = entry.key;
                           final p = entry.value;
                           final pIdx = index + 1;
@@ -907,22 +1119,22 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                           const SizedBox(height: 14),
                         ],
 
-                        // Footer Halaman 1
+                        // Footer Halaman 2
                         const SizedBox(height: 16),
                         const Divider(height: 1, color: Colors.black26),
                         const SizedBox(height: 6),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('BUKU HARIAN STANDAR • CATATAN HARIAN', style: TextStyle(fontSize: 9, color: Colors.black54)),
-                            Text('Halaman 1 dari $totalPages', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black87)),
+                            const Text('BUKU HARIAN STANDAR • RINCIAN OPERASIONAL', style: TextStyle(fontSize: 9, color: Colors.black54)),
+                            Text('Halaman 2 dari $totalPages', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black87)),
                           ],
                         ),
                             ],
                           ),
                         ),
 
-                        // HALAMAN 2+: LAMPIRAN REKAPITULASI PADA LEMBAR TERPISAH
+                        // HALAMAN 3+: LAMPIRAN REKAPITULASI PADA LEMBAR TERPISAH
                         if (hasRekapSuhuLapangan) ...[
                           _buildPageSeparator('REKAP WAKTU & SUHU LAPANGAN', suhuLapPage, totalPages),
                           _buildSheetRekapSuhuLapangan(
@@ -1119,6 +1331,290 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
     );
   }
 
+  Widget _buildRekapanFormatLamaSection({
+    required List<dynamic> normalizedPekerjaanList,
+    required List<dynamic> cuacaKejadianList,
+    required String defaultLokasi,
+  }) {
+    // 1. A. PEKERJAAN (Kompilasi semua pekerjaan)
+    final List<List<String>> allJobRows = normalizedPekerjaanList.asMap().entries.map((entry) {
+      final p = entry.value is Map ? (entry.value as Map) : <String, dynamic>{};
+      final pJenis = p['jenis']?.toString() ?? '-';
+      final pVol = p['volume']?.toString() ?? '-';
+      final pLok = p['lokasi']?.toString() ?? defaultLokasi;
+      return [
+        '${entry.key + 1}',
+        pJenis.isNotEmpty ? pJenis : '-',
+        pVol.isNotEmpty ? pVol : '-',
+        pLok.isNotEmpty ? pLok : defaultLokasi,
+      ];
+    }).toList();
+    if (allJobRows.isEmpty) {
+      allJobRows.add(['1', 'Tidak ada data pekerjaan', '-', defaultLokasi]);
+    }
+
+    // 2. B. MATERIAL (Kompilasi seluruh material dari semua pekerjaan)
+    final List<List<String>> allMatRows = [];
+    int mCount = 1;
+    for (final p in normalizedPekerjaanList) {
+      final mats = (p is Map ? p['materials'] : null) as List<dynamic>? ?? [];
+      for (final m in mats) {
+        if (m is Map) {
+          allMatRows.add([
+            '$mCount',
+            m['jenis']?.toString() ?? '-',
+            m['volume']?.toString() ?? '-',
+            m['lokasiAwal']?.toString() ?? '-',
+            m['lokasiTujuan']?.toString() ?? '-',
+          ]);
+          mCount++;
+        }
+      }
+    }
+    if (allMatRows.isEmpty) {
+      allMatRows.add(['1', 'Nihil / Tanpa material', '-', '-', '-']);
+    }
+
+    // 3. C. JENIS PERALATAN YANG DIGUNAKAN
+    final List<List<String>> allAlatRows = [];
+    int aCount = 1;
+    for (final p in normalizedPekerjaanList) {
+      final alats = (p is Map ? p['peralatans'] : null) as List<dynamic>? ?? [];
+      for (final a in alats) {
+        if (a is Map) {
+          allAlatRows.add([
+            '$aCount',
+            a['jenis']?.toString() ?? '-',
+            a['cacahAktif']?.toString() ?? a['jumlah']?.toString() ?? '-',
+            a['jumlah']?.toString() ?? '-',
+            a['noRusak']?.toString().isNotEmpty == true
+                ? a['noRusak'].toString()
+                : (a['jenisRusak']?.toString().isNotEmpty == true ? '$aCount' : '-'),
+            a['jenisRusak']?.toString().isNotEmpty == true ? a['jenisRusak'].toString() : '-',
+            a['kode']?.toString().isNotEmpty == true ? a['kode'].toString() : '-',
+            a['rusak']?.toString().isNotEmpty == true ? a['rusak'].toString() : '-',
+          ]);
+          aCount++;
+        }
+      }
+    }
+    if (allAlatRows.isEmpty) {
+      allAlatRows.add(['1', 'Pekerjaan manual / Nihil', '-', '-', '-', '-', '-', '-']);
+    }
+
+    // 4. D. PERSONAL PROYEK PENGAWAS DAN KONTRAKTOR
+    final List<List<String>> allPersRows = [];
+    final Map<String, int> roleMap = {};
+    final Map<String, String> roleLokMap = {};
+
+    for (final p in normalizedPekerjaanList) {
+      final pers = (p is Map ? p['personils'] : null) as List<dynamic>? ?? [];
+      final pLok = (p is Map ? p['lokasi'] : null)?.toString() ?? defaultLokasi;
+      for (final pr in pers) {
+        if (pr is Map) {
+          final role = (pr['role'] ?? '-').toString().trim();
+          final cnt = int.tryParse(pr['cacah']?.toString() ?? pr['count']?.toString() ?? '') ?? 1;
+          roleMap[role] = (roleMap[role] ?? 0) + cnt;
+          roleLokMap[role] = (pr['lokasi'] ?? pLok).toString();
+        }
+      }
+    }
+
+    if (roleMap.isNotEmpty) {
+      int pCount = 1;
+      roleMap.forEach((role, count) {
+        allPersRows.add([
+          '$pCount',
+          role,
+          '$count',
+          roleLokMap[role] ?? defaultLokasi,
+        ]);
+        pCount++;
+      });
+    } else {
+      final defaultRoles = [
+        'Pengawas DPU',
+        'Konsultan Pengawas',
+        'Pelaksana',
+        'Logistik',
+        'Kepala Tukang',
+        'Tukang',
+        'Pekerja',
+      ];
+      for (int i = 0; i < defaultRoles.length; i++) {
+        allPersRows.add(['${i + 1}', defaultRoles[i], '-', defaultLokasi]);
+      }
+    }
+
+    // 5. E. CUACA/BENCANA/KEJADIAN PENGHAMBAT PEKERJAAN
+    final List<List<String>> allCuacaRows = cuacaKejadianList.isNotEmpty
+        ? cuacaKejadianList.asMap().entries.map((e) {
+            final item = e.value is Map ? (e.value as Map) : <String, dynamic>{};
+            final cuacaVal = item['cuaca']?.toString() ?? '-';
+            final jk = item['jenisKejadian']?.toString() ?? item['jenis']?.toString() ?? '-';
+            return [
+              '${e.key + 1}',
+              cuacaVal.isNotEmpty ? cuacaVal : '-',
+              jk.isNotEmpty ? jk : '-',
+              item['jam']?.toString() ?? '-',
+              item['lokasi']?.toString() ?? '-',
+              item['tanggungJawab']?.toString() ?? 'Tidak',
+              item['akibat']?.toString() ?? '-',
+            ];
+          }).toList()
+        : [
+            ['1', 'Cerah', 'Nihil', '08:00 - 17:00', defaultLokasi, 'Tidak', '-'],
+          ];
+
+    Widget buildScrollableBox({
+      required String label,
+      required Map<int, TableColumnWidth> colWidths,
+      required List<String> headers,
+      required List<List<String>> rows,
+      double minWidth = 320,
+    }) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildDocSectionLabel(label),
+          const SizedBox(height: 4),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: minWidth),
+              child: _buildDocTable(
+                colWidths: colWidths,
+                headers: headers,
+                rows: rows,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final tableA = buildScrollableBox(
+      label: 'A.   PEKERJAAN',
+      colWidths: const {
+        0: FixedColumnWidth(26),
+        1: FlexColumnWidth(3.8),
+        2: FlexColumnWidth(2.0),
+        3: FlexColumnWidth(2.2),
+      },
+      headers: ['No', 'JENIS PEKERJAAN', 'VOLUME', 'LOKASI'],
+      rows: allJobRows,
+      minWidth: 320,
+    );
+
+    final tableD = buildScrollableBox(
+      label: 'D.   PERSONAL PROYEK PENGAWAS DAN KONTRAKTOR',
+      colWidths: const {
+        0: FixedColumnWidth(26),
+        1: FlexColumnWidth(3.8),
+        2: FlexColumnWidth(1.8),
+        3: FlexColumnWidth(2.2),
+      },
+      headers: ['No', 'Personil proyek', 'Cacah', 'Lokasi'],
+      rows: allPersRows,
+      minWidth: 300,
+    );
+
+    final tableB = buildScrollableBox(
+      label: 'B.   MATERIAL',
+      colWidths: const {
+        0: FixedColumnWidth(24),
+        1: FlexColumnWidth(2.4),
+        2: FlexColumnWidth(1.8),
+        3: FlexColumnWidth(1.8),
+        4: FlexColumnWidth(1.8),
+      },
+      headers: ['No', 'Jenis', 'Cacah Volume', 'Lokasi Awal', 'Lokasi Tujuan'],
+      rows: allMatRows,
+      minWidth: 340,
+    );
+
+    final tableC = buildScrollableBox(
+      label: 'C.   JENIS PERALATAN YANG DIGUNAKAN',
+      colWidths: const {
+        0: FixedColumnWidth(22),
+        1: FlexColumnWidth(2.4),
+        2: FlexColumnWidth(1.3),
+        3: FlexColumnWidth(1.1),
+        4: FixedColumnWidth(22),
+        5: FlexColumnWidth(1.6),
+        6: FlexColumnWidth(1.1),
+        7: FlexColumnWidth(1.1),
+      },
+      headers: ['No', 'Jenis Peralatan', 'Cacah aktif', 'Jumlah', 'No', 'Jenis', 'Kode', 'Rusak'],
+      rows: allAlatRows,
+      minWidth: 420,
+    );
+
+    final tableE = buildScrollableBox(
+      label: 'E.   CUACA/BENCANA/KEJADIAN PENGHAMBAT PEKERJAAN',
+      colWidths: const {
+        0: FixedColumnWidth(24),
+        1: FlexColumnWidth(1.8),
+        2: FlexColumnWidth(2.0),
+        3: FlexColumnWidth(1.4),
+        4: FlexColumnWidth(1.5),
+        5: FlexColumnWidth(1.8),
+        6: FlexColumnWidth(1.8),
+      },
+      headers: ['No', 'Cuaca', 'Jenis Kejadian', 'Jam', 'Lokasi', 'Tanggung Jwb Kontraktor\n(Ya / Tidak)', 'Akibat'],
+      rows: allCuacaRows,
+      minWidth: 420,
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double minContainerWidth = 740;
+        final double effectiveWidth = constraints.maxWidth < minContainerWidth
+            ? minContainerWidth
+            : constraints.maxWidth;
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: effectiveWidth,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Kolom Kiri: A & D (persis tata letak dokumen fisik dinas PU)
+                Expanded(
+                  flex: 48,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      tableA,
+                      const SizedBox(height: 12),
+                      tableD,
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Kolom Kanan: B, C, E (persis tata letak dokumen fisik dinas PU)
+                Expanded(
+                  flex: 52,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      tableB,
+                      const SizedBox(height: 12),
+                      tableC,
+                      const SizedBox(height: 12),
+                      tableE,
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildDocSectionLabel(String title) {
     return Text(
       title,
@@ -1173,11 +1669,31 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
         report['instruksi']?.toString() ??
         (report['instruksiSaran'] is Map ? report['instruksiSaran']['konsultanUraian']?.toString() : '') ?? '';
 
-    final rawNama = report['ttdNama']?.toString().trim() ?? '';
-    final rawJabatan = report['ttdJabatan']?.toString().trim() ?? '';
-    final ttdNama = rawNama.isNotEmpty ? rawNama : 'MISWANTO';
-    final ttdJabatan = rawJabatan.isNotEmpty ? rawJabatan : 'Inspector';
-    final ttdSig = report['ttdSignature']?.toString();
+    // Ambil list penandatangan pengawas jika ada
+    final ttdPengawasListRaw = report['ttdPengawasList'] as List<dynamic>?;
+    final List<Map<String, String?>> signers = [];
+
+    if (ttdPengawasListRaw != null && ttdPengawasListRaw.isNotEmpty) {
+      for (var t in ttdPengawasListRaw) {
+        if (t is Map) {
+          final n = t['nama']?.toString().trim() ?? '';
+          final j = t['jabatan']?.toString().trim() ?? '';
+          final s = t['signature']?.toString();
+          if (n.isNotEmpty || j.isNotEmpty || (s != null && s.isNotEmpty)) {
+            signers.add({'nama': n, 'jabatan': j, 'signature': s});
+          }
+        }
+      }
+    }
+
+    if (signers.isEmpty) {
+      final rawNama = report['ttdNama']?.toString().trim() ?? '';
+      final rawJabatan = report['ttdJabatan']?.toString().trim() ?? '';
+      final ttdNama = rawNama.isNotEmpty ? rawNama : 'MISWANTO';
+      final ttdJabatan = rawJabatan.isNotEmpty ? rawJabatan : 'Inspector';
+      final ttdSig = report['ttdSignature']?.toString();
+      signers.add({'nama': ttdNama, 'jabatan': ttdJabatan, 'signature': ttdSig});
+    }
 
     return Table(
       columnWidths: const {
@@ -1247,34 +1763,51 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                 style: const TextStyle(fontSize: 9.5, color: Colors.black),
               ),
             ),
-            // Kolom paling kanan: TTD Konsultan
+            // Kolom paling kanan: TTD Konsultan (Mendukung Multi-Penandatangan)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
               child: Column(
-                children: [
-                  if (ttdSig != null && ttdSig.isNotEmpty)
-                    SizedBox(
-                      height: 38,
-                      child: _buildSignatureImagePreview(ttdSig),
-                    )
-                  else
-                    const SizedBox(height: 28),
-                  if (ttdNama.isNotEmpty)
-                    Text(
-                      ttdNama,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 9,
-                        color: Colors.black,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  if (ttdJabatan.isNotEmpty)
-                    Text(
-                      ttdJabatan,
-                      style: const TextStyle(fontSize: 8.5, color: Colors.black),
-                    ),
-                ],
+                children: signers.asMap().entries.map((entry) {
+                  final idx = entry.key;
+                  final s = entry.value;
+                  final ttdNama = s['nama'] ?? '';
+                  final ttdJabatan = s['jabatan'] ?? '';
+                  final ttdSig = s['signature'];
+
+                  return Column(
+                    children: [
+                      if (idx > 0) ...[
+                        const SizedBox(height: 8),
+                        const Divider(height: 1, thickness: 0.5, color: Color(0xFF9CA3AF)),
+                        const SizedBox(height: 6),
+                      ],
+                      if (ttdSig != null && ttdSig.isNotEmpty)
+                        SizedBox(
+                          height: 38,
+                          child: _buildSignatureImagePreview(ttdSig),
+                        )
+                      else
+                        const SizedBox(height: 28),
+                      if (ttdNama.isNotEmpty)
+                        Text(
+                          ttdNama,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 9,
+                            color: Colors.black,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      if (ttdJabatan.isNotEmpty)
+                        Text(
+                          ttdJabatan,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 8.5, color: Colors.black),
+                        ),
+                    ],
+                  );
+                }).toList(),
               ),
             ),
           ],
@@ -2357,11 +2890,33 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final kegiatan = _currentKegiatan;
-    final String namaKegiatan = kegiatan?['namaKegiatan'] ?? widget.contract.namaKontrak;
+    ContractProvider? contractProvider;
+    try {
+      contractProvider = Provider.of<ContractProvider>(context);
+    } catch (_) {
+      contractProvider = null;
+    }
+    final liveContract = contractProvider?.contracts.firstWhere(
+      (c) => c.id == widget.contract.id,
+      orElse: () => widget.contract,
+    ) ?? widget.contract;
+
+    final kegiatan = (liveContract.kegiatans.isNotEmpty &&
+            _currentKegiatanIndex < liveContract.kegiatans.length)
+        ? liveContract.kegiatans[_currentKegiatanIndex]
+        : _currentKegiatan;
+    final String namaKegiatan = kegiatan?['namaKegiatan'] ?? liveContract.namaKontrak;
     final String lokasi = kegiatan?['lokasi'] ?? '-';
     final String kontraktor = kegiatan?['kontraktor'] ?? '-';
     final reportsOnSelectedDate = _getReportsForDate(_selectedDate);
+
+    UserProfileProvider? userProf;
+    try {
+      userProf = Provider.of<UserProfileProvider>(context);
+    } catch (_) {
+      userProf = null;
+    }
+    final isKonsultan = userProf?.isKonsultan ?? true;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -2382,7 +2937,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
         ),
         centerTitle: false,
         actions: [
-          if (widget.contract.kegiatans.length > 1)
+          if (liveContract.kegiatans.length > 1)
             PopupMenuButton<int>(
               tooltip: 'Ganti Kegiatan',
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -2413,7 +2968,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                   _currentKegiatanIndex = idx;
                 });
               },
-              itemBuilder: (ctx) => widget.contract.kegiatans.asMap().entries.map((e) {
+              itemBuilder: (ctx) => liveContract.kegiatans.asMap().entries.map((e) {
                 return PopupMenuItem<int>(
                   value: e.key,
                   child: Row(
@@ -2605,12 +3160,39 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                             tooltip: 'Minggu Sebelumnya',
                             onPressed: _goToPreviousWeek,
                           ),
-                          Text(
-                            '${_namaBulan[_selectedDate.month - 1]} ${_selectedDate.year}',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textDark,
+                          InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: _selectedDate,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2035),
+                              );
+                              if (picked != null) {
+                                setState(() {
+                                  _selectedDate = DateTime(picked.year, picked.month, picked.day);
+                                  _currentWeekMonday = _getMondayOfWeek(_selectedDate);
+                                });
+                              }
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${_namaBulan[_selectedDate.month - 1]} ${_selectedDate.year}',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textDark,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.arrow_drop_down, color: AppColors.primaryBlue),
+                                ],
+                              ),
                             ),
                           ),
                           IconButton(
@@ -2646,15 +3228,20 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '${_namaHariPanjang[_selectedDate.weekday - 1]}, ${_selectedDate.day.toString().padLeft(2, '0')} ${_namaBulan[_selectedDate.month - 1]} ${_selectedDate.year}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textDark,
+                  Expanded(
+                    child: Text(
+                      '${_namaHariPanjang[_selectedDate.weekday - 1]}, ${_selectedDate.day.toString().padLeft(2, '0')} ${_namaBulan[_selectedDate.month - 1]} ${_selectedDate.year}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textDark,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (reportsOnSelectedDate.isNotEmpty)
+                  if (reportsOnSelectedDate.isNotEmpty) ...[
+                    const SizedBox(width: 8),
                     Text(
                       '${reportsOnSelectedDate.length} Laporan',
                       style: const TextStyle(
@@ -2663,6 +3250,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                         color: AppColors.primaryBlue,
                       ),
                     ),
+                  ],
                 ],
               ),
             ),
@@ -2675,7 +3263,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                       itemCount: reportsOnSelectedDate.length,
                       itemBuilder: (context, index) {
                         final report = reportsOnSelectedDate[index];
-                        return _buildReportItem(report, index);
+                        return _buildReportItem(report, index, isKonsultan: isKonsultan);
                       },
                     )
                   : Center(
@@ -2695,32 +3283,34 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(height: 18),
-                          ElevatedButton.icon(
-                            onPressed: () async {
-                              final result = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => BuatLaporanScreen(
-                                    initialContract: widget.contract,
-                                    initialKegiatanIndex: _currentKegiatanIndex,
-                                    initialDate: _selectedDate,
+                          if (isKonsultan) ...[
+                            const SizedBox(height: 18),
+                            ElevatedButton.icon(
+                              onPressed: () async {
+                                final result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => BuatLaporanScreen(
+                                      initialContract: widget.contract,
+                                      initialKegiatanIndex: _currentKegiatanIndex,
+                                      initialDate: _selectedDate,
+                                    ),
                                   ),
-                                ),
-                              );
-                              if (result == true && mounted) {
-                                setState(() {});
-                              }
-                            },
-                            icon: const Icon(Icons.add, size: 18),
-                            label: const Text('Buat Laporan untuk Hari Ini'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primaryBlue,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                );
+                                if (result == true && mounted) {
+                                  setState(() {});
+                                }
+                              },
+                              icon: const Icon(Icons.add, size: 18),
+                              label: const Text('Buat Laporan untuk Hari Ini'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryBlue,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              ),
                             ),
-                          ),
+                          ],
                           const SizedBox(height: 40),
                         ],
                       ),
@@ -2729,7 +3319,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
           ] else ...[
             // Laporan Mingguan Section
             Expanded(
-              child: _buildLaporanMingguanListSection(),
+              child: _buildLaporanMingguanListSection(isKonsultan: isKonsultan),
             ),
           ],
         ],
@@ -2740,7 +3330,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
   Widget _buildLaporanTypeSwitcher() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       child: Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
@@ -2750,102 +3340,70 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
         ),
         child: Row(
           children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _selectedTab = 0;
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 9),
-                  decoration: BoxDecoration(
-                    color: _selectedTab == 0 ? AppColors.primaryBlue : Colors.transparent,
-                    borderRadius: BorderRadius.circular(9),
-                    boxShadow: _selectedTab == 0
-                        ? [BoxShadow(color: AppColors.primaryBlue.withValues(alpha: 0.25), blurRadius: 4, offset: const Offset(0, 2))]
-                        : null,
-                  ),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.calendar_today,
-                            size: 14,
-                            color: _selectedTab == 0 ? Colors.white : AppColors.textLight,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Laporan Harian',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: _selectedTab == 0 ? Colors.white : AppColors.textDark,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            _buildTabOption(0, Icons.calendar_today, 'Harian'),
             const SizedBox(width: 4),
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _selectedTab = 1;
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 9),
-                  decoration: BoxDecoration(
-                    color: _selectedTab == 1 ? AppColors.primaryBlue : Colors.transparent,
-                    borderRadius: BorderRadius.circular(9),
-                    boxShadow: _selectedTab == 1
-                        ? [BoxShadow(color: AppColors.primaryBlue.withValues(alpha: 0.25), blurRadius: 4, offset: const Offset(0, 2))]
-                        : null,
-                  ),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.analytics_outlined,
-                            size: 16,
-                            color: _selectedTab == 1 ? Colors.white : AppColors.textLight,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Laporan Mingguan',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: _selectedTab == 1 ? Colors.white : AppColors.textDark,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            _buildTabOption(1, Icons.analytics_outlined, 'Mingguan'),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildLaporanMingguanListSection() {
+  Widget _buildTabOption(int index, IconData icon, String label) {
+    final isSelected = _selectedTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedTab = index;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primaryBlue : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: AppColors.primaryBlue.withValues(alpha: 0.25),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    icon,
+                    size: 14,
+                    color: isSelected ? Colors.white : AppColors.textLight,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? Colors.white : AppColors.textDark,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLaporanMingguanListSection({bool isKonsultan = true}) {
     final keg = _currentKegiatan;
     final List<dynamic> rawList = keg?['laporanMingguan'] ?? [];
     final List<WeeklyReportModel> weeklyReports = rawList
@@ -2885,31 +3443,33 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => BuatLaporanMingguanScreen(
-                        initialContract: widget.contract,
-                        initialKegiatanIndex: _currentKegiatanIndex,
+              if (isKonsultan) ...[
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => BuatLaporanMingguanScreen(
+                          initialContract: widget.contract,
+                          initialKegiatanIndex: _currentKegiatanIndex,
+                        ),
                       ),
-                    ),
-                  );
-                  if (result == true && mounted) {
-                    setState(() {});
-                  }
-                },
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Buat Baru', style: TextStyle(fontSize: 12)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryBlue,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    );
+                    if (result == true && mounted) {
+                      setState(() {});
+                    }
+                  },
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Buat Baru', style: TextStyle(fontSize: 12)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryBlue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -2922,7 +3482,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                   itemCount: weeklyReports.length,
                   itemBuilder: (context, index) {
                     final report = weeklyReports[index];
-                    return _buildWeeklyReportCard(report);
+                    return _buildWeeklyReportCard(report, isKonsultan: isKonsultan);
                   },
                 )
               : Center(
@@ -2942,31 +3502,33 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(height: 18),
-                      ElevatedButton.icon(
-                        onPressed: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => BuatLaporanMingguanScreen(
-                                initialContract: widget.contract,
-                                initialKegiatanIndex: _currentKegiatanIndex,
+                      if (isKonsultan) ...[
+                        const SizedBox(height: 18),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => BuatLaporanMingguanScreen(
+                                  initialContract: widget.contract,
+                                  initialKegiatanIndex: _currentKegiatanIndex,
+                                ),
                               ),
-                            ),
-                          );
-                          if (result == true && mounted) {
-                            setState(() {});
-                          }
-                        },
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Buat Ringkasan Mingguan Pertama'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryBlue,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            );
+                            if (result == true && mounted) {
+                              setState(() {});
+                            }
+                          },
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Buat Ringkasan Mingguan Pertama'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryBlue,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          ),
                         ),
-                      ),
+                      ],
                       const SizedBox(height: 40),
                     ],
                   ),
@@ -2976,7 +3538,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
     );
   }
 
-  Widget _buildWeeklyReportCard(WeeklyReportModel report) {
+  Widget _buildWeeklyReportCard(WeeklyReportModel report, {bool isKonsultan = true}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -3211,31 +3773,33 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined, color: AppColors.primaryBlue, size: 20),
-                      tooltip: 'Edit Laporan Mingguan',
-                      onPressed: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => BuatLaporanMingguanScreen(
-                              initialContract: widget.contract,
-                              initialKegiatanIndex: _currentKegiatanIndex,
-                              editReport: report,
+                    if (isKonsultan) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, color: AppColors.primaryBlue, size: 20),
+                        tooltip: 'Edit Laporan Mingguan',
+                        onPressed: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => BuatLaporanMingguanScreen(
+                                initialContract: widget.contract,
+                                initialKegiatanIndex: _currentKegiatanIndex,
+                                editReport: report,
+                              ),
                             ),
-                          ),
-                        );
-                        if (result == true && mounted) {
-                          setState(() {});
-                        }
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                      tooltip: 'Hapus Laporan Mingguan',
-                      onPressed: () => _confirmDeleteWeeklyReport(report.id),
-                    ),
+                          );
+                          if (result == true && mounted) {
+                            setState(() {});
+                          }
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                        tooltip: 'Hapus Laporan Mingguan',
+                        onPressed: () => _confirmDeleteWeeklyReport(report.id),
+                      ),
+                    ],
                   ],
                 ),
               ],
@@ -3247,6 +3811,14 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
   }
 
   void _showDetailLaporanMingguanModal(WeeklyReportModel report) {
+    UserProfileProvider? userProf;
+    try {
+      userProf = Provider.of<UserProfileProvider>(context, listen: false);
+    } catch (_) {
+      userProf = null;
+    }
+    final isKonsultan = userProf?.isKonsultan ?? true;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -3290,43 +3862,37 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      Navigator.pop(ctx);
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => BuatLaporanMingguanScreen(
-                            initialContract: widget.contract,
-                            initialKegiatanIndex: _currentKegiatanIndex,
-                            editReport: report,
+                  if (isKonsultan) ...[
+                    const SizedBox(width: 6),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => BuatLaporanMingguanScreen(
+                              initialContract: widget.contract,
+                              initialKegiatanIndex: _currentKegiatanIndex,
+                              editReport: report,
+                            ),
                           ),
-                        ),
-                      );
-                      if (result == true && mounted) {
-                        setState(() {});
-                      }
-                    },
-                    icon: const Icon(Icons.edit, size: 13),
-                    label: const Text('Edit', style: TextStyle(fontSize: 11)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primaryBlue,
-                      side: const BorderSide(color: AppColors.primaryBlue),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        );
+                        if (result == true && mounted) {
+                          setState(() {});
+                        }
+                      },
+                      icon: const Icon(Icons.edit, size: 13),
+                      label: const Text('Edit', style: TextStyle(fontSize: 11)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primaryBlue,
+                        side: const BorderSide(color: AppColors.primaryBlue),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(width: 6),
                   ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Mengunduh Ringkasan Kegiatan Mingguan (Minggu ${report.mingguKe}).pdf...'),
-                          backgroundColor: AppColors.primaryBlue,
-                        ),
-                      );
-                    },
+                    onPressed: () => _showWeeklyPdfOptions(report),
                     icon: const Icon(Icons.picture_as_pdf, size: 13, color: Colors.white),
                     label: const Text('PDF', style: TextStyle(fontSize: 11, color: Colors.white)),
                     style: ElevatedButton.styleFrom(
@@ -3353,12 +3919,14 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                         // Sheet 1: RINGKASAN KEGIATAN MINGGUAN
                         LembarLaporanMingguanWidget(
                           report: report,
+                          onDownloadPdf: () => _openRingkasanMingguanPdf(report),
                         ),
                         const SizedBox(height: 24),
                         // Sheet 2: LEMBAR KEMAJUAN FISIK PEKERJAAN (BoQ / RKK RESMI PU)
                         LembarBoqMingguanWidget(
                           report: report,
                           kegiatan: _currentKegiatan,
+                          onDownloadPdf: () => _openBoqMingguanPdf(report),
                         ),
                       ],
                     ),
@@ -3367,6 +3935,107 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _openRingkasanMingguanPdf(WeeklyReportModel report) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PdfViewerScreen(
+          title: 'Ringkasan Mingguan - Minggu Ke-${report.mingguKe}',
+          fileName: 'Ringkasan_Mingguan_Minggu_${report.mingguKe}.pdf',
+          pageFormat: PdfPageFormat.a4,
+          buildPdf: () => PdfReportService.generateLaporanMingguanPdf(
+            report: report,
+            kegiatan: _currentKegiatan ?? {},
+            contract: widget.contract,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openBoqMingguanPdf(WeeklyReportModel report) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PdfViewerScreen(
+          title: 'BoQ Mingguan - Minggu Ke-${report.mingguKe}',
+          fileName: 'Lembar_BoQ_Mingguan_Minggu_${report.mingguKe}.pdf',
+          pageFormat: PdfPageFormat.a4.landscape,
+          buildPdf: () => PdfReportService.generateLembarBoqMingguanPdf(
+            report: report,
+            kegiatan: _currentKegiatan ?? {},
+            contract: widget.contract,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showWeeklyPdfOptions(WeeklyReportModel report) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Pilih Format Dokumen PDF Mingguan',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Laporan Minggu Ke-${report.mingguKe} (${report.periodeAwal} s.d. ${report.periodeAkhir})',
+                style: const TextStyle(fontSize: 12, color: AppColors.textLight),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryBlue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.description_outlined, color: AppColors.primaryBlue),
+                ),
+                title: const Text('Ringkasan Kegiatan Mingguan (Standar PU)'),
+                subtitle: const Text('Format Portrait A4 • Rencana vs Realisasi & Deviasi Fisik'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openRingkasanMingguanPdf(report);
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.table_chart_outlined, color: Colors.green),
+                ),
+                title: const Text('Lembar Evaluasi Kemajuan Fisik (BoQ 8-Kolom)'),
+                subtitle: const Text('Format Landscape A4 • Kumulatif Per Item Pekerjaan & Divisi'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openBoqMingguanPdf(report);
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -3390,6 +4059,26 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                 keg['laporanMingguan'] = list;
                 widget.contract.kegiatans[_currentKegiatanIndex] = keg;
                 Provider.of<ContractProvider>(context, listen: false).updateContract(widget.contract);
+                try {
+                  final timeline = Provider.of<TimelineProvider>(context, listen: false);
+                  final kName = keg['namaKegiatan']?.toString() ?? '';
+                  final kontraktor = keg['kontraktor']?.toString() ?? '';
+                  final dinas = widget.contract.instansiDinas.isNotEmpty
+                      ? widget.contract.instansiDinas.first
+                      : 'DPU-PR Kab. Purbalingga';
+                  timeline.logEvent(
+                    actorName: 'CV. Tata Saka Consultant',
+                    actionType: 'DELETE',
+                    entityType: 'LAPORAN_MINGGUAN',
+                    contractId: widget.contract.id,
+                    contractName: widget.contract.namaKontrak,
+                    kegiatanName: kName,
+                    kontraktorName: kontraktor,
+                    dinasName: dinas,
+                    title: 'Penghapusan Laporan Mingguan: $kName',
+                    description: 'Dokumen ringkasan laporan mingguan telah dihapus dari sistem.',
+                  );
+                } catch (_) {}
               }
               Navigator.pop(ctx);
               setState(() {});
@@ -3406,6 +4095,9 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
       ),
     );
   }
+
+
+
 
   Widget _buildDayItem(String dayName, DateTime date) {
     final bool isSelected = _isSameDay(date, _selectedDate);
@@ -3448,13 +4140,22 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          // Green Dot for Report marker (titik warna hijau di bawah tanggal)
+          // Green Dot for Report marker (titik warna hijau indikator laporan)
           Container(
-            width: 6,
-            height: 6,
+            width: 7,
+            height: 7,
             decoration: BoxDecoration(
-              color: hasReport ? AppColors.successGreen : Colors.transparent,
+              color: hasReport ? const Color(0xFF10B981) : Colors.transparent,
               shape: BoxShape.circle,
+              boxShadow: hasReport
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFF10B981).withOpacity(0.5),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ]
+                  : null,
             ),
           ),
         ],
@@ -3462,7 +4163,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
     );
   }
 
-  Widget _buildReportItem(Map<String, dynamic> report, int index) {
+  Widget _buildReportItem(Map<String, dynamic> report, int index, {bool isKonsultan = true}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -3610,17 +4311,19 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined, color: AppColors.primaryBlue, size: 20),
-                      tooltip: 'Edit Laporan',
-                      onPressed: () => _editReport(report),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                      tooltip: 'Hapus Laporan',
-                      onPressed: () => _confirmDeleteReport(report['id']),
-                    ),
+                    if (isKonsultan) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, color: AppColors.primaryBlue, size: 20),
+                        tooltip: 'Edit Laporan',
+                        onPressed: () => _editReport(report),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                        tooltip: 'Hapus Laporan',
+                        onPressed: () => _confirmDeleteReport(report['id']),
+                      ),
+                    ],
                   ],
                 ),
               ],

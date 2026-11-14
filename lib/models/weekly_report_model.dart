@@ -203,14 +203,41 @@ class WeeklyReportModel {
   static DateTime? parseIndonesianDate(String text) {
     if (text.isEmpty) return null;
     try {
+      String clean = text.trim();
+      // Bersihkan awalan kata "Tanggal" jika ada
+      if (clean.toLowerCase().startsWith('tanggal ')) {
+        clean = clean.substring(8).trim();
+      } else if (clean.toLowerCase().startsWith('tgl. ')) {
+        clean = clean.substring(5).trim();
+      } else if (clean.toLowerCase().startsWith('tgl ')) {
+        clean = clean.substring(4).trim();
+      }
+
       // Check yyyy-mm-dd
-      if (text.contains('-') && text.length >= 10 && text.indexOf('-') == 4) {
-        return DateTime.parse(text.substring(0, 10));
+      if (clean.contains('-') && clean.length >= 10 && clean.indexOf('-') == 4) {
+        return DateTime.parse(clean.substring(0, 10));
+      }
+
+      // Check dd-mm-yyyy atau yyyy-mm-dd
+      if (clean.contains('-')) {
+        final parts = clean.split('-');
+        if (parts.length == 3) {
+          final p0 = int.tryParse(parts[0]);
+          final p1 = int.tryParse(parts[1]);
+          final p2 = int.tryParse(parts[2]);
+          if (p0 != null && p1 != null && p2 != null) {
+            if (parts[0].length == 4) {
+              return DateTime(p0, p1, p2);
+            } else {
+              return DateTime(p2, p1, p0);
+            }
+          }
+        }
       }
 
       // Check dd/MM/yyyy
-      if (text.contains('/')) {
-        final parts = text.split('/');
+      if (clean.contains('/')) {
+        final parts = clean.split('/');
         if (parts.length == 3) {
           final day = int.tryParse(parts[0]) ?? 1;
           final month = int.tryParse(parts[1]) ?? 1;
@@ -220,7 +247,7 @@ class WeeklyReportModel {
       }
 
       // Check "20 April 2026"
-      final parts = text.trim().split(RegExp(r'\s+'));
+      final parts = clean.split(RegExp(r'\s+'));
       if (parts.length >= 3) {
         final day = int.tryParse(parts[0]) ?? 1;
         final monthName = parts[1].toLowerCase();

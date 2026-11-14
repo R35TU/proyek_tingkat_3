@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
+import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/screens/detail_data_laporan_screen.dart';
@@ -217,23 +218,35 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
 
           // List Data Laporan (Grouped by Contract with direct Kegiatan selection)
           Expanded(
-            child: Consumer<ContractProvider>(
-              builder: (context, provider, child) {
-                if (provider.contracts.isEmpty) {
-                  return const Center(
+            child: Consumer2<ContractProvider, UserProfileProvider>(
+              builder: (context, provider, userProf, child) {
+                var baseContracts = provider.contracts;
+                if (userProf.isDinas) {
+                  baseContracts = baseContracts.where((c) {
+                    return c.instansiDinas.any((d) {
+                      final din = d.toUpperCase();
+                      return din.contains('DPU-PR') || din.contains('DINAS') || din.contains('PURBALINGGA');
+                    });
+                  }).toList();
+                }
+
+                if (baseContracts.isEmpty) {
+                  return Center(
                     child: Padding(
-                      padding: EdgeInsets.all(32.0),
+                      padding: const EdgeInsets.all(32.0),
                       child: Text(
-                        'Belum ada kontrak untuk dilapor.\nTambahkan kontrak baru pada menu Kontrak.',
+                        userProf.isDinas
+                            ? 'Tidak ada kontrak yang terdaftar untuk instansi dinas Anda.'
+                            : 'Belum ada kontrak untuk dilapor.\nTambahkan kontrak baru pada menu Kontrak.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: AppColors.textLight, height: 1.4),
+                        style: const TextStyle(color: AppColors.textLight, height: 1.4),
                       ),
                     ),
                   );
                 }
 
                 // Filter contracts and activities based on search query
-                final filteredContracts = provider.contracts.where((c) {
+                final filteredContracts = baseContracts.where((c) {
                   if (_searchQuery.isEmpty) return true;
                   final matchContract = c.namaKontrak.toLowerCase().contains(_searchQuery) ||
                       c.nomorSpk.toLowerCase().contains(_searchQuery);

@@ -6,11 +6,10 @@
 // tree, read text, and verify that the values of widget properties are correct.
 
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:tata_saka_app/main.dart';
-
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
+import 'package:tata_saka_app/providers/user_profile_provider.dart';
 
 void main() {
   testWidgets('App smoke test', (WidgetTester tester) async {
@@ -19,6 +18,7 @@ void main() {
       MultiProvider(
         providers: [
           ChangeNotifierProvider(create: (_) => ContractProvider()),
+          ChangeNotifierProvider(create: (_) => UserProfileProvider()),
         ],
         child: const TataSakaApp(),
       ),

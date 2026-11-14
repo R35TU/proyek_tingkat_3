@@ -40,6 +40,17 @@ class LembarLaporanMingguanWidget extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (onDownloadPdf != null) ...[
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: onDownloadPdf,
+                  icon: const Icon(Icons.picture_as_pdf, size: 14, color: Color(0xFF1E3A8A)),
+                  label: const Text('Export PDF Ringkasan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+                ),
+              ),
+              const SizedBox(height: 6),
+            ],
             // 1. JUDUL DOKUMEN RESMI
             const Center(
               child: Text(
