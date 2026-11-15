@@ -1700,6 +1700,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   if (userProf.isKontraktor) ...[
                     _buildSidebarItem(
                       isDrawer: isDrawer,
+                      key: 'data_laporan',
+                      label: 'Data Laporan',
+                      icon: Icons.folder_outlined,
+                      isActive: _activeWebMenu == 'data_laporan',
+                      isCollapsed: isCollapsed,
+                      onTap: () => _navigateFromSidebar(
+                        'data_laporan',
+                        const DataLaporanScreen(),
+                        isDrawer: isDrawer,
+                      ),
+                    ),
+                    _buildSidebarItem(
+                      isDrawer: isDrawer,
                       key: 'laporan_harian',
                       label: 'Laporan Harian',
                       icon: Icons.today_rounded,
