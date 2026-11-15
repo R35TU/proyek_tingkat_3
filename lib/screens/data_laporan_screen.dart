@@ -27,7 +27,9 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
     if (contract.kegiatans.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Belum ada kegiatan pada kontrak ini. Silakan tambahkan kegiatan di menu Kontrak.'),
+          content: Text(
+            'Belum ada kegiatan pada kontrak ini. Silakan tambahkan kegiatan di menu Kontrak.',
+          ),
         ),
       );
       return;
@@ -37,10 +39,8 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => DetailDataLaporanScreen(
-            contract: contract,
-            kegiatanIndex: 0,
-          ),
+          builder: (context) =>
+              DetailDataLaporanScreen(contract: contract, kegiatanIndex: 0),
         ),
       );
       return;
@@ -87,7 +87,10 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                       const SizedBox(height: 4),
                       Text(
                         contract.namaKontrak,
-                        style: const TextStyle(color: AppColors.textLight, fontSize: 13),
+                        style: const TextStyle(
+                          color: AppColors.textLight,
+                          fontSize: 13,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -108,29 +111,46 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                       final kontraktor = k['kontraktor'] ?? '-';
 
                       return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         leading: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             color: AppColors.slateLighter,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Icon(Icons.work_outline, color: AppColors.primaryBlue, size: 20),
+                          child: const Icon(
+                            Icons.work_outline,
+                            color: AppColors.primaryBlue,
+                            size: 20,
+                          ),
                         ),
                         title: Text(
                           nama,
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textDark, fontSize: 14),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textDark,
+                            fontSize: 14,
+                          ),
                         ),
                         subtitle: Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             'Lokasi: $lokasi • Kontraktor: $kontraktor',
-                            style: const TextStyle(color: AppColors.textLight, fontSize: 12),
+                            style: const TextStyle(
+                              color: AppColors.textLight,
+                              fontSize: 12,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        trailing: const Icon(Icons.chevron_right, color: AppColors.textLight),
+                        trailing: const Icon(
+                          Icons.chevron_right,
+                          color: AppColors.textLight,
+                        ),
                         onTap: () {
                           Navigator.pop(ctx);
                           Navigator.push(
@@ -164,7 +184,13 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+            }
+          },
         ),
         title: const Text(
           'Data Laporan',
@@ -202,7 +228,11 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                   hintStyle: const TextStyle(color: AppColors.textLight),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear, color: AppColors.textLight, size: 20),
+                          icon: const Icon(
+                            Icons.clear,
+                            color: AppColors.textLight,
+                            size: 20,
+                          ),
                           onPressed: () {
                             _searchController.clear();
                             setState(() {
@@ -225,7 +255,9 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                   baseContracts = baseContracts.where((c) {
                     return c.instansiDinas.any((d) {
                       final din = d.toUpperCase();
-                      return din.contains('DPU-PR') || din.contains('DINAS') || din.contains('PURBALINGGA');
+                      return din.contains('DPU-PR') ||
+                          din.contains('DINAS') ||
+                          din.contains('PURBALINGGA');
                     });
                   }).toList();
                 }
@@ -239,7 +271,10 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                             ? 'Tidak ada kontrak yang terdaftar untuk instansi dinas Anda.'
                             : 'Belum ada kontrak untuk dilapor.\nTambahkan kontrak baru pada menu Kontrak.',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: AppColors.textLight, height: 1.4),
+                        style: const TextStyle(
+                          color: AppColors.textLight,
+                          height: 1.4,
+                        ),
                       ),
                     ),
                   );
@@ -248,12 +283,16 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                 // Filter contracts and activities based on search query
                 final filteredContracts = baseContracts.where((c) {
                   if (_searchQuery.isEmpty) return true;
-                  final matchContract = c.namaKontrak.toLowerCase().contains(_searchQuery) ||
+                  final matchContract =
+                      c.namaKontrak.toLowerCase().contains(_searchQuery) ||
                       c.nomorSpk.toLowerCase().contains(_searchQuery);
                   final matchKegiatan = c.kegiatans.any((k) {
-                    final nama = (k['namaKegiatan'] ?? '').toString().toLowerCase();
+                    final nama = (k['namaKegiatan'] ?? '')
+                        .toString()
+                        .toLowerCase();
                     final lokasi = (k['lokasi'] ?? '').toString().toLowerCase();
-                    return nama.contains(_searchQuery) || lokasi.contains(_searchQuery);
+                    return nama.contains(_searchQuery) ||
+                        lokasi.contains(_searchQuery);
                   });
                   return matchContract || matchKegiatan;
                 }).toList();
@@ -343,7 +382,10 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.slateLighter,
                           borderRadius: BorderRadius.circular(12),
@@ -363,7 +405,10 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFE6F4EA),
                           borderRadius: BorderRadius.circular(20),
@@ -371,10 +416,16 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.circle, size: 8, color: AppColors.successGreen),
+                            const Icon(
+                              Icons.circle,
+                              size: 8,
+                              color: AppColors.successGreen,
+                            ),
                             const SizedBox(width: 4),
                             Text(
-                              contract.status == 'Selesai' ? 'Selesai' : 'Progres',
+                              contract.status == 'Selesai'
+                                  ? 'Selesai'
+                                  : 'Progres',
                               style: const TextStyle(
                                 color: AppColors.successGreen,
                                 fontSize: 10,
@@ -391,7 +442,9 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                           child: LinearProgressIndicator(
                             value: contract.progressFisik,
                             backgroundColor: AppColors.inputBackground,
-                            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              AppColors.primaryBlue,
+                            ),
                             minHeight: 6,
                           ),
                         ),
@@ -420,12 +473,20 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
               padding: const EdgeInsets.all(16.0),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, size: 18, color: AppColors.textLight),
+                  const Icon(
+                    Icons.info_outline,
+                    size: 18,
+                    color: AppColors.textLight,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Belum ada kegiatan pada kontrak ini.',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12, fontStyle: FontStyle.italic),
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
                   ),
                 ],
@@ -435,7 +496,8 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
             ...kegiatans.asMap().entries.map((entry) {
               final kIndex = entry.key;
               final k = entry.value;
-              final namaKegiatan = k['namaKegiatan'] ?? 'Kegiatan ${kIndex + 1}';
+              final namaKegiatan =
+                  k['namaKegiatan'] ?? 'Kegiatan ${kIndex + 1}';
               final lokasi = k['lokasi'] ?? '-';
               final kontraktor = k['kontraktor'] ?? '-';
 
@@ -452,7 +514,10 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                   );
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     border: Border(
                       bottom: kIndex < kegiatans.length - 1
@@ -468,7 +533,11 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                           color: AppColors.slateLighter,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.work_outline, color: AppColors.primaryBlue, size: 18),
+                        child: const Icon(
+                          Icons.work_outline,
+                          color: AppColors.primaryBlue,
+                          size: 18,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -500,7 +569,10 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                       ),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(8),
@@ -518,7 +590,11 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                               ),
                             ),
                             SizedBox(width: 2),
-                            Icon(Icons.chevron_right, size: 14, color: AppColors.primaryBlue),
+                            Icon(
+                              Icons.chevron_right,
+                              size: 14,
+                              color: AppColors.primaryBlue,
+                            ),
                           ],
                         ),
                       ),

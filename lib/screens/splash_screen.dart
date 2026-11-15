@@ -15,7 +15,7 @@ class _SplashScreenState extends State<SplashScreen> {
     // Simulate loading and navigate to login
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/login');
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
       }
     });
   }
