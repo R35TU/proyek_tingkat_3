@@ -9,6 +9,7 @@ import 'package:tata_saka_app/screens/detail_kegiatan_screen.dart';
 import 'package:tata_saka_app/screens/detail_kontrak_screen.dart';
 import 'package:tata_saka_app/screens/kontrak_screen.dart';
 import 'package:tata_saka_app/screens/data_laporan_screen.dart';
+import 'package:tata_saka_app/screens/laporan_screen.dart';
 import 'package:tata_saka_app/screens/login_screen.dart';
 
 import 'buat_laporan_mingguan_screen.dart';
@@ -1693,11 +1694,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                   const SizedBox(height: 14),
 
-                  // 3. KATEGORI PELAPORAN (Hanya Konsultan & Dinas)
-                  if (!userProf.isKontraktor) ...[
-                    const SizedBox(height: 14),
-                    _buildSidebarCategory('PELAPORAN', isCollapsed, isDrawer),
+                  // 3. KATEGORI PELAPORAN
+                  const SizedBox(height: 14),
+                  _buildSidebarCategory('PELAPORAN', isCollapsed, isDrawer),
+                  if (userProf.isKontraktor) ...[
                     _buildSidebarItem(
+                      isDrawer: isDrawer,
+                      key: 'laporan_harian',
+                      label: 'Laporan Harian',
+                      icon: Icons.today_rounded,
+                      isActive: _activeWebMenu == 'laporan_harian',
+                      isCollapsed: isCollapsed,
+                      onTap: () => _navigateFromSidebar(
+                        'laporan_harian',
+                        const BuatLaporanScreen(),
+                        isDrawer: isDrawer,
+                      ),
+                    ),
+                  ] else ...[
+                    _buildSidebarItem(
+                      isDrawer: isDrawer,
                       key: 'laporan',
                       label: 'Laporan',
                       icon: Icons.folder_outlined,
@@ -1710,6 +1726,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                     _buildSidebarItem(
+                      isDrawer: isDrawer,
                       key: 'data_laporan',
                       label: 'Data Laporan',
                       icon: Icons.folder_outlined,
@@ -1722,6 +1739,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                     _buildSidebarItem(
+                      isDrawer: isDrawer,
                       key: 'laporan_harian',
                       label: 'Laporan Harian',
                       icon: Icons.today_rounded,
@@ -1764,7 +1782,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(height: 14),
 
                   // 4. KATEGORI DOKUMEN & HISTORI
-                  _buildSidebarCategory('HISTORI', isCollapsed),
+                  _buildSidebarCategory('HISTORI', isCollapsed, isDrawer),
                   _buildSidebarItem(
                     isDrawer: isDrawer,
                     key: 'timeline',
