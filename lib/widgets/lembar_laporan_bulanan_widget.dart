@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:tata_saka_app/models/monthly_report_model.dart';
+import 'package:tata_saka_app/widgets/horizontal_drag_scroll_area.dart';
 
 class LembarLaporanBulananWidget extends StatefulWidget {
   final MonthlyReportModel report;
@@ -193,9 +194,7 @@ class _LembarLaporanBulananWidgetState extends State<LembarLaporanBulananWidget>
                         const SizedBox(height: 16),
 
                         // Main PU Table with Horizontal Scroll
-                        Scrollbar(
-                          controller: _horizontalScrollController,
-                          thumbVisibility: true,
+                        HorizontalDragScrollArea(
                           child: SingleChildScrollView(
                             controller: _horizontalScrollController,
                             physics: const AlwaysScrollableScrollPhysics(),
