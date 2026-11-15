@@ -10,6 +10,7 @@ import 'package:tata_saka_app/screens/detail_kontrak_screen.dart';
 import 'package:tata_saka_app/screens/kontrak_screen.dart';
 import 'package:tata_saka_app/screens/laporan_screen.dart';
 import 'package:tata_saka_app/screens/data_laporan_screen.dart';
+import 'package:tata_saka_app/screens/login_screen.dart';
 
 import 'buat_laporan_mingguan_screen.dart';
 
@@ -35,6 +36,61 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _currentPage = 0;
   bool _isWebSidebarOpen = true;
   String _activeWebMenu = 'dashboard';
+
+  void _navigateFromSidebar(
+    String menuKey,
+    Widget destination, {
+    bool isDrawer = false,
+  }) {
+    if (isDrawer) Navigator.pop(context);
+    setState(() => _activeWebMenu = menuKey);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => destination),
+    ).then((_) {
+      if (mounted) {
+        setState(() => _activeWebMenu = 'dashboard');
+      }
+    });
+  }
+
+  void _handleLogout(BuildContext context, {bool isDrawer = false}) {
+    if (isDrawer) Navigator.pop(context);
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text(
+          'Konfirmasi Keluar',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        content: const Text(
+          'Apakah Anda yakin ingin keluar dari akun ini?',
+          style: TextStyle(fontSize: 13.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(dialogCtx);
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+            child: const Text('Keluar'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -1577,25 +1633,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       setState(() => _activeWebMenu = 'dashboard');
                     },
                   ),
-                  _buildSidebarItem(
-                    key: 'kegiatan',
-                    label: userProf.isKontraktor
-                        ? userProf.tr('nav_kegiatan_saya')
-                        : 'Data Proyek / Kegiatan',
-                    icon: Icons.assignment_rounded,
-                    isActive: _activeWebMenu == 'kegiatan',
-                    isCollapsed: isCollapsed,
-                    onTap: () {
-                      if (isDrawer) Navigator.pop(context);
-                      setState(() => _activeWebMenu = 'kegiatan');
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const KontrakScreen(),
-                        ),
-                      );
-                    },
-                  ),
                   if (!userProf.isKontraktor)
                     _buildSidebarItem(
                       key: 'kontrak',
@@ -1603,109 +1640,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       icon: Icons.folder_shared_rounded,
                       isActive: _activeWebMenu == 'kontrak',
                       isCollapsed: isCollapsed,
-                      onTap: () {
-                        if (isDrawer) Navigator.pop(context);
-                        setState(() => _activeWebMenu = 'kontrak');
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const KontrakScreen(),
-                          ),
-                        );
-                      },
+                      onTap: () => _navigateFromSidebar(
+                        'kontrak',
+                        const KontrakScreen(),
+                        isDrawer: isDrawer,
+                      ),
                     ),
 
                   const SizedBox(height: 14),
-
-                  // 2. KATEGORI TEKNIS & ANGGARAN
-                  _buildSidebarCategory('TEKNIS & ANGGARAN', isCollapsed),
-                  _buildSidebarItem(
-                    key: 'rab',
-                    label: 'RAB / BoQ',
-                    icon: Icons.calculate_rounded,
-                    isActive: _activeWebMenu == 'rab',
-                    isCollapsed: isCollapsed,
-                    onTap: () {
-                      if (isDrawer) Navigator.pop(context);
-                      setState(() => _activeWebMenu = 'rab');
-                      final prov = Provider.of<ContractProvider>(
-                        context,
-                        listen: false,
-                      );
-                      if (prov.contracts.isNotEmpty) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => DetailKontrakScreen(
-                              contract: prov.contracts.first,
-                            ),
-                          ),
-                        );
-                      } else {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const KontrakScreen(),
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                  _buildSidebarItem(
-                    key: 'addendum',
-                    label: 'Addendum CCO',
-                    icon: Icons.change_circle_rounded,
-                    isActive: _activeWebMenu == 'addendum',
-                    isCollapsed: isCollapsed,
-                    onTap: () {
-                      if (isDrawer) Navigator.pop(context);
-                      setState(() => _activeWebMenu = 'addendum');
-                      final prov = Provider.of<ContractProvider>(
-                        context,
-                        listen: false,
-                      );
-                      if (prov.contracts.isNotEmpty) {
-                        final c = prov.contracts.first;
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => KelolaAddendumScreen(
-                              contract: c,
-                              kegiatanIndex: 0,
-                            ),
-                          ),
-                        );
-                      } else {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const KontrakScreen(),
-                          ),
-                        );
-                      }
-                    },
-                  ),
 
                   // 3. KATEGORI PELAPORAN (Hanya Konsultan & Dinas)
                   if (!userProf.isKontraktor) ...[
                     const SizedBox(height: 14),
                     _buildSidebarCategory('PELAPORAN', isCollapsed),
                     _buildSidebarItem(
+                      key: 'laporan',
+                      label: 'Laporan',
+                      icon: Icons.folder_outlined,
+                      isActive: _activeWebMenu == 'laporan',
+                      isCollapsed: isCollapsed,
+                      onTap: () => _navigateFromSidebar(
+                        'laporan',
+                        const LaporanScreen(),
+                        isDrawer: isDrawer,
+                      ),
+                    ),
+                    _buildSidebarItem(
                       key: 'data_laporan',
                       label: 'Data Laporan',
                       icon: Icons.folder_outlined,
                       isActive: _activeWebMenu == 'data_laporan',
                       isCollapsed: isCollapsed,
-                      onTap: () {
-                        if (isDrawer) Navigator.pop(context);
-                        setState(() => _activeWebMenu = 'data_laporan');
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const DataLaporanScreen(),
-                          ),
-                        );
-                      },
+                      onTap: () => _navigateFromSidebar(
+                        'data_laporan',
+                        const DataLaporanScreen(),
+                        isDrawer: isDrawer,
+                      ),
                     ),
                     _buildSidebarItem(
                       key: 'laporan_harian',
@@ -1713,16 +1683,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       icon: Icons.today_rounded,
                       isActive: _activeWebMenu == 'laporan_harian',
                       isCollapsed: isCollapsed,
-                      onTap: () {
-                        if (isDrawer) Navigator.pop(context);
-                        setState(() => _activeWebMenu = 'laporan_harian');
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const BuatLaporanScreen(),
-                          ),
-                        );
-                      },
+                      onTap: () => _navigateFromSidebar(
+                        'laporan_harian',
+                        const BuatLaporanScreen(),
+                        isDrawer: isDrawer,
+                      ),
                     ),
                     _buildSidebarItem(
                       key: 'laporan_mingguan',
@@ -1730,16 +1695,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       icon: Icons.date_range_rounded,
                       isActive: _activeWebMenu == 'laporan_mingguan',
                       isCollapsed: isCollapsed,
-                      onTap: () {
-                        if (isDrawer) Navigator.pop(context);
-                        setState(() => _activeWebMenu = 'laporan_mingguan');
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const BuatLaporanMingguanScreen(),
-                          ),
-                        );
-                      },
+                      onTap: () => _navigateFromSidebar(
+                        'laporan_mingguan',
+                        const BuatLaporanMingguanScreen(),
+                        isDrawer: isDrawer,
+                      ),
                     ),
                     _buildSidebarItem(
                       key: 'laporan_bulanan',
@@ -1747,71 +1707,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       icon: Icons.calendar_month_rounded,
                       isActive: _activeWebMenu == 'laporan_bulanan',
                       isCollapsed: isCollapsed,
-                      onTap: () {
-                        if (isDrawer) Navigator.pop(context);
-                        setState(() => _activeWebMenu = 'laporan_bulanan');
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const LaporanBulananScreen(),
-                          ),
-                        );
-                      },
+                      onTap: () => _navigateFromSidebar(
+                        'laporan_bulanan',
+                        const LaporanBulananScreen(),
+                        isDrawer: isDrawer,
+                      ),
                     ),
                   ],
 
                   const SizedBox(height: 14),
 
                   // 4. KATEGORI DOKUMEN & HISTORI
-                  _buildSidebarCategory('DOKUMEN & HISTORI', isCollapsed),
-                  _buildSidebarItem(
-                    key: 'dokumen',
-                    label: 'Administrasi Dokumen',
-                    icon: Icons.folder_copy_rounded,
-                    isActive: _activeWebMenu == 'dokumen',
-                    isCollapsed: isCollapsed,
-                    onTap: () {
-                      if (isDrawer) Navigator.pop(context);
-                      setState(() => _activeWebMenu = 'dokumen');
-                      final prov = Provider.of<ContractProvider>(
-                        context,
-                        listen: false,
-                      );
-                      if (prov.contracts.isNotEmpty) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => DetailKontrakScreen(
-                              contract: prov.contracts.first,
-                            ),
-                          ),
-                        );
-                      } else {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const KontrakScreen(),
-                          ),
-                        );
-                      }
-                    },
-                  ),
+                  _buildSidebarCategory('HISTORI', isCollapsed),
                   _buildSidebarItem(
                     key: 'timeline',
                     label: 'Timeline & Histori',
                     icon: Icons.timeline_rounded,
                     isActive: _activeWebMenu == 'timeline',
                     isCollapsed: isCollapsed,
-                    onTap: () {
-                      if (isDrawer) Navigator.pop(context);
-                      setState(() => _activeWebMenu = 'timeline');
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const TimelineScreen(),
-                        ),
-                      );
-                    },
+                    onTap: () => _navigateFromSidebar(
+                      'timeline',
+                      const TimelineScreen(),
+                      isDrawer: isDrawer,
+                    ),
                   ),
 
                   const SizedBox(height: 14),
@@ -1824,16 +1742,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     icon: Icons.settings_rounded,
                     isActive: _activeWebMenu == 'pengaturan',
                     isCollapsed: isCollapsed,
-                    onTap: () {
-                      if (isDrawer) Navigator.pop(context);
-                      setState(() => _activeWebMenu = 'pengaturan');
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const PengaturanScreen(),
-                        ),
-                      );
-                    },
+                    onTap: () => _navigateFromSidebar(
+                      'pengaturan',
+                      const PengaturanScreen(),
+                      isDrawer: isDrawer,
+                    ),
                   ),
                   _buildSidebarItem(
                     key: 'keamanan',
@@ -1841,16 +1754,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     icon: Icons.security_rounded,
                     isActive: _activeWebMenu == 'keamanan',
                     isCollapsed: isCollapsed,
-                    onTap: () {
-                      if (isDrawer) Navigator.pop(context);
-                      setState(() => _activeWebMenu = 'keamanan');
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const KeamananScreen(),
-                        ),
-                      );
-                    },
+                    onTap: () => _navigateFromSidebar(
+                      'keamanan',
+                      const KeamananScreen(),
+                      isDrawer: isDrawer,
+                    ),
                   ),
                   _buildSidebarItem(
                     key: 'edit_profil',
@@ -1858,21 +1766,88 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     icon: Icons.person_outline_rounded,
                     isActive: _activeWebMenu == 'edit_profil',
                     isCollapsed: isCollapsed,
-                    onTap: () {
-                      if (isDrawer) Navigator.pop(context);
-                      setState(() => _activeWebMenu = 'edit_profil');
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const EditProfilScreen(),
-                        ),
-                      );
-                    },
+                    onTap: () => _navigateFromSidebar(
+                      'edit_profil',
+                      const EditProfilScreen(),
+                      isDrawer: isDrawer,
+                    ),
                   ),
 
                   const SizedBox(height: 24),
                 ],
               ),
+            ),
+            // ─── Footer: Tombol Logout ───
+            Container(
+              padding: EdgeInsets.all(isCollapsed ? 8 : 12),
+              decoration: const BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: Color(0xFF1E293B), width: 1),
+                ),
+              ),
+              child: isCollapsed
+                  ? Tooltip(
+                      message: 'Keluar / Logout',
+                      preferBelow: false,
+                      child: InkWell(
+                        onTap: () => _handleLogout(context, isDrawer: isDrawer),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          height: 44,
+                          width: 44,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: const Color(0xFFEF4444).withOpacity(0.3),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.logout_rounded,
+                            color: Color(0xFFF87171),
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    )
+                  : InkWell(
+                      onTap: () => _handleLogout(context, isDrawer: isDrawer),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 11,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: const Color(0xFFEF4444).withOpacity(0.3),
+                          ),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(
+                              Icons.logout_rounded,
+                              color: Color(0xFFF87171),
+                              size: 20,
+                            ),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Keluar / Logout',
+                                style: TextStyle(
+                                  color: Color(0xFFF87171),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
             ),
           ],
         ),
