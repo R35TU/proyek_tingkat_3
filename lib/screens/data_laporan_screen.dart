@@ -23,8 +23,41 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
     super.dispose();
   }
 
-  void _showPilihKegiatanSheet(BuildContext context, ContractModel contract) {
-    if (contract.kegiatans.isEmpty) {
+  bool _isKegiatanOwnedByContractor(
+    Map<String, dynamic> k,
+    UserProfileProvider userProf,
+  ) {
+    final contractorName = userProf.namaLengkap.toLowerCase();
+    final kKontraktor = (k['kontraktor'] ?? '').toString().toLowerCase();
+    if (kKontraktor.isEmpty) return false;
+    if (kKontraktor.contains(contractorName) ||
+        contractorName.contains(kKontraktor)) {
+      return true;
+    }
+    if (contractorName.contains('divan') && kKontraktor.contains('divan')) {
+      return true;
+    }
+    if (contractorName.contains('langgeng') &&
+        kKontraktor.contains('langgeng')) {
+      return true;
+    }
+    return false;
+  }
+
+  void _showPilihKegiatanSheet(
+    BuildContext context,
+    ContractModel contract,
+    UserProfileProvider userProf,
+  ) {
+    final visibleIndices = <int>[];
+    for (int i = 0; i < contract.kegiatans.length; i++) {
+      if (!userProf.isKontraktor ||
+          _isKegiatanOwnedByContractor(contract.kegiatans[i], userProf)) {
+        visibleIndices.add(i);
+      }
+    }
+
+    if (visibleIndices.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -35,12 +68,14 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
       return;
     }
 
-    if (contract.kegiatans.length == 1) {
+    if (visibleIndices.length == 1) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) =>
-              DetailDataLaporanScreen(contract: contract, kegiatanIndex: 0),
+          builder: (context) => DetailDataLaporanScreen(
+            contract: contract,
+            kegiatanIndex: visibleIndices.first,
+          ),
         ),
       );
       return;
@@ -102,11 +137,14 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                   child: ListView.separated(
                     shrinkWrap: true,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: contract.kegiatans.length,
-                    separatorBuilder: (context, i) => const Divider(height: 1),
-                    itemBuilder: (context, i) {
-                      final k = contract.kegiatans[i];
-                      final nama = k['namaKegiatan'] ?? 'Kegiatan ${i + 1}';
+                    itemCount: visibleIndices.length,
+                    separatorBuilder: (context, idx) =>
+                        const Divider(height: 1),
+                    itemBuilder: (context, idx) {
+                      final originalIndex = visibleIndices[idx];
+                      final k = contract.kegiatans[originalIndex];
+                      final nama =
+                          k['namaKegiatan'] ?? 'Kegiatan ${originalIndex + 1}';
                       final lokasi = k['lokasi'] ?? '-';
                       final kontraktor = k['kontraktor'] ?? '-';
 
@@ -158,7 +196,7 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                             MaterialPageRoute(
                               builder: (context) => DetailDataLaporanScreen(
                                 contract: contract,
-                                kegiatanIndex: i,
+                                kegiatanIndex: originalIndex,
                               ),
                             ),
                           );
@@ -188,7 +226,11 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
             if (Navigator.canPop(context)) {
               Navigator.pop(context);
             } else {
-              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                '/main',
+                (route) => false,
+              );
             }
           },
         ),
@@ -204,7 +246,7 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
       ),
       body: Column(
         children: [
-          // Search Bar Only (Filter Tabs Removed per user request)
+          // Search Bar Only
           Container(
             color: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -246,7 +288,7 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
             ),
           ),
 
-          // List Data Laporan (Grouped by Contract with direct Kegiatan selection)
+          // List Data Laporan
           Expanded(
             child: Consumer2<ContractProvider, UserProfileProvider>(
               builder: (context, provider, userProf, child) {
@@ -260,6 +302,12 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                           din.contains('PURBALINGGA');
                     });
                   }).toList();
+                } else if (userProf.isKontraktor) {
+                  baseContracts = baseContracts.where((c) {
+                    return c.kegiatans.any(
+                      (k) => _isKegiatanOwnedByContractor(k, userProf),
+                    );
+                  }).toList();
                 }
 
                 if (baseContracts.isEmpty) {
@@ -269,7 +317,9 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                       child: Text(
                         userProf.isDinas
                             ? 'Tidak ada kontrak yang terdaftar untuk instansi dinas Anda.'
-                            : 'Belum ada kontrak untuk dilapor.\nTambahkan kontrak baru pada menu Kontrak.',
+                            : (userProf.isKontraktor
+                                  ? 'Belum ada kegiatan pelaporan yang ditugaskan kepada Anda.'
+                                  : 'Belum ada kontrak untuk dilapor.\nTambahkan kontrak baru pada menu Kontrak.'),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: AppColors.textLight,
@@ -287,6 +337,10 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                       c.namaKontrak.toLowerCase().contains(_searchQuery) ||
                       c.nomorSpk.toLowerCase().contains(_searchQuery);
                   final matchKegiatan = c.kegiatans.any((k) {
+                    if (userProf.isKontraktor &&
+                        !_isKegiatanOwnedByContractor(k, userProf)) {
+                      return false;
+                    }
                     final nama = (k['namaKegiatan'] ?? '')
                         .toString()
                         .toLowerCase();
@@ -314,7 +368,7 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                   itemCount: filteredContracts.length,
                   itemBuilder: (context, index) {
                     final contract = filteredContracts[index];
-                    return _buildContractCard(contract);
+                    return _buildContractCard(contract, userProf);
                   },
                 );
               },
@@ -325,9 +379,15 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
     );
   }
 
-  Widget _buildContractCard(ContractModel contract) {
+  Widget _buildContractCard(
+    ContractModel contract,
+    UserProfileProvider userProf,
+  ) {
     int progressPercentage = (contract.progressFisik * 100).toInt();
-    final kegiatans = contract.kegiatans;
+    final visibleEntries = contract.kegiatans.asMap().entries.where((entry) {
+      if (!userProf.isKontraktor) return true;
+      return _isKegiatanOwnedByContractor(entry.value, userProf);
+    }).toList();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -347,7 +407,7 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
         children: [
           // Contract Header
           InkWell(
-            onTap: () => _showPilihKegiatanSheet(context, contract),
+            onTap: () => _showPilihKegiatanSheet(context, contract, userProf),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             child: Padding(
               padding: const EdgeInsets.all(18),
@@ -391,7 +451,7 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          '${kegiatans.length} Kegiatan',
+                          '${visibleEntries.length} Kegiatan',
                           style: const TextStyle(
                             color: AppColors.primaryBlue,
                             fontWeight: FontWeight.bold,
@@ -468,7 +528,7 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
           const Divider(height: 1),
 
           // Daftar Kegiatan List
-          if (kegiatans.isEmpty)
+          if (visibleEntries.isEmpty)
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Row(
@@ -493,11 +553,12 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
               ),
             )
           else
-            ...kegiatans.asMap().entries.map((entry) {
-              final kIndex = entry.key;
-              final k = entry.value;
+            ...visibleEntries.asMap().entries.map((listEntry) {
+              final listIdx = listEntry.key;
+              final originalIndex = listEntry.value.key;
+              final k = listEntry.value.value;
               final namaKegiatan =
-                  k['namaKegiatan'] ?? 'Kegiatan ${kIndex + 1}';
+                  k['namaKegiatan'] ?? 'Kegiatan ${originalIndex + 1}';
               final lokasi = k['lokasi'] ?? '-';
               final kontraktor = k['kontraktor'] ?? '-';
 
@@ -508,7 +569,7 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                     MaterialPageRoute(
                       builder: (context) => DetailDataLaporanScreen(
                         contract: contract,
-                        kegiatanIndex: kIndex,
+                        kegiatanIndex: originalIndex,
                       ),
                     ),
                   );
@@ -520,7 +581,7 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                   ),
                   decoration: BoxDecoration(
                     border: Border(
-                      bottom: kIndex < kegiatans.length - 1
+                      bottom: listIdx < visibleEntries.length - 1
                           ? const BorderSide(color: Color(0xFFF1F5F9))
                           : BorderSide.none,
                     ),
