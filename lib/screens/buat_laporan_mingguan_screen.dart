@@ -11,6 +11,11 @@ import 'package:tata_saka_app/utils/rupiah_input_formatter.dart';
 import 'package:tata_saka_app/widgets/lembar_laporan_mingguan_widget.dart';
 import 'package:tata_saka_app/widgets/lembar_boq_mingguan_widget.dart';
 
+/// Normalisasi status dokumen: nilai lama ('Normal', 'Rencana', dll)
+/// dipetakan ke 'Kontrak' agar sesuai pilihan dropdown ('Kontrak'/'Adendum').
+String _normalizeStatusDokumen(String s) {
+  return s == 'Adendum' ? 'Adendum' : 'Kontrak';
+}
 
 /// Struktur perhitungan rentang tanggal kalender per minggu
 class WeekDateRange {
@@ -175,7 +180,7 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
     _akhirMasaKontrakController.text = r.akhirMasaKontrak;
 
     _tabelMingguan = r.tabelMingguan.map((e) => WeeklyTableRow(
-      status: e.status,
+      status: _normalizeStatusDokumen(e.status),
       mingguKe: e.mingguKe,
       tglMulai: e.tglMulai,
       tglSelesai: e.tglSelesai,
@@ -188,7 +193,7 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
       (tr) => tr.mingguKe == _mingguKe,
       orElse: () => WeeklyTableRow(status: 'Kontrak', mingguKe: _mingguKe, tglMulai: '', tglSelesai: ''),
     );
-    _statusDokumen = currentRow.status.isNotEmpty ? currentRow.status : 'Kontrak';
+    _statusDokumen = _normalizeStatusDokumen(currentRow.status);
   }
 
   void _initFromSelectedKegiatanData() {
@@ -413,7 +418,7 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
             realisasi: saved.realisasiPersen,
           ),
         );
-        status = match.status.isNotEmpty ? match.status : 'Kontrak';
+        status = _normalizeStatusDokumen(match.status);
         rencana = saved.rencanaPersen;
         realisasi = saved.realisasiPersen;
       } else if (widget.editReport != null && widget.editReport!.mingguKe == w) {
@@ -428,7 +433,7 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
             tglSelesai: range.tglSelesaiSlash,
           ),
         );
-        status = match.status.isNotEmpty ? match.status : 'Kontrak';
+        status = _normalizeStatusDokumen(match.status);
       }
 
       rows.add(WeeklyTableRow(
@@ -468,7 +473,7 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
     }
 
     if (row != null) {
-      _statusDokumen = row.status.isNotEmpty ? row.status : 'Kontrak';
+      _statusDokumen = _normalizeStatusDokumen(row.status);
 
       if (row.rencana != null) {
         _rencanaPersen = row.rencana!;
