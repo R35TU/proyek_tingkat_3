@@ -1694,10 +1694,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                   const SizedBox(height: 14),
 
-                  // 3. KATEGORI PELAPORAN (Hanya Konsultan & Dinas)
-                  if (!userProf.isKontraktor) ...[
-                    const SizedBox(height: 14),
-                    _buildSidebarCategory('PELAPORAN', isCollapsed, isDrawer),
+                  // 3. KATEGORI PELAPORAN
+                  const SizedBox(height: 14),
+                  _buildSidebarCategory('PELAPORAN', isCollapsed, isDrawer),
+                  if (userProf.isKontraktor) ...[
+                    _buildSidebarItem(
+                      isDrawer: isDrawer,
+                      key: 'laporan_harian',
+                      label: 'Laporan Harian',
+                      icon: Icons.today_rounded,
+                      isActive: _activeWebMenu == 'laporan_harian',
+                      isCollapsed: isCollapsed,
+                      onTap: () => _navigateFromSidebar(
+                        'laporan_harian',
+                        const BuatLaporanScreen(),
+                        isDrawer: isDrawer,
+                      ),
+                    ),
+                  ] else ...[
                     _buildSidebarItem(
                       isDrawer: isDrawer,
                       key: 'laporan',
