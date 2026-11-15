@@ -15,6 +15,7 @@ import 'package:tata_saka_app/utils/plat_nomor_util.dart';
 import 'package:pdf/pdf.dart';
 import 'package:tata_saka_app/screens/pdf_viewer_screen.dart';
 import 'package:tata_saka_app/services/pdf_report_service.dart';
+import 'package:tata_saka_app/widgets/horizontal_drag_scroll_area.dart';
 
 class DetailDataLaporanScreen extends StatefulWidget {
   final ContractModel contract;
@@ -1466,6 +1467,10 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
             ['1', 'Cerah', 'Nihil', '08:00 - 17:00', defaultLokasi, 'Tidak', '-'],
           ];
 
+    Widget buildHorizontalScroll(Widget child) {
+      return HorizontalDragScrollArea(child: child);
+    }
+
     Widget buildScrollableBox({
       required String label,
       required Map<int, TableColumnWidth> colWidths,
@@ -1478,14 +1483,16 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
         children: [
           _buildDocSectionLabel(label),
           const SizedBox(height: 4),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minWidth: minWidth),
-              child: _buildDocTable(
-                colWidths: colWidths,
-                headers: headers,
-                rows: rows,
+          buildHorizontalScroll(
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: minWidth),
+                child: _buildDocTable(
+                  colWidths: colWidths,
+                  headers: headers,
+                  rows: rows,
+                ),
               ),
             ),
           ),
@@ -1573,41 +1580,43 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
             ? minContainerWidth
             : constraints.maxWidth;
 
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: SizedBox(
-            width: effectiveWidth,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Kolom Kiri: A & D (persis tata letak dokumen fisik dinas PU)
-                Expanded(
-                  flex: 48,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      tableA,
-                      const SizedBox(height: 12),
-                      tableD,
-                    ],
+        return buildHorizontalScroll(
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: effectiveWidth,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Kolom Kiri: A & D (persis tata letak dokumen fisik dinas PU)
+                  Expanded(
+                    flex: 48,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        tableA,
+                        const SizedBox(height: 12),
+                        tableD,
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                // Kolom Kanan: B, C, E (persis tata letak dokumen fisik dinas PU)
-                Expanded(
-                  flex: 52,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      tableB,
-                      const SizedBox(height: 12),
-                      tableC,
-                      const SizedBox(height: 12),
-                      tableE,
-                    ],
+                  const SizedBox(width: 12),
+                  // Kolom Kanan: B, C, E (persis tata letak dokumen fisik dinas PU)
+                  Expanded(
+                    flex: 52,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        tableB,
+                        const SizedBox(height: 12),
+                        tableC,
+                        const SizedBox(height: 12),
+                        tableE,
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );

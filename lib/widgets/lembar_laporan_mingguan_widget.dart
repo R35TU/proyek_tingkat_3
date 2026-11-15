@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
+import 'package:tata_saka_app/widgets/horizontal_drag_scroll_area.dart';
 
 class LembarLaporanMingguanWidget extends StatelessWidget {
   final WeeklyReportModel report;
@@ -20,62 +21,64 @@ class LembarLaporanMingguanWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Container(
-        width: 600,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: Colors.black, width: 1.0),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (onDownloadPdf != null) ...[
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: onDownloadPdf,
-                  icon: const Icon(Icons.picture_as_pdf, size: 14, color: Color(0xFF1E3A8A)),
-                  label: const Text('Export PDF Ringkasan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+    return HorizontalDragScrollArea(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Container(
+          width: 600,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Colors.black, width: 1.0),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (onDownloadPdf != null) ...[
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: onDownloadPdf,
+                    icon: const Icon(Icons.picture_as_pdf, size: 14, color: Color(0xFF1E3A8A)),
+                    label: const Text('Export PDF Ringkasan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))),
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
+              // 1. JUDUL DOKUMEN RESMI
+              const Center(
+                child: Text(
+                  'RINGKASAN KEGIATAN MINGGUAN',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.black,
+                    letterSpacing: 0.8,
+                  ),
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 14),
+
+              // 2. KOTAK INFORMASI KONTRAK & PROYEK
+              _buildInfoTable(),
+              const SizedBox(height: 14),
+
+              // 3. TABEL BOBOT S/D MINGGU INI (TABEL BAWAH)
+              _buildWeeklyProgressTable(),
+              const SizedBox(height: 14),
             ],
-            // 1. JUDUL DOKUMEN RESMI
-            const Center(
-              child: Text(
-                'RINGKASAN KEGIATAN MINGGUAN',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-                color: Colors.black,
-                letterSpacing: 0.8,
-              ),
-            ),
           ),
-          const SizedBox(height: 14),
-
-          // 2. KOTAK INFORMASI KONTRAK & PROYEK
-          _buildInfoTable(),
-          const SizedBox(height: 14),
-
-          // 3. TABEL BOBOT S/D MINGGU INI (TABEL BAWAH)
-          _buildWeeklyProgressTable(),
-          const SizedBox(height: 14),
-        ],
+        ),
       ),
-    ),
-  );
+    );
 }
 
   // TABLE BAGIAN ATAS (KOP & RINGKASAN PROGRESS MINGGU INI)
