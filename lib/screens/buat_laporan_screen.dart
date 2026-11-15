@@ -1,7 +1,13 @@
 import 'dart:convert';
+
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/cupertino.dart'
-    show CupertinoTimerPicker, CupertinoTimerPickerMode, CupertinoTheme, CupertinoThemeData, CupertinoTextThemeData;
+    show
+        CupertinoTimerPicker,
+        CupertinoTimerPickerMode,
+        CupertinoTheme,
+        CupertinoThemeData,
+        CupertinoTextThemeData;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -42,9 +48,9 @@ class _TtdPengawasItem {
     String nama = '',
     String jabatan = '',
     this.signatureBase64,
-  })  : id = id ?? UniqueKey().toString(),
-        namaController = TextEditingController(text: nama),
-        jabatanController = TextEditingController(text: jabatan);
+  }) : id = id ?? UniqueKey().toString(),
+       namaController = TextEditingController(text: nama),
+       jabatanController = TextEditingController(text: jabatan);
 
   void dispose() {
     namaController.dispose();
@@ -64,13 +70,18 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
   final List<Map<String, dynamic>> _cuacaKejadianList = [];
 
   // F. INSTRUKSI DAN SARAN-SARAN (Auto Konsultan Supervisi CV. TATA SAKA CONSULTANT)
-  final TextEditingController _instruksiKonsultanController = TextEditingController();
+  final TextEditingController _instruksiKonsultanController =
+      TextEditingController();
   final List<Map<String, TextEditingController>> _instruksiList = [];
 
   // G. TANDA TANGAN (TTD) PENGAWAS (Mendukung Multi-Penandatangan)
   final List<_TtdPengawasItem> _ttdPengawasList = [];
 
-  void _addTtdPengawasRow({String nama = '', String jabatan = '', String? signature}) {
+  void _addTtdPengawasRow({
+    String nama = '',
+    String jabatan = '',
+    String? signature,
+  }) {
     setState(() {
       _ttdPengawasList.add(
         _TtdPengawasItem(
@@ -101,7 +112,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
 
   // DOKUMEN REKAPITULASI TAMBAHAN & PERJALANAN DT (OPSIONAL - PEKERJAAN ASPAL)
   bool _enableRekapitulasiAspal = false;
-  final TextEditingController _jenisMaterialAspalController = TextEditingController();
+  final TextEditingController _jenisMaterialAspalController =
+      TextEditingController();
   final TextEditingController _penyediaAmpController = TextEditingController();
   final TextEditingController _jarakTempuhController = TextEditingController();
 
@@ -111,16 +123,33 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
   // DOKUMEN REKAPITULASI PENGECORAN BETON (OPSIONAL - PEKERJAAN BETON / READY MIX)
   bool _enableRekapitulasiBeton = false;
   final TextEditingController _jenisBetonController = TextEditingController();
-  final TextEditingController _penyediaJasaBetonController = TextEditingController();
+  final TextEditingController _penyediaJasaBetonController =
+      TextEditingController();
   final List<Map<String, TextEditingController>> _rekapPengecoranBetonList = [];
 
   static const List<String> _namaBulan = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
   ];
 
   static const List<String> _namaHariPanjang = [
-    'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'
+    'Senin',
+    'Selasa',
+    'Rabu',
+    'Kamis',
+    'Jumat',
+    'Sabtu',
+    'Minggu',
   ];
 
   @override
@@ -156,7 +185,14 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     _addPekerjaanRow(jenis: '', volume: '', lokasi: '');
 
     // E. Cuaca & Kejadian: Kosongkan default (1 baris kosong)
-    _addCuacaRow(cuaca: '', jenisKejadian: '', jam: '', lokasi: '', tanggungJawab: 'Tidak', akibat: '');
+    _addCuacaRow(
+      cuaca: '',
+      jenisKejadian: '',
+      jam: '',
+      lokasi: '',
+      tanggungJawab: 'Tidak',
+      akibat: '',
+    );
 
     // F. Instruksi dan Saran-Saran (Auto Konsultan Supervisi)
     _instruksiKonsultanController.clear();
@@ -192,13 +228,31 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       for (int i = 0; i < pList.length; i++) {
         final item = pList[i];
         final matList = (item['materials'] as List<dynamic>?)
-            ?.map((m) => Map<String, String>.from((m as Map).map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''))))
+            ?.map(
+              (m) => Map<String, String>.from(
+                (m as Map).map(
+                  (k, v) => MapEntry(k.toString(), v?.toString() ?? ''),
+                ),
+              ),
+            )
             .toList();
         final alatList = (item['peralatans'] as List<dynamic>?)
-            ?.map((a) => Map<String, String>.from((a as Map).map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''))))
+            ?.map(
+              (a) => Map<String, String>.from(
+                (a as Map).map(
+                  (k, v) => MapEntry(k.toString(), v?.toString() ?? ''),
+                ),
+              ),
+            )
             .toList();
         final perList = (item['personils'] as List<dynamic>?)
-            ?.map((p) => Map<String, String>.from((p as Map).map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''))))
+            ?.map(
+              (p) => Map<String, String>.from(
+                (p as Map).map(
+                  (k, v) => MapEntry(k.toString(), v?.toString() ?? ''),
+                ),
+              ),
+            )
             .toList();
 
         // Backward compatibility: If loaded data has no nested sub-items, attach root lists to first pekerjaan
@@ -208,34 +262,48 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
 
         if (matList == null && i == 0) {
           final oldMats = r['materialList'] as List<dynamic>? ?? [];
-          finalMats = oldMats.map((m) => {
-            'jenis': (m['jenis'] ?? '').toString(),
-            'volume': (m['volume'] ?? '').toString(),
-            'lokasiAwal': (m['lokasiAwal'] ?? m['lokasi'] ?? '').toString(),
-            'lokasiTujuan': (m['lokasiTujuan'] ?? '').toString(),
-          }).toList();
+          finalMats = oldMats
+              .map(
+                (m) => {
+                  'jenis': (m['jenis'] ?? '').toString(),
+                  'volume': (m['volume'] ?? '').toString(),
+                  'lokasiAwal': (m['lokasiAwal'] ?? m['lokasi'] ?? '')
+                      .toString(),
+                  'lokasiTujuan': (m['lokasiTujuan'] ?? '').toString(),
+                },
+              )
+              .toList();
         }
 
         if (alatList == null && i == 0) {
           final oldAlats = r['peralatanList'] as List<dynamic>? ?? [];
-          finalAlats = oldAlats.map((a) => {
-            'jenis': (a['jenis'] ?? '').toString(),
-            'cacahAktif': (a['cacahAktif'] ?? a['jumlah'] ?? '').toString(),
-            'jumlah': (a['jumlah'] ?? '').toString(),
-            'noRusak': (a['noRusak'] ?? '').toString(),
-            'jenisRusak': (a['jenisRusak'] ?? '').toString(),
-            'kode': (a['kode'] ?? '').toString(),
-            'rusak': (a['rusak'] ?? a['kondisi'] ?? '').toString(),
-          }).toList();
+          finalAlats = oldAlats
+              .map(
+                (a) => {
+                  'jenis': (a['jenis'] ?? '').toString(),
+                  'cacahAktif': (a['cacahAktif'] ?? a['jumlah'] ?? '')
+                      .toString(),
+                  'jumlah': (a['jumlah'] ?? '').toString(),
+                  'noRusak': (a['noRusak'] ?? '').toString(),
+                  'jenisRusak': (a['jenisRusak'] ?? '').toString(),
+                  'kode': (a['kode'] ?? '').toString(),
+                  'rusak': (a['rusak'] ?? a['kondisi'] ?? '').toString(),
+                },
+              )
+              .toList();
         }
 
         if (perList == null && i == 0) {
           final oldPers = r['personilList'] as List<dynamic>? ?? [];
-          finalPers = oldPers.map((p) => {
-            'role': (p['role'] ?? '').toString(),
-            'cacah': (p['cacah'] ?? p['count'] ?? '').toString(),
-            'lokasi': (p['lokasi'] ?? '').toString(),
-          }).toList();
+          finalPers = oldPers
+              .map(
+                (p) => {
+                  'role': (p['role'] ?? '').toString(),
+                  'cacah': (p['cacah'] ?? p['count'] ?? '').toString(),
+                  'lokasi': (p['lokasi'] ?? '').toString(),
+                },
+              )
+              .toList();
         }
 
         _addPekerjaanRow(
@@ -252,30 +320,49 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         );
       }
     } else {
-      _addPekerjaanRow(jenis: r['temuan'] ?? '', volume: '', lokasi: r['lokasiSta'] ?? '');
+      _addPekerjaanRow(
+        jenis: r['temuan'] ?? '',
+        volume: '',
+        lokasi: r['lokasiSta'] ?? '',
+      );
     }
 
     // E. Cuaca
     final cList = r['cuacaKejadianList'] as List<dynamic>? ?? [];
     if (cList.isNotEmpty) {
       for (var item in cList) {
+        final rawTj = (item['tanggungJawab'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+        final normalizedTj = (rawTj == 'ya' || rawTj.contains('kontraktor'))
+            ? 'Ya'
+            : 'Tidak';
         _addCuacaRow(
           cuaca: item['cuaca'] ?? '',
           jenisKejadian: item['jenisKejadian'] ?? item['jenis'] ?? '',
           jam: item['jam'] ?? '',
           lokasi: item['lokasi'] ?? '',
-          tanggungJawab: item['tanggungJawab'] ?? 'Tidak',
+          tanggungJawab: normalizedTj,
           akibat: item['akibat'] ?? '',
         );
       }
     } else {
-      _addCuacaRow(cuaca: '', jenisKejadian: '', jam: '', lokasi: '', tanggungJawab: 'Tidak', akibat: '');
+      _addCuacaRow(
+        cuaca: '',
+        jenisKejadian: '',
+        jam: '',
+        lokasi: '',
+        tanggungJawab: 'Tidak',
+        akibat: '',
+      );
     }
 
     // F. Instruksi dan Saran-Saran (Auto Konsultan Supervisi)
     final insList = r['instruksiList'] as List<dynamic>? ?? [];
     final insMap = r['instruksiSaran'] as Map<String, dynamic>?;
-    final konsultanUraian = r['instruksiKonsultan'] ??
+    final konsultanUraian =
+        r['instruksiKonsultan'] ??
         (insMap?['konsultanUraian']) ??
         (insList.isNotEmpty ? insList.first['uraian'] : r['instruksi']);
     if (konsultanUraian != null && konsultanUraian.toString().isNotEmpty) {
@@ -317,12 +404,14 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     }
 
     // Rekapitulasi Aspal & Data Perjalanan
-    _enableRekapitulasiAspal = r['hasRekapitulasiAspal'] == true ||
+    _enableRekapitulasiAspal =
+        r['hasRekapitulasiAspal'] == true ||
         r['hasRekapSuhuLapangan'] == true ||
         r['hasRekapSuhuAmp'] == true ||
         r['hasRekapTonaseAspal'] == true;
 
-    if (r['jenisMaterialAspal'] != null && r['jenisMaterialAspal'].toString().isNotEmpty) {
+    if (r['jenisMaterialAspal'] != null &&
+        r['jenisMaterialAspal'].toString().isNotEmpty) {
       _jenisMaterialAspalController.text = r['jenisMaterialAspal'].toString();
     }
     if (r['penyediaAmp'] != null && r['penyediaAmp'].toString().isNotEmpty) {
@@ -338,18 +427,33 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       _enableRekapitulasiAspal = true;
       for (var item in pdtList) {
         _addRekapPengirimanDtRow(
-          nomorKendaraan: PlatNomorUtil.normalize(item['nomorKendaraan']?.toString() ?? ''),
-          jamPergiAmp: PlatNomorUtil.normalizeTime(item['jamPergiAmp']?.toString() ?? ''),
+          nomorKendaraan: PlatNomorUtil.normalize(
+            item['nomorKendaraan']?.toString() ?? '',
+          ),
+          jamPergiAmp: PlatNomorUtil.normalizeTime(
+            item['jamPergiAmp']?.toString() ?? '',
+          ),
           suhuAmp: item['suhuAmp']?.toString() ?? '',
-          jamDatangLap: PlatNomorUtil.normalizeTime(item['jamDatangLap']?.toString() ?? ''),
+          jamDatangLap: PlatNomorUtil.normalizeTime(
+            item['jamDatangLap']?.toString() ?? '',
+          ),
           suhuDatang: item['suhuDatang']?.toString() ?? '',
           waktuAntrian: item['waktuAntrian']?.toString() ?? '5',
-          suhuLap: item['suhuLap']?.toString() ?? item['suhu']?.toString() ?? '',
-          jamMulaiTuang: PlatNomorUtil.normalizeTime(item['jamMulaiTuang']?.toString() ?? ''),
-          jamSelesaiTuang: PlatNomorUtil.normalizeTime(item['jamSelesaiTuang']?.toString() ?? ''),
+          suhuLap:
+              item['suhuLap']?.toString() ?? item['suhu']?.toString() ?? '',
+          jamMulaiTuang: PlatNomorUtil.normalizeTime(
+            item['jamMulaiTuang']?.toString() ?? '',
+          ),
+          jamSelesaiTuang: PlatNomorUtil.normalizeTime(
+            item['jamSelesaiTuang']?.toString() ?? '',
+          ),
           suhuPemadatanAkhir: item['suhuPemadatanAkhir']?.toString() ?? '',
-          jamPulangLap: PlatNomorUtil.normalizeTime(item['jamPulangLap']?.toString() ?? ''),
-          jamPulangAmp: PlatNomorUtil.normalizeTime(item['jamPulangAmp']?.toString() ?? ''),
+          jamPulangLap: PlatNomorUtil.normalizeTime(
+            item['jamPulangLap']?.toString() ?? '',
+          ),
+          jamPulangAmp: PlatNomorUtil.normalizeTime(
+            item['jamPulangAmp']?.toString() ?? '',
+          ),
           tonaseTiket: item['tonaseTiket']?.toString() ?? '',
           jumlahKumulatif: item['jumlahKumulatif']?.toString() ?? '',
         );
@@ -360,31 +464,58 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       final rsaList = r['rekapSuhuAmpList'] as List<dynamic>? ?? [];
       final rtaList = r['rekapTonaseAspalList'] as List<dynamic>? ?? [];
 
-      final int maxLen = [rslList.length, rsaList.length, rtaList.length].reduce((a, b) => a > b ? a : b);
+      final int maxLen = [
+        rslList.length,
+        rsaList.length,
+        rtaList.length,
+      ].reduce((a, b) => a > b ? a : b);
       if (maxLen > 0) {
         _enableRekapitulasiAspal = true;
         for (int i = 0; i < maxLen; i++) {
-          final lap = i < rslList.length && rslList[i] is Map ? rslList[i] as Map : null;
-          final amp = i < rsaList.length && rsaList[i] is Map ? rsaList[i] as Map : null;
-          final ton = i < rtaList.length && rtaList[i] is Map ? rtaList[i] as Map : null;
+          final lap = i < rslList.length && rslList[i] is Map
+              ? rslList[i] as Map
+              : null;
+          final amp = i < rsaList.length && rsaList[i] is Map
+              ? rsaList[i] as Map
+              : null;
+          final ton = i < rtaList.length && rtaList[i] is Map
+              ? rtaList[i] as Map
+              : null;
 
           final plat = PlatNomorUtil.normalize(
-            (lap?['nomorKendaraan'] ?? amp?['nomorKendaraan'] ?? ton?['nomorKendaraan'] ?? '').toString(),
+            (lap?['nomorKendaraan'] ??
+                    amp?['nomorKendaraan'] ??
+                    ton?['nomorKendaraan'] ??
+                    '')
+                .toString(),
           );
 
           _addRekapPengirimanDtRow(
             nomorKendaraan: plat,
-            jamPergiAmp: PlatNomorUtil.normalizeTime(amp?['jamPergi']?.toString() ?? ''),
+            jamPergiAmp: PlatNomorUtil.normalizeTime(
+              amp?['jamPergi']?.toString() ?? '',
+            ),
             suhuAmp: amp?['suhuAmp']?.toString() ?? '',
-            jamDatangLap: PlatNomorUtil.normalizeTime(lap?['jamDatang']?.toString() ?? ''),
+            jamDatangLap: PlatNomorUtil.normalizeTime(
+              lap?['jamDatang']?.toString() ?? '',
+            ),
             suhuDatang: lap?['suhuDatang']?.toString() ?? '',
             waktuAntrian: lap?['waktuAntrian']?.toString() ?? '5',
-            suhuLap: lap?['suhu']?.toString() ?? lap?['suhuLap']?.toString() ?? '',
-            jamMulaiTuang: PlatNomorUtil.normalizeTime(lap?['jamMulaiTuang']?.toString() ?? ''),
-            jamSelesaiTuang: PlatNomorUtil.normalizeTime(lap?['jamSelesaiTuang']?.toString() ?? ''),
+            suhuLap:
+                lap?['suhu']?.toString() ?? lap?['suhuLap']?.toString() ?? '',
+            jamMulaiTuang: PlatNomorUtil.normalizeTime(
+              lap?['jamMulaiTuang']?.toString() ?? '',
+            ),
+            jamSelesaiTuang: PlatNomorUtil.normalizeTime(
+              lap?['jamSelesaiTuang']?.toString() ?? '',
+            ),
             suhuPemadatanAkhir: lap?['suhuPemadatanAkhir']?.toString() ?? '',
-            jamPulangLap: PlatNomorUtil.normalizeTime(lap?['jamPulang']?.toString() ?? ''),
-            jamPulangAmp: PlatNomorUtil.normalizeTime(amp?['jamPulang']?.toString() ?? ''),
+            jamPulangLap: PlatNomorUtil.normalizeTime(
+              lap?['jamPulang']?.toString() ?? '',
+            ),
+            jamPulangAmp: PlatNomorUtil.normalizeTime(
+              amp?['jamPulang']?.toString() ?? '',
+            ),
             tonaseTiket: ton?['tonaseTiket']?.toString() ?? '',
             jumlahKumulatif: ton?['jumlahKumulatif']?.toString() ?? '',
           );
@@ -393,14 +524,17 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     }
 
     // Rekapitulasi Pengecoran Beton (Ready Mix)
-    _enableRekapitulasiBeton = r['hasRekapBeton'] == true || r['hasRekapitulasiBeton'] == true;
+    _enableRekapitulasiBeton =
+        r['hasRekapBeton'] == true || r['hasRekapitulasiBeton'] == true;
     if (r['jenisBeton'] != null && r['jenisBeton'].toString().isNotEmpty) {
       _jenisBetonController.text = r['jenisBeton'].toString();
     }
-    if (r['penyediaJasaBeton'] != null && r['penyediaJasaBeton'].toString().isNotEmpty) {
+    if (r['penyediaJasaBeton'] != null &&
+        r['penyediaJasaBeton'].toString().isNotEmpty) {
       _penyediaJasaBetonController.text = r['penyediaJasaBeton'].toString();
     } else if (_currentKegiatan?['kontraktor'] != null) {
-      _penyediaJasaBetonController.text = _currentKegiatan!['kontraktor'].toString();
+      _penyediaJasaBetonController.text = _currentKegiatan!['kontraktor']
+          .toString();
     }
 
     final pBetonList = r['rekapPengecoranBetonList'] as List<dynamic>? ?? [];
@@ -423,10 +557,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     // Custom Fields
     final cfList = r['customFields'] as List<dynamic>? ?? [];
     for (var item in cfList) {
-      _addCustomFieldRow(
-        nama: item['nama'] ?? '',
-        isi: item['isi'] ?? '',
-      );
+      _addCustomFieldRow(nama: item['nama'] ?? '', isi: item['isi'] ?? '');
     }
   }
 
@@ -526,13 +657,24 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         final pUraian = (p['uraian'] ?? p['jenis'])?.toString().trim();
 
         bool match = false;
-        if (rkkItemId != null && rkkItemId.isNotEmpty && pId != null && pId.isNotEmpty) {
+        if (rkkItemId != null &&
+            rkkItemId.isNotEmpty &&
+            pId != null &&
+            pId.isNotEmpty) {
           match = (rkkItemId == pId);
         }
-        if (!match && noMataPembayaran != null && noMataPembayaran.isNotEmpty && pNoMata != null && pNoMata.isNotEmpty) {
+        if (!match &&
+            noMataPembayaran != null &&
+            noMataPembayaran.isNotEmpty &&
+            pNoMata != null &&
+            pNoMata.isNotEmpty) {
           match = (noMataPembayaran == pNoMata);
         }
-        if (!match && uraian != null && uraian.isNotEmpty && pUraian != null && pUraian.isNotEmpty) {
+        if (!match &&
+            uraian != null &&
+            uraian.isNotEmpty &&
+            pUraian != null &&
+            pUraian.isNotEmpty) {
           match = (uraian.toLowerCase() == pUraian.toLowerCase());
         }
 
@@ -565,7 +707,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 9.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+            style: const TextStyle(
+              fontSize: 9.5,
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w500,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -630,12 +776,16 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       for (var p in initialPeralatans) {
         peralatansList.add({
           'jenis': TextEditingController(text: p['jenis'] ?? ''),
-          'cacahAktif': TextEditingController(text: p['cacahAktif'] ?? p['jumlah'] ?? ''),
+          'cacahAktif': TextEditingController(
+            text: p['cacahAktif'] ?? p['jumlah'] ?? '',
+          ),
           'jumlah': TextEditingController(text: p['jumlah'] ?? ''),
           'noRusak': TextEditingController(text: p['noRusak'] ?? ''),
           'jenisRusak': TextEditingController(text: p['jenisRusak'] ?? ''),
           'kode': TextEditingController(text: p['kode'] ?? ''),
-          'rusak': TextEditingController(text: p['rusak'] ?? p['kondisi'] ?? ''),
+          'rusak': TextEditingController(
+            text: p['rusak'] ?? p['kondisi'] ?? '',
+          ),
         });
       }
       if (peralatansList.isEmpty && addEmptySubRowsIfEmpty) {
@@ -654,7 +804,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       for (var per in initialPersonils) {
         personilsList.add({
           'roleController': TextEditingController(text: per['role'] ?? ''),
-          'cacahController': TextEditingController(text: per['cacah'] ?? per['count'] ?? ''),
+          'cacahController': TextEditingController(
+            text: per['cacah'] ?? per['count'] ?? '',
+          ),
           'lokasiController': TextEditingController(text: per['lokasi'] ?? ''),
         });
       }
@@ -688,9 +840,17 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     });
   }
 
-  void _addMaterialToPekerjaan(int pIdx, {String jenis = '', String volume = '', String lokasiAwal = '', String lokasiTujuan = ''}) {
+  void _addMaterialToPekerjaan(
+    int pIdx, {
+    String jenis = '',
+    String volume = '',
+    String lokasiAwal = '',
+    String lokasiTujuan = '',
+  }) {
     setState(() {
-      final materials = _pekerjaanList[pIdx]['materials'] as List<Map<String, TextEditingController>>;
+      final materials =
+          _pekerjaanList[pIdx]['materials']
+              as List<Map<String, TextEditingController>>;
       materials.add({
         'jenis': TextEditingController(text: jenis),
         'volume': TextEditingController(text: volume),
@@ -700,7 +860,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     });
   }
 
-  void _addPeralatanToPekerjaan(int pIdx, {
+  void _addPeralatanToPekerjaan(
+    int pIdx, {
     String jenis = '',
     String cacahAktif = '',
     String jumlah = '',
@@ -710,7 +871,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     String rusak = '',
   }) {
     setState(() {
-      final peralatans = _pekerjaanList[pIdx]['peralatans'] as List<Map<String, TextEditingController>>;
+      final peralatans =
+          _pekerjaanList[pIdx]['peralatans']
+              as List<Map<String, TextEditingController>>;
       peralatans.add({
         'jenis': TextEditingController(text: jenis),
         'cacahAktif': TextEditingController(text: cacahAktif),
@@ -723,9 +886,15 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     });
   }
 
-  void _addPersonilToPekerjaan(int pIdx, {String role = '', String cacah = '', String lokasi = ''}) {
+  void _addPersonilToPekerjaan(
+    int pIdx, {
+    String role = '',
+    String cacah = '',
+    String lokasi = '',
+  }) {
     setState(() {
-      final personils = _pekerjaanList[pIdx]['personils'] as List<Map<String, dynamic>>;
+      final personils =
+          _pekerjaanList[pIdx]['personils'] as List<Map<String, dynamic>>;
       personils.add({
         'roleController': TextEditingController(text: role),
         'cacahController': TextEditingController(text: cacah),
@@ -783,7 +952,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     String jumlahKumulatif = '',
   }) {
     setState(() {
-      final ctrlPlat = TextEditingController(text: PlatNomorUtil.normalize(nomorKendaraan));
+      final ctrlPlat = TextEditingController(
+        text: PlatNomorUtil.normalize(nomorKendaraan),
+      );
       final ctrlTonase = TextEditingController(text: tonaseTiket);
       final ctrlKumulatif = TextEditingController(text: jumlahKumulatif);
 
@@ -797,7 +968,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         'suhuAmp': TextEditingController(text: suhuAmp),
         'jamDatangLap': TextEditingController(text: jamDatangLap),
         'suhuDatang': TextEditingController(text: suhuDatang),
-        'waktuAntrian': TextEditingController(text: waktuAntrian.isNotEmpty ? waktuAntrian : '5'),
+        'waktuAntrian': TextEditingController(
+          text: waktuAntrian.isNotEmpty ? waktuAntrian : '5',
+        ),
         'suhuLap': TextEditingController(text: suhuLap),
         'jamMulaiTuang': TextEditingController(text: jamMulaiTuang),
         'jamSelesaiTuang': TextEditingController(text: jamSelesaiTuang),
@@ -845,7 +1018,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     String volumeKumulatif = '',
   }) {
     setState(() {
-      final ctrlPlat = TextEditingController(text: PlatNomorUtil.normalize(nomorKendaraan));
+      final ctrlPlat = TextEditingController(
+        text: PlatNomorUtil.normalize(nomorKendaraan),
+      );
       final ctrlVolume = TextEditingController(text: volume);
       final ctrlKumulatif = TextEditingController(text: volumeKumulatif);
 
@@ -856,8 +1031,12 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       _rekapPengecoranBetonList.add({
         'nomorKendaraan': ctrlPlat,
         'batchingPlant': TextEditingController(text: batchingPlant),
-        'jamBerangkat': TextEditingController(text: PlatNomorUtil.normalizeTime(jamBerangkat)),
-        'jamDatang': TextEditingController(text: PlatNomorUtil.normalizeTime(jamDatang)),
+        'jamBerangkat': TextEditingController(
+          text: PlatNomorUtil.normalizeTime(jamBerangkat),
+        ),
+        'jamDatang': TextEditingController(
+          text: PlatNomorUtil.normalizeTime(jamDatang),
+        ),
         'slumpTest': TextEditingController(text: slumpTest),
         'volume': ctrlVolume,
         'volumeKumulatif': ctrlKumulatif,
@@ -956,7 +1135,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         '${_namaHariPanjang[_selectedDate.weekday - 1]}, ${_selectedDate.day.toString().padLeft(2, '0')} ${_namaBulan[_selectedDate.month - 1]} ${_selectedDate.year}';
 
     final isEdit = widget.editReport != null;
-    final reportId = isEdit ? widget.editReport!['id'] : DateTime.now().millisecondsSinceEpoch.toString();
+    final reportId = isEdit
+        ? widget.editReport!['id']
+        : DateTime.now().millisecondsSinceEpoch.toString();
 
     final keg = _currentKegiatan!;
     final String lokasiKegiatan = keg['lokasi'] ?? '-';
@@ -968,8 +1149,14 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     // Validasi Kunci Ketat: Blokir jika volume melebihi sisa kontrak sebelum ada Addendum CCO
     for (int i = 0; i < _pekerjaanList.length; i++) {
       final p = _pekerjaanList[i];
-      final jenisPek = (p['jenis'] as TextEditingController?)?.text.trim() ?? '';
-      final volText = (p['volume'] as TextEditingController?)?.text.trim().replaceAll(',', '.') ?? '';
+      final jenisPek =
+          (p['jenis'] as TextEditingController?)?.text.trim() ?? '';
+      final volText =
+          (p['volume'] as TextEditingController?)?.text.trim().replaceAll(
+            ',',
+            '.',
+          ) ??
+          '';
       final inputVol = double.tryParse(volText.split(' ').first) ?? 0.0;
       final noMata = (p['noMataPembayaran'] ?? '').toString();
       final satuan = (p['satuan'] ?? '').toString();
@@ -980,11 +1167,17 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         targetVol = (p['targetVolume'] as num).toDouble();
       } else if (rkkFlatItems.isNotEmpty) {
         final match = rkkFlatItems.firstWhere(
-          (it) => it['id'] == rkkId || it['uraian'].toString().toLowerCase() == jenisPek.toLowerCase(),
+          (it) =>
+              it['id'] == rkkId ||
+              it['uraian'].toString().toLowerCase() == jenisPek.toLowerCase(),
           orElse: () => {},
         );
         if (match.isNotEmpty) {
-          targetVol = double.tryParse((match['volumeCCO'] ?? match['volume'] ?? 0).toString()) ?? 0.0;
+          targetVol =
+              double.tryParse(
+                (match['volumeCCO'] ?? match['volume'] ?? 0).toString(),
+              ) ??
+              0.0;
         }
       }
 
@@ -1002,7 +1195,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
           showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               title: Row(
                 children: const [
                   Icon(Icons.block, color: Color(0xFFDC2626), size: 28),
@@ -1010,7 +1205,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                   Expanded(
                     child: Text(
                       'Penyimpanan Dikunci',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ],
@@ -1021,7 +1219,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                 children: [
                   Text(
                     'Volume pekerjaan "$jenisPek" melebihi batas kuantitas kontrak/CCO.',
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF1F2937)),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF1F2937),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Container(
@@ -1034,31 +1235,59 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('• Target Kontrak/CCO: ${_formatNumber(targetVol)} $satuan',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                        Text('• Realisasi Sebelumnya: ${_formatNumber(sudahDikerjakan)} $satuan',
-                            style: const TextStyle(fontSize: 12)),
-                        Text('• Sisa Kontrak: ${_formatNumber(sisa > 0 ? sisa : 0)} $satuan',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF047857))),
-                        Text('• Input Hari Ini: ${_formatNumber(inputVol)} $satuan',
-                            style: const TextStyle(fontSize: 12)),
+                        Text(
+                          '• Target Kontrak/CCO: ${_formatNumber(targetVol)} $satuan',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '• Realisasi Sebelumnya: ${_formatNumber(sudahDikerjakan)} $satuan',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        Text(
+                          '• Sisa Kontrak: ${_formatNumber(sisa > 0 ? sisa : 0)} $satuan',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF047857),
+                          ),
+                        ),
+                        Text(
+                          '• Input Hari Ini: ${_formatNumber(inputVol)} $satuan',
+                          style: const TextStyle(fontSize: 12),
+                        ),
                         const Divider(height: 16),
-                        Text('• Akumulasi: ${_formatNumber(akumulasi)} $satuan (Lebih +${_formatNumber(lebih)} $satuan)',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFDC2626))),
+                        Text(
+                          '• Akumulasi: ${_formatNumber(akumulasi)} $satuan (Lebih +${_formatNumber(lebih)} $satuan)',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFDC2626),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 12),
                   const Text(
                     'Sesuai ketentuan, penambahan volume harus melalui Addendum CCO terlebih dahulu.',
-                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF4B5563)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFF4B5563),
+                    ),
                   ),
                 ],
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Tutup & Perbaiki Volume', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Tutup & Perbaiki Volume',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
@@ -1069,80 +1298,112 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     }
 
     // A. Clean Pekerjaan (dengan sub-items Material, Peralatan, Personil)
-    final cleanPekerjaan = _pekerjaanList.asMap().entries.map((e) {
-      final pIdx = e.key + 1;
-      final p = e.value;
-      final jenisPek = (p['jenis'] as TextEditingController?)?.text.trim() ?? '';
-      final volPek = (p['volume'] as TextEditingController?)?.text.trim() ?? '';
-      final lokPek = (p['lokasi'] as TextEditingController?)?.text.trim() ?? '';
+    final cleanPekerjaan = _pekerjaanList
+        .asMap()
+        .entries
+        .map((e) {
+          final pIdx = e.key + 1;
+          final p = e.value;
+          final jenisPek =
+              (p['jenis'] as TextEditingController?)?.text.trim() ?? '';
+          final volPek =
+              (p['volume'] as TextEditingController?)?.text.trim() ?? '';
+          final lokPek =
+              (p['lokasi'] as TextEditingController?)?.text.trim() ?? '';
 
-      final mats = (p['materials'] as List<Map<String, TextEditingController>>?) ?? [];
-      final cleanMats = mats
-          .asMap()
-          .entries
-          .map((me) => {
-                'no': '$pIdx.${me.key + 1}',
-                'pekerjaanNama': jenisPek,
-                'pekerjaanIndex': '$pIdx',
-                'jenis': me.value['jenis']?.text.trim() ?? '',
-                'volume': me.value['volume']?.text.trim() ?? '',
-                'lokasiAwal': me.value['lokasiAwal']?.text.trim() ?? '',
-                'lokasiTujuan': me.value['lokasiTujuan']?.text.trim() ?? '',
-              })
-          .where((m) => m['jenis']!.isNotEmpty)
-          .toList();
+          final mats =
+              (p['materials'] as List<Map<String, TextEditingController>>?) ??
+              [];
+          final cleanMats = mats
+              .asMap()
+              .entries
+              .map(
+                (me) => {
+                  'no': '$pIdx.${me.key + 1}',
+                  'pekerjaanNama': jenisPek,
+                  'pekerjaanIndex': '$pIdx',
+                  'jenis': me.value['jenis']?.text.trim() ?? '',
+                  'volume': me.value['volume']?.text.trim() ?? '',
+                  'lokasiAwal': me.value['lokasiAwal']?.text.trim() ?? '',
+                  'lokasiTujuan': me.value['lokasiTujuan']?.text.trim() ?? '',
+                },
+              )
+              .where((m) => m['jenis']!.isNotEmpty)
+              .toList();
 
-      final alats = (p['peralatans'] as List<Map<String, TextEditingController>>?) ?? [];
-      final cleanAlats = alats
-          .asMap()
-          .entries
-          .map((ae) => {
-                'no': '$pIdx.${ae.key + 1}',
-                'pekerjaanNama': jenisPek,
-                'pekerjaanIndex': '$pIdx',
-                'jenis': ae.value['jenis']?.text.trim() ?? '',
-                'cacahAktif': ae.value['cacahAktif']?.text.trim() ?? '',
-                'jumlah': ae.value['jumlah']?.text.trim() ?? '',
-                'noRusak': ae.value['noRusak']?.text.trim() ?? '',
-                'jenisRusak': ae.value['jenisRusak']?.text.trim() ?? '',
-                'kode': ae.value['kode']?.text.trim() ?? '',
-                'rusak': ae.value['rusak']?.text.trim() ?? '',
-              })
-          .where((m) => m['jenis']!.isNotEmpty || m['jenisRusak']!.isNotEmpty)
-          .toList();
+          final alats =
+              (p['peralatans'] as List<Map<String, TextEditingController>>?) ??
+              [];
+          final cleanAlats = alats
+              .asMap()
+              .entries
+              .map(
+                (ae) => {
+                  'no': '$pIdx.${ae.key + 1}',
+                  'pekerjaanNama': jenisPek,
+                  'pekerjaanIndex': '$pIdx',
+                  'jenis': ae.value['jenis']?.text.trim() ?? '',
+                  'cacahAktif': ae.value['cacahAktif']?.text.trim() ?? '',
+                  'jumlah': ae.value['jumlah']?.text.trim() ?? '',
+                  'noRusak': ae.value['noRusak']?.text.trim() ?? '',
+                  'jenisRusak': ae.value['jenisRusak']?.text.trim() ?? '',
+                  'kode': ae.value['kode']?.text.trim() ?? '',
+                  'rusak': ae.value['rusak']?.text.trim() ?? '',
+                },
+              )
+              .where(
+                (m) => m['jenis']!.isNotEmpty || m['jenisRusak']!.isNotEmpty,
+              )
+              .toList();
 
-      final pers = (p['personils'] as List<Map<String, dynamic>>?) ?? [];
-      final cleanPers = pers
-          .asMap()
-          .entries
-          .map((pe) => {
-                'no': '$pIdx.${pe.key + 1}',
-                'pekerjaanNama': jenisPek,
-                'pekerjaanIndex': '$pIdx',
-                'role': (pe.value['roleController'] as TextEditingController?)?.text.trim() ?? '',
-                'cacah': (pe.value['cacahController'] as TextEditingController?)?.text.trim() ?? '',
-                'lokasi': (pe.value['lokasiController'] as TextEditingController?)?.text.trim() ?? '',
-              })
-          .where((m) => m['role']!.isNotEmpty)
-          .toList();
+          final pers = (p['personils'] as List<Map<String, dynamic>>?) ?? [];
+          final cleanPers = pers
+              .asMap()
+              .entries
+              .map(
+                (pe) => {
+                  'no': '$pIdx.${pe.key + 1}',
+                  'pekerjaanNama': jenisPek,
+                  'pekerjaanIndex': '$pIdx',
+                  'role':
+                      (pe.value['roleController'] as TextEditingController?)
+                          ?.text
+                          .trim() ??
+                      '',
+                  'cacah':
+                      (pe.value['cacahController'] as TextEditingController?)
+                          ?.text
+                          .trim() ??
+                      '',
+                  'lokasi':
+                      (pe.value['lokasiController'] as TextEditingController?)
+                          ?.text
+                          .trim() ??
+                      '',
+                },
+              )
+              .where((m) => m['role']!.isNotEmpty)
+              .toList();
 
-      return {
-        'no': pIdx.toString(),
-        'jenis': jenisPek,
-        'uraian': jenisPek,
-        'volume': volPek,
-        'lokasi': lokPek,
-        'noMataPembayaran': p['noMataPembayaran'] ?? '',
-        'satuan': p['satuan'] ?? '',
-        'rkkItemId': p['rkkItemId'] ?? '',
-        'targetVolume': p['targetVolume'],
-        'hargaSatuan': p['hargaSatuan'],
-        'nilaiBobot': p['nilaiBobot'],
-        'materials': cleanMats,
-        'peralatans': cleanAlats,
-        'personils': cleanPers,
-      };
-    }).where((m) => (m['jenis'] as String).isNotEmpty).toList();
+          return {
+            'no': pIdx.toString(),
+            'jenis': jenisPek,
+            'uraian': jenisPek,
+            'volume': volPek,
+            'lokasi': lokPek,
+            'noMataPembayaran': p['noMataPembayaran'] ?? '',
+            'satuan': p['satuan'] ?? '',
+            'rkkItemId': p['rkkItemId'] ?? '',
+            'targetVolume': p['targetVolume'],
+            'hargaSatuan': p['hargaSatuan'],
+            'nilaiBobot': p['nilaiBobot'],
+            'materials': cleanMats,
+            'peralatans': cleanAlats,
+            'personils': cleanPers,
+          };
+        })
+        .where((m) => (m['jenis'] as String).isNotEmpty)
+        .toList();
 
     // B, C, D: Flattened Aggregated Lists for root & backward compatibility
     final List<Map<String, String>> cleanMaterial = [];
@@ -1156,43 +1417,52 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     for (var p in cleanPekerjaan) {
       final mats = p['materials'] as List<Map<String, String>>;
       for (var m in mats) {
-        cleanMaterial.add({
-          ...m,
-          'no': '${matNo++}',
-        });
+        cleanMaterial.add({...m, 'no': '${matNo++}'});
       }
       final alats = p['peralatans'] as List<Map<String, String>>;
       for (var a in alats) {
-        cleanPeralatan.add({
-          ...a,
-          'no': '${alatNo++}',
-        });
+        cleanPeralatan.add({...a, 'no': '${alatNo++}'});
       }
       final pers = p['personils'] as List<Map<String, String>>;
       for (var pr in pers) {
-        cleanPersonil.add({
-          ...pr,
-          'no': '${persNo++}',
-        });
+        cleanPersonil.add({...pr, 'no': '${persNo++}'});
       }
     }
 
     // E. Clean Cuaca & Kejadian
-    final cleanCuaca = _cuacaKejadianList.asMap().entries.map((e) {
-      final jk = (e.value['jenisKejadianController'] as TextEditingController?)?.text.trim() ??
-          (e.value['jenisController'] as TextEditingController?)?.text.trim() ?? '';
-      final cuacaVal = (e.value['cuacaController'] as TextEditingController?)?.text.trim() ?? '';
-      return {
-        'no': (e.key + 1).toString(),
-        'jenisKejadian': jk,
-        'cuaca': cuacaVal,
-        'jenis': jk.isNotEmpty ? jk : cuacaVal,
-        'jam': (e.value['jamController'] as TextEditingController).text.trim(),
-        'lokasi': (e.value['lokasiController'] as TextEditingController).text.trim(),
-        'tanggungJawab': e.value['tanggungJawab'] as String? ?? 'Tidak',
-        'akibat': (e.value['akibatController'] as TextEditingController).text.trim(),
-      };
-    }).where((m) => m['jenisKejadian']!.isNotEmpty || m['cuaca']!.isNotEmpty).toList();
+    final cleanCuaca = _cuacaKejadianList
+        .asMap()
+        .entries
+        .map((e) {
+          final jk =
+              (e.value['jenisKejadianController'] as TextEditingController?)
+                  ?.text
+                  .trim() ??
+              (e.value['jenisController'] as TextEditingController?)?.text
+                  .trim() ??
+              '';
+          final cuacaVal =
+              (e.value['cuacaController'] as TextEditingController?)?.text
+                  .trim() ??
+              '';
+          return {
+            'no': (e.key + 1).toString(),
+            'jenisKejadian': jk,
+            'cuaca': cuacaVal,
+            'jenis': jk.isNotEmpty ? jk : cuacaVal,
+            'jam': (e.value['jamController'] as TextEditingController).text
+                .trim(),
+            'lokasi': (e.value['lokasiController'] as TextEditingController)
+                .text
+                .trim(),
+            'tanggungJawab': e.value['tanggungJawab'] as String? ?? 'Tidak',
+            'akibat': (e.value['akibatController'] as TextEditingController)
+                .text
+                .trim(),
+          };
+        })
+        .where((m) => m['jenisKejadian']!.isNotEmpty || m['cuaca']!.isNotEmpty)
+        .toList();
 
     // F. Clean Instruksi (Konsultan Supervisi CV. TATA SAKA CONSULTANT)
     final String instruksiText = _instruksiKonsultanController.text.trim();
@@ -1202,15 +1472,20 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
               'no': '1',
               'pihak': 'Konsultan Supervisi (CV. TATA SAKA CONSULTANT)',
               'uraian': instruksiText,
-            }
+            },
           ]
         : <Map<String, String>>[];
 
     // Clean Custom Fields (tanpa sugesti nama/isi)
-    final cleanCustomFields = _customFields.map((c) => {
-      'nama': c['nama']?.text.trim() ?? '',
-      'isi': c['isi']?.text.trim() ?? '',
-    }).where((c) => c['nama']!.isNotEmpty).toList();
+    final cleanCustomFields = _customFields
+        .map(
+          (c) => {
+            'nama': c['nama']?.text.trim() ?? '',
+            'isi': c['isi']?.text.trim() ?? '',
+          },
+        )
+        .where((c) => c['nama']!.isNotEmpty)
+        .toList();
 
     // Clean Rekapitulasi Terpadu Pengiriman DT Aspal & Ekspor Lembar Dokumen Resmi
     final List<Map<String, String>> cleanRekapSuhuLapangan = [];
@@ -1221,15 +1496,29 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     if (_enableRekapitulasiAspal) {
       for (int i = 0; i < _rekapPengirimanDtList.length; i++) {
         final m = _rekapPengirimanDtList[i];
-        final plat = PlatNomorUtil.normalize(m['nomorKendaraan']?.text.trim() ?? '');
+        final plat = PlatNomorUtil.normalize(
+          m['nomorKendaraan']?.text.trim() ?? '',
+        );
         final idxStr = '${i + 1}';
 
-        final jamPergiAmp = PlatNomorUtil.normalizeTime(m['jamPergiAmp']?.text.trim() ?? '');
-        final jamPulangAmp = PlatNomorUtil.normalizeTime(m['jamPulangAmp']?.text.trim() ?? '');
-        final jamDatangLap = PlatNomorUtil.normalizeTime(m['jamDatangLap']?.text.trim() ?? '');
-        final jamMulaiTuang = PlatNomorUtil.normalizeTime(m['jamMulaiTuang']?.text.trim() ?? '');
-        final jamSelesaiTuang = PlatNomorUtil.normalizeTime(m['jamSelesaiTuang']?.text.trim() ?? '');
-        final jamPulangLap = PlatNomorUtil.normalizeTime(m['jamPulangLap']?.text.trim() ?? '');
+        final jamPergiAmp = PlatNomorUtil.normalizeTime(
+          m['jamPergiAmp']?.text.trim() ?? '',
+        );
+        final jamPulangAmp = PlatNomorUtil.normalizeTime(
+          m['jamPulangAmp']?.text.trim() ?? '',
+        );
+        final jamDatangLap = PlatNomorUtil.normalizeTime(
+          m['jamDatangLap']?.text.trim() ?? '',
+        );
+        final jamMulaiTuang = PlatNomorUtil.normalizeTime(
+          m['jamMulaiTuang']?.text.trim() ?? '',
+        );
+        final jamSelesaiTuang = PlatNomorUtil.normalizeTime(
+          m['jamSelesaiTuang']?.text.trim() ?? '',
+        );
+        final jamPulangLap = PlatNomorUtil.normalizeTime(
+          m['jamPulangLap']?.text.trim() ?? '',
+        );
 
         cleanRekapPengirimanDt.add({
           'no': idxStr,
@@ -1284,9 +1573,15 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     if (_enableRekapitulasiBeton) {
       for (int i = 0; i < _rekapPengecoranBetonList.length; i++) {
         final m = _rekapPengecoranBetonList[i];
-        final plat = PlatNomorUtil.normalize(m['nomorKendaraan']?.text.trim() ?? '');
-        final jamBerangkat = PlatNomorUtil.normalizeTime(m['jamBerangkat']?.text.trim() ?? '');
-        final jamDatang = PlatNomorUtil.normalizeTime(m['jamDatang']?.text.trim() ?? '');
+        final plat = PlatNomorUtil.normalize(
+          m['nomorKendaraan']?.text.trim() ?? '',
+        );
+        final jamBerangkat = PlatNomorUtil.normalizeTime(
+          m['jamBerangkat']?.text.trim() ?? '',
+        );
+        final jamDatang = PlatNomorUtil.normalizeTime(
+          m['jamDatang']?.text.trim() ?? '',
+        );
 
         cleanRekapPengecoranBeton.add({
           'no': '${i + 1}',
@@ -1357,17 +1652,21 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
 
       'rekapPengirimanDtList': cleanRekapPengirimanDt,
 
-      'hasRekapSuhuLapangan': _enableRekapitulasiAspal && cleanRekapSuhuLapangan.isNotEmpty,
+      'hasRekapSuhuLapangan':
+          _enableRekapitulasiAspal && cleanRekapSuhuLapangan.isNotEmpty,
       'rekapSuhuLapanganList': cleanRekapSuhuLapangan,
 
-      'hasRekapSuhuAmp': _enableRekapitulasiAspal && cleanRekapSuhuAmp.isNotEmpty,
+      'hasRekapSuhuAmp':
+          _enableRekapitulasiAspal && cleanRekapSuhuAmp.isNotEmpty,
       'rekapSuhuAmpList': cleanRekapSuhuAmp,
 
-      'hasRekapTonaseAspal': _enableRekapitulasiAspal && cleanRekapTonaseAspal.isNotEmpty,
+      'hasRekapTonaseAspal':
+          _enableRekapitulasiAspal && cleanRekapTonaseAspal.isNotEmpty,
       'rekapTonaseAspalList': cleanRekapTonaseAspal,
 
       // Dokumen Rekapitulasi Pengecoran Beton Ready Mix (Opsional Halaman Terpisah)
-      'hasRekapBeton': _enableRekapitulasiBeton && cleanRekapPengecoranBeton.isNotEmpty,
+      'hasRekapBeton':
+          _enableRekapitulasiBeton && cleanRekapPengecoranBeton.isNotEmpty,
       'hasRekapitulasiBeton': _enableRekapitulasiBeton,
       'jenisBeton': _jenisBetonController.text.trim(),
       'penyediaJasaBeton': _penyediaJasaBetonController.text.trim().isNotEmpty
@@ -1377,14 +1676,16 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
 
       // Backward Compatibility & Kartu
       'temuan': cleanPekerjaan.isNotEmpty
-          ? cleanPekerjaan.map((p) => '${p['jenis']} (${p['volume']})').join(', ')
+          ? cleanPekerjaan
+                .map((p) => '${p['jenis']} (${p['volume']})')
+                .join(', ')
           : 'Pekerjaan sesuai buku harian standar.',
       'cuaca': cleanCuaca.isNotEmpty
           ? (cleanCuaca.first['cuaca']!.isNotEmpty
-              ? cleanCuaca.first['cuaca']!
-              : (cleanCuaca.first['jenisKejadian']!.isNotEmpty
-                  ? cleanCuaca.first['jenisKejadian']!
-                  : 'Normal'))
+                ? cleanCuaca.first['cuaca']!
+                : (cleanCuaca.first['jenisKejadian']!.isNotEmpty
+                      ? cleanCuaca.first['jenisKejadian']!
+                      : 'Normal'))
           : 'Normal',
       'instruksi': instruksiText,
       'rekomendasi': '',
@@ -1410,7 +1711,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     keg['laporans'] = existingReports;
     _selectedContract!.kegiatans[_selectedKegiatanIndex!] = keg;
 
-    Provider.of<ContractProvider>(context, listen: false).updateContract(_selectedContract!);
+    Provider.of<ContractProvider>(
+      context,
+      listen: false,
+    ).updateContract(_selectedContract!);
 
     try {
       final timeline = Provider.of<TimelineProvider>(context, listen: false);
@@ -1446,9 +1750,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(isEdit
-            ? 'Buku Harian Standar ($dateFormatted) berhasil diperbarui!'
-            : 'Buku Harian Standar ($dateFormatted) berhasil disimpan!'),
+        content: Text(
+          isEdit
+              ? 'Buku Harian Standar ($dateFormatted) berhasil diperbarui!'
+              : 'Buku Harian Standar ($dateFormatted) berhasil disimpan!',
+        ),
         backgroundColor: AppColors.successGreen,
       ),
     );
@@ -1487,12 +1793,18 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             if (Navigator.canPop(context)) {
               Navigator.pop(context);
             } else {
-              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                '/main',
+                (route) => false,
+              );
             }
           },
         ),
         title: Text(
-          widget.editReport != null ? 'Edit Buku Harian Standar' : 'Form Buku Harian Standar',
+          widget.editReport != null
+              ? 'Edit Buku Harian Standar'
+              : 'Form Buku Harian Standar',
           style: const TextStyle(
             color: Color(0xFF111827),
             fontSize: 16,
@@ -1506,12 +1818,21 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
               onPressed: _simpanLaporan,
               style: TextButton.styleFrom(
                 backgroundColor: const Color(0xFF1F2937),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: const Text(
                 'Simpan',
-                style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white, fontSize: 13),
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  fontSize: 13,
+                ),
               ),
             ),
           ),
@@ -1527,7 +1848,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             const SizedBox(height: 16),
 
             // 2. PILIH KONTRAK & KEGIATAN
-            _buildContractAndKegiatanSelector(contracts, lokasiAuto, sumberDanaAuto),
+            _buildContractAndKegiatanSelector(
+              contracts,
+              lokasiAuto,
+              sumberDanaAuto,
+            ),
             const SizedBox(height: 16),
 
             // 3. A - D. PEKERJAAN & SUMBER DAYA (MATERIAL, ALAT, PERSONIL)
@@ -1570,12 +1895,20 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                 onPressed: _simpanLaporan,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1F2937),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                   elevation: 0,
                 ),
                 child: Text(
-                  widget.editReport != null ? 'Perbarui Buku Harian Standar' : 'Simpan Buku Harian Standar',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                  widget.editReport != null
+                      ? 'Perbarui Buku Harian Standar'
+                      : 'Simpan Buku Harian Standar',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -1587,7 +1920,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
   }
 
   // ─── 1. TANGGAL PENGAWASAN ───
-  Widget _buildOfficialHeader(String dateFormatted, String lokasi, String sumberDana) {
+  Widget _buildOfficialHeader(
+    String dateFormatted,
+    String lokasi,
+    String sumberDana,
+  ) {
     return _buildCard(
       title: 'Hari / Tanggal Pengawasan',
       children: [
@@ -1599,7 +1936,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                 children: [
                   const Text(
                     'Tanggal Pelaksanaan',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Color(0xFF6B7280)),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF6B7280),
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -1617,13 +1958,22 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
               onPressed: _pickDate,
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Color(0xFFD1D5DB)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 backgroundColor: const Color(0xFFF9FAFB),
               ),
               child: const Text(
                 'Ubah Tanggal',
-                style: TextStyle(color: Color(0xFF374151), fontSize: 12, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: Color(0xFF374151),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -1633,25 +1983,47 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
   }
 
   // ─── 2. KONTRAK & KEGIATAN ───
-  Widget _buildContractAndKegiatanSelector(List<ContractModel> contracts, String lokasi, String sumberDana) {
+  Widget _buildContractAndKegiatanSelector(
+    List<ContractModel> contracts,
+    String lokasi,
+    String sumberDana,
+  ) {
     return _buildCard(
       title: 'Pilih Kontrak & Kegiatan',
       children: [
         // Dropdown Kontrak
         const Text(
           'Kontrak *',
-          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF374151), letterSpacing: 0.3),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF374151),
+            letterSpacing: 0.3,
+          ),
         ),
         const SizedBox(height: 6),
         DropdownButtonFormField<ContractModel>(
           value: _selectedContract,
           isExpanded: true,
           decoration: _cleanInputDec('Pilih Kontrak'),
-          items: contracts.map((c) => DropdownMenuItem(value: c, child: Text(c.namaKontrak, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)))).toList(),
+          items: contracts
+              .map(
+                (c) => DropdownMenuItem(
+                  value: c,
+                  child: Text(
+                    c.namaKontrak,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              )
+              .toList(),
           onChanged: (val) {
             setState(() {
               _selectedContract = val;
-              _selectedKegiatanIndex = (val?.kegiatans.isNotEmpty ?? false) ? 0 : null;
+              _selectedKegiatanIndex = (val?.kegiatans.isNotEmpty ?? false)
+                  ? 0
+                  : null;
             });
           },
         ),
@@ -1660,7 +2032,12 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         // Dropdown Kegiatan
         const Text(
           'Kegiatan *',
-          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF374151), letterSpacing: 0.3),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF374151),
+            letterSpacing: 0.3,
+          ),
         ),
         const SizedBox(height: 6),
         if (_selectedContract == null || _selectedContract!.kegiatans.isEmpty)
@@ -1672,11 +2049,17 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: const Color(0xFFE5E7EB)),
             ),
-            child: const Text('Belum ada kegiatan pada kontrak ini.', style: TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+            child: const Text(
+              'Belum ada kegiatan pada kontrak ini.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+            ),
           )
         else
           DropdownButtonFormField<int>(
-            value: (_selectedKegiatanIndex != null && _selectedKegiatanIndex! < _selectedContract!.kegiatans.length)
+            value:
+                (_selectedKegiatanIndex != null &&
+                    _selectedKegiatanIndex! <
+                        _selectedContract!.kegiatans.length)
                 ? _selectedKegiatanIndex
                 : 0,
             isExpanded: true,
@@ -1685,7 +2068,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
               final k = entry.value;
               return DropdownMenuItem<int>(
                 value: entry.key,
-                child: Text(k['namaKegiatan'] ?? 'Kegiatan ${entry.key + 1}', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
+                child: Text(
+                  k['namaKegiatan'] ?? 'Kegiatan ${entry.key + 1}',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13),
+                ),
               );
             }).toList(),
             onChanged: (idx) {
@@ -1708,9 +2095,15 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildDocMetaRow('Lokasi Kegiatan', lokasi.isNotEmpty ? lokasi : '-'),
+              _buildDocMetaRow(
+                'Lokasi Kegiatan',
+                lokasi.isNotEmpty ? lokasi : '-',
+              ),
               const SizedBox(height: 6),
-              _buildDocMetaRow('Sumber Dana', sumberDana.isNotEmpty ? sumberDana : '-'),
+              _buildDocMetaRow(
+                'Sumber Dana',
+                sumberDana.isNotEmpty ? sumberDana : '-',
+              ),
             ],
           ),
         ),
@@ -1719,7 +2112,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
   }
 
   List<Map<String, dynamic>> _getRkkFlatItems() {
-    if (_selectedContract == null || _selectedContract!.kegiatans.isEmpty) return [];
+    if (_selectedContract == null || _selectedContract!.kegiatans.isEmpty)
+      return [];
     final idx = _selectedKegiatanIndex ?? 0;
     if (idx < 0 || idx >= _selectedContract!.kegiatans.length) return [];
     final keg = _selectedContract!.kegiatans[idx];
@@ -1774,8 +2168,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
           final jenisPekCtrl = p['jenis'] as TextEditingController;
           final volPekCtrl = p['volume'] as TextEditingController;
           final lokPekCtrl = p['lokasi'] as TextEditingController;
-          final materials = p['materials'] as List<Map<String, TextEditingController>>;
-          final peralatans = p['peralatans'] as List<Map<String, TextEditingController>>;
+          final materials =
+              p['materials'] as List<Map<String, TextEditingController>>;
+          final peralatans =
+              p['peralatans'] as List<Map<String, TextEditingController>>;
           final personils = p['personils'] as List<Map<String, dynamic>>;
 
           return Container(
@@ -1790,28 +2186,44 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
               children: [
                 // Header Card Pekerjaan
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                   decoration: const BoxDecoration(
                     color: Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(11)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(11),
+                    ),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF1F2937),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           'Pekerjaan #${pIdx + 1}',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                       const Spacer(),
                       if (_pekerjaanList.length > 1)
                         IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Color(0xFFDC2626), size: 20),
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Color(0xFFDC2626),
+                            size: 20,
+                          ),
                           tooltip: 'Hapus Pekerjaan #${pIdx + 1}',
                           onPressed: () {
                             setState(() {
@@ -1832,7 +2244,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                       // Sub-Header A. PEKERJAAN
                       const Text(
                         'A. PEKERJAAN',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1F2937),
+                        ),
                       ),
                       const SizedBox(height: 8),
 
@@ -1842,33 +2258,69 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                           children: [
                             const Text(
                               'Pilih dari RKK Kontrak *',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryBlue),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primaryBlue,
+                              ),
                             ),
                             const Spacer(),
-                            if (p['satuan'] != null && (p['satuan'] as String).isNotEmpty)
+                            if (p['satuan'] != null &&
+                                (p['satuan'] as String).isNotEmpty)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppColors.slateLighter,
                                   borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: AppColors.border, width: 0.6),
+                                  border: Border.all(
+                                    color: AppColors.border,
+                                    width: 0.6,
+                                  ),
                                 ),
                                 child: Text(
                                   'Satuan: ${p['satuan']}',
-                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.navySlate),
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.navySlate,
+                                  ),
                                 ),
                               ),
                           ],
                         ),
                         const SizedBox(height: 6),
                         DropdownButtonFormField<String>(
-                          value: (p['rkkItemId'] != null && rkkFlatItems.any((it) => it['id'] == p['rkkItemId']))
+                          value:
+                              (p['rkkItemId'] != null &&
+                                  rkkFlatItems.any(
+                                    (it) => it['id'] == p['rkkItemId'],
+                                  ))
                               ? p['rkkItemId'] as String
-                              : (rkkFlatItems.any((it) => it['uraian'].toString().toLowerCase() == jenisPekCtrl.text.toLowerCase())
-                                  ? rkkFlatItems.firstWhere((it) => it['uraian'].toString().toLowerCase() == jenisPekCtrl.text.toLowerCase())['id'] as String
-                                  : (jenisPekCtrl.text.isNotEmpty ? jenisPekCtrl.text : null)),
+                              : (rkkFlatItems.any(
+                                      (it) =>
+                                          it['uraian']
+                                              .toString()
+                                              .toLowerCase() ==
+                                          jenisPekCtrl.text.toLowerCase(),
+                                    )
+                                    ? rkkFlatItems.firstWhere(
+                                            (it) =>
+                                                it['uraian']
+                                                    .toString()
+                                                    .toLowerCase() ==
+                                                jenisPekCtrl.text.toLowerCase(),
+                                          )['id']
+                                          as String
+                                    : (jenisPekCtrl.text.isNotEmpty
+                                          ? jenisPekCtrl.text
+                                          : null)),
                           isExpanded: true,
-                          decoration: _cleanInputDec('Pilih item pekerjaan dari daftar RKK'),
+                          decoration: _cleanInputDec(
+                            'Pilih item pekerjaan dari daftar RKK',
+                          ),
                           items: [
                             ...rkkFlatItems.map((item) {
                               return DropdownMenuItem<String>(
@@ -1876,18 +2328,29 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                                 child: Text(
                                   item['uraian'] as String,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               );
                             }),
                             if (jenisPekCtrl.text.isNotEmpty &&
-                                !rkkFlatItems.any((it) => it['id'] == p['rkkItemId'] || it['uraian'].toString().toLowerCase() == jenisPekCtrl.text.toLowerCase()))
+                                !rkkFlatItems.any(
+                                  (it) =>
+                                      it['id'] == p['rkkItemId'] ||
+                                      it['uraian'].toString().toLowerCase() ==
+                                          jenisPekCtrl.text.toLowerCase(),
+                                ))
                               DropdownMenuItem<String>(
                                 value: jenisPekCtrl.text,
                                 child: Text(
                                   jenisPekCtrl.text,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
                           ],
@@ -1895,13 +2358,23 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                             setState(() {
                               p['rkkItemId'] = selectedId;
                               if (selectedId != null) {
-                                final matchedList = rkkFlatItems.where((it) => it['id'] == selectedId);
+                                final matchedList = rkkFlatItems.where(
+                                  (it) => it['id'] == selectedId,
+                                );
                                 if (matchedList.isNotEmpty) {
                                   final matched = matchedList.first;
                                   jenisPekCtrl.text = matched['uraian'] ?? '';
                                   p['satuan'] = matched['satuan'] ?? '';
-                                  p['noMataPembayaran'] = matched['noMataPembayaran'] ?? '';
-                                  p['targetVolume'] = double.tryParse((matched['volumeCCO'] ?? matched['volume'] ?? 0).toString()) ?? 0.0;
+                                  p['noMataPembayaran'] =
+                                      matched['noMataPembayaran'] ?? '';
+                                  p['targetVolume'] =
+                                      double.tryParse(
+                                        (matched['volumeCCO'] ??
+                                                matched['volume'] ??
+                                                0)
+                                            .toString(),
+                                      ) ??
+                                      0.0;
                                   p['volumeCCO'] = matched['volumeCCO'];
                                   p['hargaSatuan'] = matched['hargaSatuan'];
                                   p['nilaiBobot'] = matched['nilaiBobot'];
@@ -1913,36 +2386,61 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                         const SizedBox(height: 8),
 
                         // Badges: Mata Pembayaran & Satuan terkunci
-                        if ((p['satuan'] != null && (p['satuan'] as String).isNotEmpty) ||
-                            (p['noMataPembayaran'] != null && (p['noMataPembayaran'] as String).isNotEmpty)) ...[
+                        if ((p['satuan'] != null &&
+                                (p['satuan'] as String).isNotEmpty) ||
+                            (p['noMataPembayaran'] != null &&
+                                (p['noMataPembayaran'] as String)
+                                    .isNotEmpty)) ...[
                           Wrap(
                             spacing: 8,
                             runSpacing: 4,
                             children: [
-                              if (p['noMataPembayaran'] != null && (p['noMataPembayaran'] as String).isNotEmpty)
+                              if (p['noMataPembayaran'] != null &&
+                                  (p['noMataPembayaran'] as String).isNotEmpty)
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFF1F5F9),
                                     borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: const Color(0xFFCBD5E1), width: 0.8),
+                                    border: Border.all(
+                                      color: const Color(0xFFCBD5E1),
+                                      width: 0.8,
+                                    ),
                                   ),
                                   child: Text(
                                     'Mata Pembayaran: ${p['noMataPembayaran']}',
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF475569),
+                                    ),
                                   ),
                                 ),
-                              if (p['satuan'] != null && (p['satuan'] as String).isNotEmpty)
+                              if (p['satuan'] != null &&
+                                  (p['satuan'] as String).isNotEmpty)
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFEFF6FF),
                                     borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: const Color(0xFFBFDBFE), width: 0.8),
+                                    border: Border.all(
+                                      color: const Color(0xFFBFDBFE),
+                                      width: 0.8,
+                                    ),
                                   ),
                                   child: Text(
                                     'Satuan: ${p['satuan']}',
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF1D4ED8)),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF1D4ED8),
+                                    ),
                                   ),
                                 ),
                             ],
@@ -1963,17 +2461,26 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                       _buildField(
                         controller: volPekCtrl,
                         label: 'Volume Realisasi Hari Ini *',
-                        hintText: (p['satuan'] != null && (p['satuan'] as String).isNotEmpty)
+                        hintText:
+                            (p['satuan'] != null &&
+                                (p['satuan'] as String).isNotEmpty)
                             ? 'Contoh: 0.30 (${p['satuan']})'
                             : 'Contoh: 0.30',
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        suffixText: (p['satuan'] != null && (p['satuan'] as String).isNotEmpty) ? p['satuan'] as String : null,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        suffixText:
+                            (p['satuan'] != null &&
+                                (p['satuan'] as String).isNotEmpty)
+                            ? p['satuan'] as String
+                            : null,
                       ),
 
                       // Status Card Target & Akumulasi Realisasi
                       () {
                         final String satuan = (p['satuan'] ?? '').toString();
-                        final String noMata = (p['noMataPembayaran'] ?? '').toString();
+                        final String noMata = (p['noMataPembayaran'] ?? '')
+                            .toString();
                         final String rkkId = (p['rkkItemId'] ?? '').toString();
                         final String jenisStr = jenisPekCtrl.text.trim();
 
@@ -1982,11 +2489,19 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                           targetVol = (p['targetVolume'] as num).toDouble();
                         } else if (rkkFlatItems.isNotEmpty) {
                           final match = rkkFlatItems.firstWhere(
-                            (it) => it['id'] == rkkId || it['uraian'].toString().toLowerCase() == jenisStr.toLowerCase(),
+                            (it) =>
+                                it['id'] == rkkId ||
+                                it['uraian'].toString().toLowerCase() ==
+                                    jenisStr.toLowerCase(),
                             orElse: () => {},
                           );
                           if (match.isNotEmpty) {
-                            targetVol = double.tryParse((match['volumeCCO'] ?? match['volume'] ?? 0).toString()) ?? 0.0;
+                            targetVol =
+                                double.tryParse(
+                                  (match['volumeCCO'] ?? match['volume'] ?? 0)
+                                      .toString(),
+                                ) ??
+                                0.0;
                           }
                         }
 
@@ -1998,13 +2513,23 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                           uraian: jenisStr,
                         );
 
-                        final inputVolStr = volPekCtrl.text.trim().replaceAll(',', '.');
-                        final inputVol = double.tryParse(inputVolStr.split(' ').first) ?? 0.0;
+                        final inputVolStr = volPekCtrl.text.trim().replaceAll(
+                          ',',
+                          '.',
+                        );
+                        final inputVol =
+                            double.tryParse(inputVolStr.split(' ').first) ??
+                            0.0;
 
-                        final sisaSebelumHariIni = (targetVol - sudahDikerjakan);
+                        final sisaSebelumHariIni =
+                            (targetVol - sudahDikerjakan);
                         final akumulasiTotal = sudahDikerjakan + inputVol;
-                        final persenAkumulasi = targetVol > 0 ? (akumulasiTotal / targetVol) * 100 : 0.0;
-                        final bool isOver = targetVol > 0 && akumulasiTotal > (targetVol + 0.0001);
+                        final persenAkumulasi = targetVol > 0
+                            ? (akumulasiTotal / targetVol) * 100
+                            : 0.0;
+                        final bool isOver =
+                            targetVol > 0 &&
+                            akumulasiTotal > (targetVol + 0.0001);
 
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2013,10 +2538,14 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: isOver ? const Color(0xFFFEF2F2) : const Color(0xFFF8FAFC),
+                                color: isOver
+                                    ? const Color(0xFFFEF2F2)
+                                    : const Color(0xFFF8FAFC),
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: isOver ? const Color(0xFFF87171) : const Color(0xFFE2E8F0),
+                                  color: isOver
+                                      ? const Color(0xFFF87171)
+                                      : const Color(0xFFE2E8F0),
                                   width: isOver ? 1.2 : 1.0,
                                 ),
                               ),
@@ -2024,14 +2553,17 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
                                         'Status Target & Akumulasi Pekerjaan',
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.bold,
-                                          color: isOver ? const Color(0xFFB91C1C) : const Color(0xFF334155),
+                                          color: isOver
+                                              ? const Color(0xFFB91C1C)
+                                              : const Color(0xFF334155),
                                         ),
                                       ),
                                       Text(
@@ -2039,7 +2571,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w800,
-                                          color: isOver ? const Color(0xFFDC2626) : const Color(0xFF0F766E),
+                                          color: isOver
+                                              ? const Color(0xFFDC2626)
+                                              : const Color(0xFF0F766E),
                                         ),
                                       ),
                                     ],
@@ -2048,10 +2582,17 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(4),
                                     child: LinearProgressIndicator(
-                                      value: targetVol > 0 ? (akumulasiTotal / targetVol).clamp(0.0, 1.0) : 0.0,
+                                      value: targetVol > 0
+                                          ? (akumulasiTotal / targetVol).clamp(
+                                              0.0,
+                                              1.0,
+                                            )
+                                          : 0.0,
                                       backgroundColor: const Color(0xFFE2E8F0),
                                       valueColor: AlwaysStoppedAnimation<Color>(
-                                        isOver ? const Color(0xFFDC2626) : const Color(0xFF10B981),
+                                        isOver
+                                            ? const Color(0xFFDC2626)
+                                            : const Color(0xFF10B981),
                                       ),
                                       minHeight: 6,
                                     ),
@@ -2062,7 +2603,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                                       Expanded(
                                         child: _buildMetricTile(
                                           label: 'Target Kontrak',
-                                          value: '${_formatNumber(targetVol)} $satuan',
+                                          value:
+                                              '${_formatNumber(targetVol)} $satuan',
                                           textColor: const Color(0xFF1E293B),
                                         ),
                                       ),
@@ -2070,7 +2612,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                                       Expanded(
                                         child: _buildMetricTile(
                                           label: 'Sudah Dikerjakan',
-                                          value: '${_formatNumber(sudahDikerjakan)} $satuan',
+                                          value:
+                                              '${_formatNumber(sudahDikerjakan)} $satuan',
                                           textColor: const Color(0xFF475569),
                                         ),
                                       ),
@@ -2082,7 +2625,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                                       Expanded(
                                         child: _buildMetricTile(
                                           label: 'Sisa Target',
-                                          value: '${_formatNumber(sisaSebelumHariIni > 0 ? sisaSebelumHariIni : 0)} $satuan',
+                                          value:
+                                              '${_formatNumber(sisaSebelumHariIni > 0 ? sisaSebelumHariIni : 0)} $satuan',
                                           textColor: const Color(0xFF0D9488),
                                           isBold: true,
                                         ),
@@ -2091,8 +2635,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                                       Expanded(
                                         child: _buildMetricTile(
                                           label: 'Akumulasi Realisasi',
-                                          value: '${_formatNumber(akumulasiTotal)} $satuan',
-                                          textColor: isOver ? const Color(0xFFDC2626) : const Color(0xFF1E293B),
+                                          value:
+                                              '${_formatNumber(akumulasiTotal)} $satuan',
+                                          textColor: isOver
+                                              ? const Color(0xFFDC2626)
+                                              : const Color(0xFF1E293B),
                                           isBold: true,
                                         ),
                                       ),
@@ -2101,21 +2648,35 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                                   if (isOver) ...[
                                     const SizedBox(height: 10),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 8,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFFFEE2E2),
                                         borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: const Color(0xFFFCA5A5)),
+                                        border: Border.all(
+                                          color: const Color(0xFFFCA5A5),
+                                        ),
                                       ),
                                       child: Row(
                                         children: [
-                                          const Icon(Icons.error_outline, color: Color(0xFFDC2626), size: 16),
+                                          const Icon(
+                                            Icons.error_outline,
+                                            color: Color(0xFFDC2626),
+                                            size: 16,
+                                          ),
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: Text(
                                               '⛔ Melebihi target kontrak sebesar +${_formatNumber(akumulasiTotal - targetVol)} $satuan. '
                                               'Penyimpanan dikunci sebelum Addendum CCO diterbitkan.',
-                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF991B1B), height: 1.2),
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF991B1B),
+                                                height: 1.2,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -2145,12 +2706,19 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                           const Expanded(
                             child: Text(
                               'B. MATERIAL DIGUNAKAN',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1F2937),
+                              ),
                             ),
                           ),
                           Text(
                             '${materials.length} Bahan',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF6B7280),
+                            ),
                           ),
                         ],
                       ),
@@ -2166,7 +2734,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                           ),
                           child: const Text(
                             'Tidak ada material digunakan untuk pekerjaan ini (opsional).',
-                            style: TextStyle(fontSize: 11, color: Color(0xFF6B7280), fontStyle: FontStyle.italic),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF6B7280),
+                              fontStyle: FontStyle.italic,
+                            ),
                           ),
                         )
                       else
@@ -2198,7 +2770,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                               _buildField(
                                 controller: m['lokasiAwal']!,
                                 label: 'Lokasi Awal (Asal)',
-                                hintText: 'Contoh: Quarry / Basecamp / Gudang Utama',
+                                hintText:
+                                    'Contoh: Quarry / Basecamp / Gudang Utama',
                               ),
                               const SizedBox(height: 8),
                               _buildField(
@@ -2224,12 +2797,19 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                           const Expanded(
                             child: Text(
                               'C. JENIS PERALATAN YANG DIGUNAKAN',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1F2937),
+                              ),
                             ),
                           ),
                           Text(
                             '${peralatans.length} Alat',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF6B7280),
+                            ),
                           ),
                         ],
                       ),
@@ -2245,7 +2825,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                           ),
                           child: const Text(
                             'Tidak ada peralatan khusus yang digunakan (opsional).',
-                            style: TextStyle(fontSize: 11, color: Color(0xFF6B7280), fontStyle: FontStyle.italic),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF6B7280),
+                              fontStyle: FontStyle.italic,
+                            ),
                           ),
                         )
                       else
@@ -2309,12 +2893,19 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                           const Expanded(
                             child: Text(
                               'D. PERSONAL PROYEK PENGAWAS DAN KONTRAKTOR',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1F2937),
+                              ),
                             ),
                           ),
                           Text(
                             '${personils.length} Personil',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF6B7280),
+                            ),
                           ),
                         ],
                       ),
@@ -2330,16 +2921,23 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                           ),
                           child: const Text(
                             'Tidak ada personil spesifik (opsional).',
-                            style: TextStyle(fontSize: 11, color: Color(0xFF6B7280), fontStyle: FontStyle.italic),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF6B7280),
+                              fontStyle: FontStyle.italic,
+                            ),
                           ),
                         )
                       else
                         ...personils.asMap().entries.map((pEntry) {
                           final persIdx = pEntry.key;
                           final pers = pEntry.value;
-                          final roleCtrl = pers['roleController'] as TextEditingController;
-                          final cacahCtrl = pers['cacahController'] as TextEditingController;
-                          final lokasiCtrl = pers['lokasiController'] as TextEditingController;
+                          final roleCtrl =
+                              pers['roleController'] as TextEditingController;
+                          final cacahCtrl =
+                              pers['cacahController'] as TextEditingController;
+                          final lokasiCtrl =
+                              pers['lokasiController'] as TextEditingController;
 
                           return _buildNestedItemCard(
                             title: 'Personil #${persIdx + 1}',
@@ -2386,7 +2984,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
           );
         }),
         const SizedBox(height: 8),
-        _buildAddButton('+ Tambah Baris Pekerjaan Baru', () => _addPekerjaanRow()),
+        _buildAddButton(
+          '+ Tambah Baris Pekerjaan Baru',
+          () => _addPekerjaanRow(),
+        ),
       ],
     );
   }
@@ -2399,7 +3000,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         icon: const Icon(Icons.add, size: 14, color: Color(0xFF374151)),
         label: Text(
           label,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF374151)),
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF374151),
+          ),
         ),
         style: OutlinedButton.styleFrom(
           backgroundColor: Colors.white,
@@ -2433,7 +3038,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF4B5563)),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF4B5563),
+                  ),
                 ),
               ),
               InkWell(
@@ -2478,7 +3087,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
           ..._cuacaKejadianList.asMap().entries.map((entry) {
             final idx = entry.key;
             final m = entry.value;
-            final jenisKejadianCtrl = (m['jenisKejadianController'] ?? m['jenisController']) as TextEditingController;
+            final jenisKejadianCtrl =
+                (m['jenisKejadianController'] ?? m['jenisController'])
+                    as TextEditingController;
             final cuacaCtrl = m['cuacaController'] as TextEditingController;
             final jamCtrl = m['jamController'] as TextEditingController;
             final lokasiCtrl = m['lokasiController'] as TextEditingController;
@@ -2530,22 +3141,36 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                     ),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
-                      value: m['tanggungJawab'],
+                      value:
+                          (m['tanggungJawab'] == 'Ya' ||
+                              m['tanggungJawab'] == 'Tidak')
+                          ? m['tanggungJawab']
+                          : 'Tidak',
                       isExpanded: true,
                       decoration: InputDecoration(
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFD1D5DB),
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFD1D5DB),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFF1F2937), width: 1.5),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF1F2937),
+                            width: 1.5,
+                          ),
                         ),
                         filled: true,
                         fillColor: Colors.white,
@@ -2553,11 +3178,17 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                       items: const [
                         DropdownMenuItem(
                           value: 'Tidak',
-                          child: Text('Tidak (Force Majeure / Alami)', style: TextStyle(fontSize: 12)),
+                          child: Text(
+                            'Tidak (Force Majeure / Alami)',
+                            style: TextStyle(fontSize: 12),
+                          ),
                         ),
                         DropdownMenuItem(
                           value: 'Ya',
-                          child: Text('Ya (Tanggung Jawab Kontraktor)', style: TextStyle(fontSize: 12)),
+                          child: Text(
+                            'Ya (Tanggung Jawab Kontraktor)',
+                            style: TextStyle(fontSize: 12),
+                          ),
                         ),
                       ],
                       onChanged: (val) {
@@ -2580,7 +3211,14 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         const SizedBox(height: 10),
         _buildAddButton(
           '+ Tambah Baris Cuaca / Hambatan',
-          () => _addCuacaRow(cuaca: '', jenisKejadian: '', jam: '', lokasi: '', tanggungJawab: 'Tidak', akibat: ''),
+          () => _addCuacaRow(
+            cuaca: '',
+            jenisKejadian: '',
+            jam: '',
+            lokasi: '',
+            tanggungJawab: 'Tidak',
+            akibat: '',
+          ),
         ),
       ],
     );
@@ -2594,7 +3232,12 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       children: [
         const Text(
           'Instruksi dan Saran - Saran',
-          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF374151), letterSpacing: 0.3),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF374151),
+            letterSpacing: 0.3,
+          ),
         ),
         const SizedBox(height: 6),
         CleanTextFormField(
@@ -2636,16 +3279,26 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   decoration: const BoxDecoration(
                     color: Color(0xFFF9FAFB),
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
-                    border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(9),
+                    ),
+                    border: Border(
+                      bottom: BorderSide(color: Color(0xFFE5E7EB)),
+                    ),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.navySlate,
                           borderRadius: BorderRadius.circular(5),
@@ -2662,7 +3315,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                       const Spacer(),
                       if (_ttdPengawasList.length > 1)
                         IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Color(0xFFDC2626), size: 20),
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Color(0xFFDC2626),
+                            size: 20,
+                          ),
                           tooltip: 'Hapus Penandatangan #${idx + 1}',
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
@@ -2703,7 +3360,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               side: const BorderSide(color: AppColors.navySlate, width: 1.2),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
         ),
@@ -2725,27 +3384,39 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: _isDraggingPhoto ? const Color(0xFFEFF6FF) : const Color(0xFFF9FAFB),
+              color: _isDraggingPhoto
+                  ? const Color(0xFFEFF6FF)
+                  : const Color(0xFFF9FAFB),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: _isDraggingPhoto ? const Color(0xFF2563EB) : const Color(0xFFD1D5DB),
+                color: _isDraggingPhoto
+                    ? const Color(0xFF2563EB)
+                    : const Color(0xFFD1D5DB),
                 width: _isDraggingPhoto ? 2 : 1,
               ),
             ),
             child: Column(
               children: [
                 Icon(
-                  _isDraggingPhoto ? Icons.file_download_outlined : Icons.cloud_upload_outlined,
+                  _isDraggingPhoto
+                      ? Icons.file_download_outlined
+                      : Icons.cloud_upload_outlined,
                   size: 36,
-                  color: _isDraggingPhoto ? const Color(0xFF2563EB) : const Color(0xFF6B7280),
+                  color: _isDraggingPhoto
+                      ? const Color(0xFF2563EB)
+                      : const Color(0xFF6B7280),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _isDraggingPhoto ? 'Lepaskan file foto di sini...' : 'Tarik & lepas file foto ke sini',
+                  _isDraggingPhoto
+                      ? 'Lepaskan file foto di sini...'
+                      : 'Tarik & lepas file foto ke sini',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: _isDraggingPhoto ? const Color(0xFF1D4ED8) : const Color(0xFF374151),
+                    color: _isDraggingPhoto
+                        ? const Color(0xFF1D4ED8)
+                        : const Color(0xFF374151),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -2761,23 +3432,55 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                   children: [
                     ElevatedButton.icon(
                       onPressed: _ambilFotoKamera,
-                      icon: const Icon(Icons.camera_alt_outlined, size: 16, color: Colors.white),
-                      label: const Text('Ambil Kamera', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+                      icon: const Icon(
+                        Icons.camera_alt_outlined,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                      label: const Text(
+                        'Ambil Kamera',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1F2937),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
                         elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                     OutlinedButton.icon(
                       onPressed: _pilihFotoDariGaleri,
-                      icon: const Icon(Icons.photo_library_outlined, size: 16, color: Color(0xFF1F2937)),
-                      label: const Text('Pilih File / Galeri', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1F2937))),
+                      icon: const Icon(
+                        Icons.photo_library_outlined,
+                        size: 16,
+                        color: Color(0xFF1F2937),
+                      ),
+                      label: const Text(
+                        'Pilih File / Galeri',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1F2937),
+                        ),
+                      ),
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Color(0xFFD1D5DB)),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   ],
@@ -2830,7 +3533,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal mengambil foto kamera: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Gagal mengambil foto kamera: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -2856,7 +3562,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal memilih foto: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Gagal memilih foto: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -2879,7 +3588,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('$addedCount foto berhasil ditambahkan via drag and drop'),
+            content: Text(
+              '$addedCount foto berhasil ditambahkan via drag and drop',
+            ),
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 2),
           ),
@@ -2889,7 +3600,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
   }
 
   Widget _buildPhotoThumbnail(int idx, String fotoStr) {
-    final bool isBase64 = fotoStr.startsWith('data:image') || (!fotoStr.startsWith('Foto ') && fotoStr.length > 50);
+    final bool isBase64 =
+        fotoStr.startsWith('data:image') ||
+        (!fotoStr.startsWith('Foto ') && fotoStr.length > 50);
 
     return Stack(
       children: [
@@ -2909,13 +3622,21 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                 : Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.image_outlined, color: Color(0xFF4B5563), size: 28),
+                      const Icon(
+                        Icons.image_outlined,
+                        color: Color(0xFF4B5563),
+                        size: 28,
+                      ),
                       const SizedBox(height: 4),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: Text(
                           fotoStr,
-                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Color(0xFF1F2937)),
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1F2937),
+                          ),
                           textAlign: TextAlign.center,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -2936,7 +3657,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             ),
             child: Text(
               '#${idx + 1}',
-              style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ),
@@ -2963,7 +3688,12 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     );
   }
 
-  Widget _buildImageFromBase64(String b64, {BoxFit fit = BoxFit.cover, double? width, double? height}) {
+  Widget _buildImageFromBase64(
+    String b64, {
+    BoxFit fit = BoxFit.cover,
+    double? width,
+    double? height,
+  }) {
     try {
       String clean = b64;
       if (clean.contains(',')) {
@@ -2980,12 +3710,16 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         ),
       );
     } catch (_) {
-      return const Center(child: Icon(Icons.image_not_supported, color: Colors.grey));
+      return const Center(
+        child: Icon(Icons.image_not_supported, color: Colors.grey),
+      );
     }
   }
 
   void _showPhotoPreviewDialog(int idx, String fotoStr) {
-    final bool isBase64 = fotoStr.startsWith('data:image') || (!fotoStr.startsWith('Foto ') && fotoStr.length > 50);
+    final bool isBase64 =
+        fotoStr.startsWith('data:image') ||
+        (!fotoStr.startsWith('Foto ') && fotoStr.length > 50);
 
     showDialog(
       context: context,
@@ -3003,10 +3737,18 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                 children: [
                   Text(
                     'Foto Dokumentasi Lapangan #${idx + 1}',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white, size: 18),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                     onPressed: () => Navigator.pop(ctx),
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
@@ -3027,9 +3769,16 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.image, size: 60, color: Colors.blueGrey),
+                          const Icon(
+                            Icons.image,
+                            size: 60,
+                            color: Colors.blueGrey,
+                          ),
                           const SizedBox(height: 12),
-                          Text(fotoStr, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          Text(
+                            fotoStr,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
                         ],
                       ),
                     ),
@@ -3099,7 +3848,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                 setState(() {
                   _enableRekapitulasiAspal = val;
                   if (val) {
-                    if (_rekapPengirimanDtList.isEmpty) _addRekapPengirimanDtRow();
+                    if (_rekapPengirimanDtList.isEmpty)
+                      _addRekapPengirimanDtRow();
                   }
                 });
               },
@@ -3145,7 +3895,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                   controller: _jarakTempuhController,
                   label: 'Jarak Tempuh AMP ke Proyek (km)',
                   hintText: 'Contoh: 35.5',
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                 ),
               ],
             ),
@@ -3230,13 +3982,19 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                       const SizedBox(height: 2),
                       Text(
                         subtitle,
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF6B7280),
+                        ),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF3F4F6),
                     borderRadius: BorderRadius.circular(6),
@@ -3244,17 +4002,18 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                   ),
                   child: Text(
                     badge,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF4B5563)),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF4B5563),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
           const Divider(height: 1, color: Color(0xFFE5E7EB)),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: body,
-          ),
+          Padding(padding: const EdgeInsets.all(12), child: body),
         ],
       ),
     );
@@ -3278,7 +4037,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             },
             children: [
               // 1. IDENTITAS KENDARAAN (HANYA DIISI 1 KALI)
-              _buildSubSectionBadge('1. IDENTITAS KENDARAAN (DT)', Icons.local_shipping_outlined),
+              _buildSubSectionBadge(
+                '1. IDENTITAS KENDARAAN (DT)',
+                Icons.local_shipping_outlined,
+              ),
               const SizedBox(height: 8),
               _buildPlateInputField(
                 controller: m['nomorKendaraan']!,
@@ -3287,7 +4049,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
               const SizedBox(height: 14),
 
               // 2. DATA DI PABRIK (AMP)
-              _buildSubSectionBadge('2. DATA DI PABRIK (AMP)', Icons.factory_outlined),
+              _buildSubSectionBadge(
+                '2. DATA DI PABRIK (AMP)',
+                Icons.factory_outlined,
+              ),
               const SizedBox(height: 8),
               _buildTimePickerField(
                 controller: m['jamPergiAmp']!,
@@ -3310,7 +4075,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
               const SizedBox(height: 14),
 
               // 3. DATA DI LOKASI PROYEK (LAPANGAN)
-              _buildSubSectionBadge('3. DATA DI LOKASI PROYEK (LAPANGAN)', Icons.location_on_outlined),
+              _buildSubSectionBadge(
+                '3. DATA DI LOKASI PROYEK (LAPANGAN)',
+                Icons.location_on_outlined,
+              ),
               const SizedBox(height: 8),
               _buildTimePickerField(
                 controller: m['jamDatangLap']!,
@@ -3366,13 +4134,18 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
               const SizedBox(height: 14),
 
               // 4. DATA TONASE TIKET
-              _buildSubSectionBadge('4. DATA TONASE TIKET', Icons.receipt_long_outlined),
+              _buildSubSectionBadge(
+                '4. DATA TONASE TIKET',
+                Icons.receipt_long_outlined,
+              ),
               const SizedBox(height: 8),
               _buildField(
                 controller: m['tonaseTiket']!,
                 label: 'Tonase Tiket (Ton)',
                 hintText: 'Contoh: 8.5',
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
               ),
               const SizedBox(height: 10),
               _buildField(
@@ -3397,7 +4170,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
   // ─── 4. DOKUMEN DATA PERJALANAN DT (OTOMATIS) ───
   Widget _buildDataPerjalananDtSection() {
     final rows = _computeDataPerjalananRows();
-    final double totalTonase = rows.fold(0.0, (sum, r) => sum + (r['beratAc'] as double));
+    final double totalTonase = rows.fold(
+      0.0,
+      (sum, r) => sum + (r['beratAc'] as double),
+    );
 
     return Container(
       decoration: BoxDecoration(
@@ -3440,7 +4216,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                 ),
                 child: Text(
                   '${rows.length} Rit Terhitung',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF1F2937)),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1F2937),
+                  ),
                 ),
               ),
             ],
@@ -3462,9 +4242,22 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                   ),
                   child: Column(
                     children: [
-                      const Text('Total Rit', style: TextStyle(fontSize: 10.5, color: Color(0xFF6B7280))),
+                      const Text(
+                        'Total Rit',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text('${rows.length} Rit', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF111827))),
+                      Text(
+                        '${rows.length} Rit',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF111827),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -3480,9 +4273,22 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                   ),
                   child: Column(
                     children: [
-                      const Text('Total Berat AC', style: TextStyle(fontSize: 10.5, color: Color(0xFF6B7280))),
+                      const Text(
+                        'Total Berat AC',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text('${PlatNomorUtil.formatDecimal(totalTonase, fractionDigits: 2)} Ton', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF111827))),
+                      Text(
+                        '${PlatNomorUtil.formatDecimal(totalTonase, fractionDigits: 2)} Ton',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF111827),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -3529,7 +4335,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                         Expanded(
                           child: Text(
                             '#${idx + 1}  ${r['plate']} (Rit ${r['rit']})',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF111827)),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF111827),
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -3537,19 +4347,29 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                         const SizedBox(width: 8),
                         Text(
                           '${PlatNomorUtil.formatDecimal(r['beratAc'] as double, fractionDigits: 2)} Ton',
-                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF4B5563)),
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF4B5563),
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
                     Text(
                       'AMP ${r['jamDariAmp']} ➔ Lap. ${r['jamTibaLokasi']} (${PlatNomorUtil.formatDecimal(r['waktuBerangkatJam'] as double, fractionDigits: 2)} Jam • ${PlatNomorUtil.formatDecimal(r['kecepatanBerangkat'] as double, fractionDigits: 1)} km/jam)',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF374151)),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF374151),
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Suhu: ${PlatNomorUtil.formatDecimal(r['suhuAmp'] as double, fractionDigits: 0)}°C ➔ ${PlatNomorUtil.formatDecimal(r['suhuLokasi'] as double, fractionDigits: 0)}°C (Turun: ${PlatNomorUtil.formatDecimal(r['selisihSuhu'] as double, fractionDigits: 0)}°C)',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF4B5563)),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF4B5563),
+                      ),
                     ),
                   ],
                 ),
@@ -3561,33 +4381,59 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
   }
 
   List<Map<String, dynamic>> _computeDataPerjalananRows() {
-    final double jarakKm = double.tryParse(_jarakTempuhController.text.replaceAll(',', '.')) ?? 35.5;
+    final double jarakKm =
+        double.tryParse(_jarakTempuhController.text.replaceAll(',', '.')) ??
+        35.5;
 
-    final List<Map<String, String>> lapanganList = _rekapPengirimanDtList.map((m) => {
-      'nomorKendaraan': m['nomorKendaraan']?.text.trim() ?? '',
-      'jamDatang': PlatNomorUtil.normalizeTime(m['jamDatangLap']?.text.trim() ?? ''),
-      'suhuDatang': m['suhuDatang']?.text.trim() ?? '',
-      'waktuAntrian': m['waktuAntrian']?.text.trim() ?? '',
-      'suhu': m['suhuLap']?.text.trim() ?? '',
-      'suhuLap': m['suhuLap']?.text.trim() ?? '',
-      'jamMulaiTuang': PlatNomorUtil.normalizeTime(m['jamMulaiTuang']?.text.trim() ?? ''),
-      'jamSelesaiTuang': PlatNomorUtil.normalizeTime(m['jamSelesaiTuang']?.text.trim() ?? ''),
-      'suhuPemadatanAkhir': m['suhuPemadatanAkhir']?.text.trim() ?? '',
-      'jamPulang': PlatNomorUtil.normalizeTime(m['jamPulangLap']?.text.trim() ?? ''),
-    }).toList();
+    final List<Map<String, String>> lapanganList = _rekapPengirimanDtList
+        .map(
+          (m) => {
+            'nomorKendaraan': m['nomorKendaraan']?.text.trim() ?? '',
+            'jamDatang': PlatNomorUtil.normalizeTime(
+              m['jamDatangLap']?.text.trim() ?? '',
+            ),
+            'suhuDatang': m['suhuDatang']?.text.trim() ?? '',
+            'waktuAntrian': m['waktuAntrian']?.text.trim() ?? '',
+            'suhu': m['suhuLap']?.text.trim() ?? '',
+            'suhuLap': m['suhuLap']?.text.trim() ?? '',
+            'jamMulaiTuang': PlatNomorUtil.normalizeTime(
+              m['jamMulaiTuang']?.text.trim() ?? '',
+            ),
+            'jamSelesaiTuang': PlatNomorUtil.normalizeTime(
+              m['jamSelesaiTuang']?.text.trim() ?? '',
+            ),
+            'suhuPemadatanAkhir': m['suhuPemadatanAkhir']?.text.trim() ?? '',
+            'jamPulang': PlatNomorUtil.normalizeTime(
+              m['jamPulangLap']?.text.trim() ?? '',
+            ),
+          },
+        )
+        .toList();
 
-    final List<Map<String, String>> ampList = _rekapPengirimanDtList.map((m) => {
-      'nomorKendaraan': m['nomorKendaraan']?.text.trim() ?? '',
-      'jamPergi': PlatNomorUtil.normalizeTime(m['jamPergiAmp']?.text.trim() ?? ''),
-      'suhuAmp': m['suhuAmp']?.text.trim() ?? '',
-      'jamPulang': PlatNomorUtil.normalizeTime(m['jamPulangAmp']?.text.trim() ?? ''),
-    }).toList();
+    final List<Map<String, String>> ampList = _rekapPengirimanDtList
+        .map(
+          (m) => {
+            'nomorKendaraan': m['nomorKendaraan']?.text.trim() ?? '',
+            'jamPergi': PlatNomorUtil.normalizeTime(
+              m['jamPergiAmp']?.text.trim() ?? '',
+            ),
+            'suhuAmp': m['suhuAmp']?.text.trim() ?? '',
+            'jamPulang': PlatNomorUtil.normalizeTime(
+              m['jamPulangAmp']?.text.trim() ?? '',
+            ),
+          },
+        )
+        .toList();
 
-    final List<Map<String, String>> tonaseList = _rekapPengirimanDtList.map((m) => {
-      'nomorKendaraan': m['nomorKendaraan']?.text.trim() ?? '',
-      'tonaseTiket': m['tonaseTiket']?.text.trim() ?? '',
-      'jumlahKumulatif': m['jumlahKumulatif']?.text.trim() ?? '',
-    }).toList();
+    final List<Map<String, String>> tonaseList = _rekapPengirimanDtList
+        .map(
+          (m) => {
+            'nomorKendaraan': m['nomorKendaraan']?.text.trim() ?? '',
+            'tonaseTiket': m['tonaseTiket']?.text.trim() ?? '',
+            'jumlahKumulatif': m['jumlahKumulatif']?.text.trim() ?? '',
+          },
+        )
+        .toList();
 
     return PlatNomorUtil.computeDataPerjalananRows(
       lapanganList: lapanganList,
@@ -3601,7 +4447,12 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
   Widget _buildSectionRekapitulasiBetonOpsional() {
     final double totalKubikasi = _rekapPengecoranBetonList.fold(
       0.0,
-      (sum, r) => sum + (double.tryParse((r['volume']?.text.trim() ?? '').replaceAll(',', '.')) ?? 0.0),
+      (sum, r) =>
+          sum +
+          (double.tryParse(
+                (r['volume']?.text.trim() ?? '').replaceAll(',', '.'),
+              ) ??
+              0.0),
     );
     final String formattedTotal = totalKubikasi % 1 == 0
         ? totalKubikasi.toInt().toString()
@@ -3644,8 +4495,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                   if (val && _rekapPengecoranBetonList.isEmpty) {
                     _addRekapPengecoranBetonRow();
                   }
-                  if (val && _penyediaJasaBetonController.text.isEmpty && _currentKegiatan?['kontraktor'] != null) {
-                    _penyediaJasaBetonController.text = _currentKegiatan!['kontraktor'].toString();
+                  if (val &&
+                      _penyediaJasaBetonController.text.isEmpty &&
+                      _currentKegiatan?['kontraktor'] != null) {
+                    _penyediaJasaBetonController.text =
+                        _currentKegiatan!['kontraktor'].toString();
                   }
                 });
               },
@@ -3704,11 +4558,18 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             children: [
               Text(
                 'Data Pengiriman Truck Mixer (${_rekapPengecoranBetonList.length} Unit)',
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF1F2937)),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: Color(0xFF1F2937),
+                ),
               ),
               if (totalKubikasi > 0)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.slateLighter,
                     borderRadius: BorderRadius.circular(6),
@@ -3716,7 +4577,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                   ),
                   child: Text(
                     'Total: $formattedTotal m³',
-                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppColors.navySlate),
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.navySlate,
+                    ),
                   ),
                 ),
             ],
@@ -3775,7 +4640,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                         controller: m['volume']!,
                         label: 'Volume Cor (m³ / Kubik)',
                         hintText: 'Contoh: 6.0',
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -3856,10 +4723,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             );
           }),
         const SizedBox(height: 10),
-        _buildAddButton(
-          '+ Tambah Field Kustom',
-          () => _addCustomFieldRow(),
-        ),
+        _buildAddButton('+ Tambah Field Kustom', () => _addCustomFieldRow()),
       ],
     );
   }
@@ -3902,7 +4766,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
               ),
               if (badge != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF3F4F6),
                     borderRadius: BorderRadius.circular(6),
@@ -3999,7 +4866,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               child: Text(
                 suffixText,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.slate),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.slate,
+                ),
               ),
             )
           : null,
@@ -4040,7 +4911,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             ),
           const SizedBox(width: 4),
           IconButton(
-            icon: const Icon(Icons.access_time_rounded, size: 20, color: Color(0xFF1E3A8A)),
+            icon: const Icon(
+              Icons.access_time_rounded,
+              size: 20,
+              color: Color(0xFF1E3A8A),
+            ),
             padding: const EdgeInsets.only(right: 8),
             constraints: const BoxConstraints(),
             tooltip: 'Buka Pemilih Waktu',
@@ -4072,7 +4947,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       initialDuration = Duration(hours: h, minutes: m, seconds: s);
     } else {
       final now = DateTime.now();
-      initialDuration = Duration(hours: now.hour, minutes: now.minute, seconds: 0);
+      initialDuration = Duration(
+        hours: now.hour,
+        minutes: now.minute,
+        seconds: 0,
+      );
     }
 
     Duration selectedDuration = initialDuration;
@@ -4091,7 +4970,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
               children: [
                 // Header Bar dengan tombol Batal, Judul, dan Selesai
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -4099,7 +4981,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                         onPressed: () => Navigator.pop(sheetContext),
                         child: const Text(
                           'Batal',
-                          style: TextStyle(color: Color(0xFF6B7280), fontSize: 14),
+                          style: TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                       Expanded(
@@ -4117,9 +5002,16 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                       ),
                       TextButton(
                         onPressed: () {
-                          final h = selectedDuration.inHours.toString().padLeft(2, '0');
-                          final m = (selectedDuration.inMinutes % 60).toString().padLeft(2, '0');
-                          final s = (selectedDuration.inSeconds % 60).toString().padLeft(2, '0');
+                          final h = selectedDuration.inHours.toString().padLeft(
+                            2,
+                            '0',
+                          );
+                          final m = (selectedDuration.inMinutes % 60)
+                              .toString()
+                              .padLeft(2, '0');
+                          final s = (selectedDuration.inSeconds % 60)
+                              .toString()
+                              .padLeft(2, '0');
                           controller.text = '$h:$m:$s';
                           setState(() {});
                           Navigator.pop(sheetContext);
@@ -4170,10 +5062,18 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                       setState(() {});
                       Navigator.pop(sheetContext);
                     },
-                    icon: const Icon(Icons.clear, size: 16, color: Color(0xFFEF4444)),
+                    icon: const Icon(
+                      Icons.clear,
+                      size: 16,
+                      color: Color(0xFFEF4444),
+                    ),
                     label: const Text(
                       'Kosongkan Waktu',
-                      style: TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        color: Color(0xFFEF4444),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -4196,13 +5096,13 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             width: 110,
             child: Text(
               label,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF6B7280),
-              ),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
             ),
           ),
-          const Text(': ', style: TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+          const Text(
+            ': ',
+            style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+          ),
           Expanded(
             child: Text(
               value,
