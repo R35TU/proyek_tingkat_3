@@ -50,8 +50,26 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
   bool _isModified = false;
 
   static const List<String> _romanNumerals = [
-    'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X',
-    'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX'
+    'I',
+    'II',
+    'III',
+    'IV',
+    'V',
+    'VI',
+    'VII',
+    'VIII',
+    'IX',
+    'X',
+    'XI',
+    'XII',
+    'XIII',
+    'XIV',
+    'XV',
+    'XVI',
+    'XVII',
+    'XVIII',
+    'XIX',
+    'XX',
   ];
 
   static String toRoman(int number) {
@@ -64,15 +82,60 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
   /// Preset divisi standar PU / Bina Marga
   static const List<Map<String, String>> _standardDivisions = [
     {'nomor': '1', 'romawi': 'I', 'nama': 'DIVISI I. UMUM', 'short': 'UMUM'},
-    {'nomor': '2', 'romawi': 'II', 'nama': 'DIVISI 2. DRAINASE', 'short': 'DRAINASE'},
-    {'nomor': '3', 'romawi': 'III', 'nama': 'DIVISI 3. PEKERJAAN TANAH & GEOSINTETIK', 'short': 'PEKERJAAN TANAH'},
-    {'nomor': '4', 'romawi': 'IV', 'nama': 'DIVISI 4. PEKERJAAN PREVENTIF', 'short': 'PREVENTIF'},
-    {'nomor': '5', 'romawi': 'V', 'nama': 'DIVISI 5. PERKERASAN BERBUTIR', 'short': 'PERKERASAN BERBUTIR'},
-    {'nomor': '6', 'romawi': 'VI', 'nama': 'DIVISI 6. PERKERASAN ASPAL', 'short': 'PERKERASAN ASPAL'},
-    {'nomor': '7', 'romawi': 'VII', 'nama': 'DIVISI 7 STRUKTUR', 'short': 'STRUKTUR'},
-    {'nomor': '8', 'romawi': 'VIII', 'nama': 'DIVISI 8. REHABILITASI JEMBATAN', 'short': 'REHAB. JEMBATAN'},
-    {'nomor': '9', 'romawi': 'IX', 'nama': 'DIVISI 9. PEKERJAAN HARIAN & LAIN-LAIN', 'short': 'PEKERJAAN HARIAN'},
-    {'nomor': '10', 'romawi': 'X', 'nama': 'DIVISI 10. PEMELIHARAAN KINERJA', 'short': 'PEMELIHARAAN KINERJA'},
+    {
+      'nomor': '2',
+      'romawi': 'II',
+      'nama': 'DIVISI 2. DRAINASE',
+      'short': 'DRAINASE',
+    },
+    {
+      'nomor': '3',
+      'romawi': 'III',
+      'nama': 'DIVISI 3. PEKERJAAN TANAH & GEOSINTETIK',
+      'short': 'PEKERJAAN TANAH',
+    },
+    {
+      'nomor': '4',
+      'romawi': 'IV',
+      'nama': 'DIVISI 4. PEKERJAAN PREVENTIF',
+      'short': 'PREVENTIF',
+    },
+    {
+      'nomor': '5',
+      'romawi': 'V',
+      'nama': 'DIVISI 5. PERKERASAN BERBUTIR',
+      'short': 'PERKERASAN BERBUTIR',
+    },
+    {
+      'nomor': '6',
+      'romawi': 'VI',
+      'nama': 'DIVISI 6. PERKERASAN ASPAL',
+      'short': 'PERKERASAN ASPAL',
+    },
+    {
+      'nomor': '7',
+      'romawi': 'VII',
+      'nama': 'DIVISI 7 STRUKTUR',
+      'short': 'STRUKTUR',
+    },
+    {
+      'nomor': '8',
+      'romawi': 'VIII',
+      'nama': 'DIVISI 8. REHABILITASI JEMBATAN',
+      'short': 'REHAB. JEMBATAN',
+    },
+    {
+      'nomor': '9',
+      'romawi': 'IX',
+      'nama': 'DIVISI 9. PEKERJAAN HARIAN & LAIN-LAIN',
+      'short': 'PEKERJAAN HARIAN',
+    },
+    {
+      'nomor': '10',
+      'romawi': 'X',
+      'nama': 'DIVISI 10. PEMELIHARAAN KINERJA',
+      'short': 'PEMELIHARAAN KINERJA',
+    },
   ];
 
   @override
@@ -85,16 +148,20 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
     final keg = widget.contract.kegiatans[widget.kegiatanIndex];
     _namaKegiatan = keg['namaKegiatan'] ?? widget.contract.namaKontrak;
 
-    final kegNilaiStr = keg['nilaiKontrak']?.toString() ?? widget.contract.nilaiKontrak;
+    final kegNilaiStr =
+        keg['nilaiKontrak']?.toString() ?? widget.contract.nilaiKontrak;
     _nilaiKontrakKegiatan = RupiahUtil.parseToDouble(kegNilaiStr);
 
-    final rawRkk = (keg['rkkKontrakAwal'] != null && (keg['rkkKontrakAwal'] as List).isNotEmpty)
+    final rawRkk =
+        (keg['rkkKontrakAwal'] != null &&
+            (keg['rkkKontrakAwal'] as List).isNotEmpty)
         ? keg['rkkKontrakAwal']
         : keg['rkkDivisiList'];
     if (rawRkk != null && (rawRkk as List).isNotEmpty) {
       _rkkDivisiList = (rawRkk as List).map((entry) {
         final dMap = Map<String, dynamic>.from(entry);
-        if (dMap['nomorRomawi'] == null || dMap['nomorRomawi'].toString().trim().isEmpty) {
+        if (dMap['nomorRomawi'] == null ||
+            dMap['nomorRomawi'].toString().trim().isEmpty) {
           dMap['nomorRomawi'] = 'I';
         }
         final items = (dMap['items'] as List? ?? []).map((it) {
@@ -142,7 +209,8 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
           total += th;
         } else {
           final hs = (item['hargaSatuan'] as num?)?.toDouble() ?? 0.0;
-          final vol = (item['volume'] ?? item['volumeCCO'] as num?)?.toDouble() ?? 0.0;
+          final vol =
+              (item['volume'] ?? item['volumeCCO'] as num?)?.toDouble() ?? 0.0;
           total += (hs * vol);
         }
       }
@@ -179,7 +247,8 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
         total += th;
       } else {
         final hs = (item['hargaSatuan'] as num?)?.toDouble() ?? 0.0;
-        final vol = (item['volume'] ?? item['volumeCCO'] as num?)?.toDouble() ?? 0.0;
+        final vol =
+            (item['volume'] ?? item['volumeCCO'] as num?)?.toDouble() ?? 0.0;
         total += (hs * vol);
       }
     }
@@ -198,7 +267,9 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
 
   void _recalculateAllBobot({bool notify = true}) {
     final totalRkk = _totalHargaRkk;
-    final divisor = totalRkk > 0 ? totalRkk : (_nilaiKontrakKegiatan > 0 ? _nilaiKontrakKegiatan : 0.0);
+    final divisor = totalRkk > 0
+        ? totalRkk
+        : (_nilaiKontrakKegiatan > 0 ? _nilaiKontrakKegiatan : 0.0);
 
     if (divisor > 0) {
       for (final div in _rkkDivisiList) {
@@ -207,7 +278,9 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
           final itemTotal = (item['totalHarga'] as num?)?.toDouble() ?? 0.0;
           if (itemTotal > 0) {
             final calculatedBobot = (itemTotal / divisor) * 100.0;
-            item['nilaiBobot'] = double.parse(calculatedBobot.toStringAsFixed(3));
+            item['nilaiBobot'] = double.parse(
+              calculatedBobot.toStringAsFixed(3),
+            );
           } else {
             item['nilaiBobot'] = 0.0;
           }
@@ -221,10 +294,14 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Seluruh nilai bobot berhasil dihitung ulang otomatis (Total: 100.000%).'),
+          content: const Text(
+            'Seluruh nilai bobot berhasil dihitung ulang otomatis (Total: 100.000%).',
+          ),
           backgroundColor: const Color(0xFF0F172A),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     }
@@ -252,7 +329,7 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
 
   void _saveRkk() {
     final keg = widget.contract.kegiatans[widget.kegiatanIndex];
-    
+
     // 1. Simpan selalu ke rkkKontrakAwal sebagai Master Baseline
     keg['rkkKontrakAwal'] = _rkkDivisiList;
 
@@ -299,7 +376,11 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
+            const Icon(
+              Icons.check_circle_outline,
+              color: Colors.white,
+              size: 20,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -320,11 +401,16 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
 
   /// Menyelaraskan seluruh Addendum (CCO) yang telah dibuat dengan baseline Kontrak Awal yang baru diedit,
   /// tanpa menghapus Addendum atau volume perubahan lapangan yang sudah tercatat pada Addendum.
-  void _syncAddendumsWithNewBaseline(Map<String, dynamic> keg, List<Map<String, dynamic>> newBaseline) {
+  void _syncAddendumsWithNewBaseline(
+    Map<String, dynamic> keg,
+    List<Map<String, dynamic>> newBaseline,
+  ) {
     final rawAdds = keg['addendums'] as List?;
     if (rawAdds == null || rawAdds.isEmpty) return;
 
-    final adds = rawAdds.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final adds = rawAdds
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
     List<Map<String, dynamic>> currentBase = newBaseline;
 
     for (int addIdx = 0; addIdx < adds.length; addIdx++) {
@@ -341,7 +427,10 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
           final itMap = Map<String, dynamic>.from(it as Map);
           final id = (itMap['id'] ?? '').toString().trim();
           final noMata = (itMap['noMataPembayaran'] ?? '').toString().trim();
-          final uraian = (itMap['uraian'] ?? '').toString().trim().toLowerCase();
+          final uraian = (itMap['uraian'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase();
           if (id.isNotEmpty) oldAddItems['id:$id'] = itMap;
           if (noMata.isNotEmpty) oldAddItems['no:$noMata'] = itMap;
           if (uraian.isNotEmpty) oldAddItems['u:$uraian'] = itMap;
@@ -365,7 +454,8 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
           final bNo = (bMap['noMataPembayaran'] ?? '').toString().trim();
           final bUr = (bMap['uraian'] ?? '').toString().trim().toLowerCase();
           final bHarga = (bMap['hargaSatuan'] as num?)?.toDouble() ?? 0.0;
-          final bVol = (bMap['volume'] ?? bMap['volumeCCO'] as num?)?.toDouble() ?? 0.0;
+          final bVol =
+              (bMap['volume'] ?? bMap['volumeCCO'] as num?)?.toDouble() ?? 0.0;
 
           // Temukan apakah item ini memiliki catatan penyesuaian di addendum sebelumnya
           Map<String, dynamic>? match;
@@ -379,7 +469,9 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
 
           double finalVol = bVol;
           if (match != null) {
-            final oldVol = (match['volume'] ?? match['volumeCCO'] as num?)?.toDouble() ?? 0.0;
+            final oldVol =
+                (match['volume'] ?? match['volumeCCO'] as num?)?.toDouble() ??
+                0.0;
             // Pertahankan volume CCO yang sudah ditetapkan di addendum
             finalVol = oldVol;
           }
@@ -433,7 +525,9 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
 
           if (!existsInBase) {
             final targetDivIdx = syncedDivList.indexWhere(
-              (d) => d['nomorRomawi'].toString().trim().toUpperCase() == oldDivNomor.toString().trim().toUpperCase(),
+              (d) =>
+                  d['nomorRomawi'].toString().trim().toUpperCase() ==
+                  oldDivNomor.toString().trim().toUpperCase(),
             );
             if (targetDivIdx == -1) {
               syncedDivList.add({
@@ -444,7 +538,8 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
             } else {
               (syncedDivList[targetDivIdx]['items'] as List).add(itMap);
             }
-            addendumGrandTotal += (itMap['totalHarga'] as num?)?.toDouble() ?? 0.0;
+            addendumGrandTotal +=
+                (itMap['totalHarga'] as num?)?.toDouble() ?? 0.0;
           }
         }
       }
@@ -485,10 +580,13 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
   void _showAddEditDivisiSheet({int? index}) {
     final isEdit = index != null;
     String currentRoman = isEdit
-        ? (_rkkDivisiList[index]['nomorRomawi']?.toString().toUpperCase() ?? 'I')
+        ? (_rkkDivisiList[index]['nomorRomawi']?.toString().toUpperCase() ??
+              'I')
         : toRoman(_rkkDivisiList.length + 1);
 
-    final existingFullName = isEdit ? (_rkkDivisiList[index]['namaDivisi']?.toString() ?? '') : '';
+    final existingFullName = isEdit
+        ? (_rkkDivisiList[index]['namaDivisi']?.toString() ?? '')
+        : '';
 
     final romawiCtrl = TextEditingController(text: currentRoman);
     final namaDivisiCtrl = TextEditingController(text: existingFullName);
@@ -530,7 +628,10 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF0F172A),
                         borderRadius: BorderRadius.circular(8),
@@ -548,7 +649,9 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        isEdit ? 'Ubah Divisi Pekerjaan' : 'Tambah Divisi Pekerjaan',
+                        isEdit
+                            ? 'Ubah Divisi Pekerjaan'
+                            : 'Tambah Divisi Pekerjaan',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -561,14 +664,22 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                 const SizedBox(height: 6),
                 const Text(
                   'Urutan divisi dapat melompat sesuai dengan jenis pekerjaan proyek Anda. Pilih preset standar PU atau edit langsung di bawah.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.35),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF64748B),
+                    height: 1.35,
+                  ),
                 ),
                 const SizedBox(height: 18),
 
                 // Pilihan Cepat Standar PU / Bina Marga (Scrollable & Responsive)
                 const Text(
                   'Pilihan Cepat Standar Bina Marga (PU):',
-                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF334155),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 SingleChildScrollView(
@@ -579,7 +690,8 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                       final pNom = preset['nomor']!;
                       final pNam = preset['nama']!;
                       final pShort = preset['short']!;
-                      final isSelected = romawiCtrl.text.trim().toUpperCase() == pRom;
+                      final isSelected =
+                          romawiCtrl.text.trim().toUpperCase() == pRom;
 
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
@@ -593,12 +705,19 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                           },
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 7,
+                            ),
                             decoration: BoxDecoration(
-                              color: isSelected ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                              color: isSelected
+                                  ? const Color(0xFF0F172A)
+                                  : const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: isSelected ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0),
+                                color: isSelected
+                                    ? const Color(0xFF0F172A)
+                                    : const Color(0xFFE2E8F0),
                               ),
                             ),
                             child: Column(
@@ -609,8 +728,12 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                                   'Divisi $pNom ($pRom)',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                                    color: isSelected ? Colors.white : const Color(0xFF334155),
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.w600,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : const Color(0xFF334155),
                                   ),
                                 ),
                                 const SizedBox(height: 1),
@@ -619,7 +742,9 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                                   style: TextStyle(
                                     fontSize: 9.5,
                                     fontWeight: FontWeight.w500,
-                                    color: isSelected ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                    color: isSelected
+                                        ? const Color(0xFF94A3B8)
+                                        : const Color(0xFF64748B),
                                   ),
                                 ),
                               ],
@@ -670,10 +795,15 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                           foregroundColor: const Color(0xFF64748B),
                           side: const BorderSide(color: Color(0xFFCBD5E1)),
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         onPressed: () => Navigator.pop(ctx),
-                        child: const Text('Batal', style: TextStyle(fontWeight: FontWeight.w600)),
+                        child: const Text(
+                          'Batal',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -685,25 +815,31 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         onPressed: () {
                           final rawName = namaDivisiCtrl.text.trim();
                           if (rawName.isEmpty) return;
 
-                          final rom = romawiCtrl.text.trim().toUpperCase().isNotEmpty
+                          final rom =
+                              romawiCtrl.text.trim().toUpperCase().isNotEmpty
                               ? romawiCtrl.text.trim().toUpperCase()
                               : currentRoman;
 
                           String formattedTitle = rawName;
-                          if (!formattedTitle.toUpperCase().startsWith('DIVISI')) {
+                          if (!formattedTitle.toUpperCase().startsWith(
+                            'DIVISI',
+                          )) {
                             formattedTitle = 'DIVISI $rom. $rawName';
                           }
 
                           setState(() {
                             if (isEdit) {
                               _rkkDivisiList[index]['nomorRomawi'] = rom;
-                              _rkkDivisiList[index]['namaDivisi'] = formattedTitle;
+                              _rkkDivisiList[index]['namaDivisi'] =
+                                  formattedTitle;
                             } else {
                               _rkkDivisiList.add({
                                 'nomorRomawi': rom,
@@ -716,7 +852,9 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                           Navigator.pop(ctx);
                         },
                         child: Text(
-                          isEdit ? 'Simpan Perubahan' : 'Tambahkan Divisi $currentRoman',
+                          isEdit
+                              ? 'Simpan Perubahan'
+                              : 'Tambahkan Divisi $currentRoman',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -736,7 +874,8 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
   // ─────────────────────────────────────────────────────────────────────────
   void _showAddEditItemSheet(int divIndex, {int? itemIndex}) {
     final isEdit = itemIndex != null;
-    final items = _rkkDivisiList[divIndex]['items'] as List<Map<String, dynamic>>;
+    final items =
+        _rkkDivisiList[divIndex]['items'] as List<Map<String, dynamic>>;
     final existing = isEdit ? items[itemIndex] : null;
 
     final noMataPembayaranCtrl = TextEditingController(
@@ -750,21 +889,37 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
     );
 
     // Initial Volume
-    final initialVol = (existing?['volume'] ?? existing?['volumeCCO'] as num?)?.toDouble() ?? 0.0;
+    final initialVol =
+        (existing?['volume'] ?? existing?['volumeCCO'] as num?)?.toDouble() ??
+        0.0;
     final volumeCtrl = TextEditingController(
-      text: initialVol > 0 ? (initialVol == initialVol.toInt() ? initialVol.toInt().toString() : initialVol.toString()) : '',
+      text: initialVol > 0
+          ? (initialVol == initialVol.toInt()
+                ? initialVol.toInt().toString()
+                : initialVol.toString())
+          : '',
     );
 
     // Initial Harga Satuan (format titik ribuan)
     final initialHs = (existing?['hargaSatuan'] as num?)?.toDouble() ?? 0.0;
     final hargaSatuanCtrl = TextEditingController(
-      text: initialHs > 0 ? (initialHs == initialHs.toInt() ? RupiahUtil.formatNumber(initialHs) : formatRupiah(initialHs).replaceFirst('Rp ', '')) : '',
+      text: initialHs > 0
+          ? (initialHs == initialHs.toInt()
+                ? RupiahUtil.formatNumber(initialHs)
+                : formatRupiah(initialHs).replaceFirst('Rp ', ''))
+          : '',
     );
 
     // Initial Total Harga
-    final initialTotal = (existing?['totalHarga'] as num?)?.toDouble() ?? (initialHs * initialVol);
+    final initialTotal =
+        (existing?['totalHarga'] as num?)?.toDouble() ??
+        (initialHs * initialVol);
     final totalHargaCtrl = TextEditingController(
-      text: initialTotal > 0 ? (initialTotal == initialTotal.toInt() ? initialTotal.toInt().toString() : initialTotal.toStringAsFixed(2)) : '',
+      text: initialTotal > 0
+          ? (initialTotal == initialTotal.toInt()
+                ? initialTotal.toInt().toString()
+                : initialTotal.toStringAsFixed(2))
+          : '',
     );
 
     // Initial Bobot
@@ -792,12 +947,16 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
 
             if (!isCustomOverride) {
               if (tot > 0) {
-                totalHargaCtrl.text = tot == tot.toInt() ? tot.toInt().toString() : tot.toStringAsFixed(2);
+                totalHargaCtrl.text = tot == tot.toInt()
+                    ? tot.toInt().toString()
+                    : tot.toStringAsFixed(2);
               } else if (vol == 0.0) {
                 totalHargaCtrl.text = '0';
               }
 
-              final refTotal = _totalHargaRkk > 0 ? _totalHargaRkk : _nilaiKontrakKegiatan;
+              final refTotal = _totalHargaRkk > 0
+                  ? _totalHargaRkk
+                  : _nilaiKontrakKegiatan;
               if (refTotal > 0 && tot > 0) {
                 final bbt = (tot / refTotal) * 100.0;
                 bobotCtrl.text = bbt.toStringAsFixed(3);
@@ -811,7 +970,8 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
           final liveVol = parseNumberInput(volumeCtrl.text);
           final liveTotal = parseNumberInput(totalHargaCtrl.text);
           final effectiveTotal = liveTotal > 0 ? liveTotal : (liveHs * liveVol);
-          final liveBobot = double.tryParse(bobotCtrl.text.replaceAll(',', '.')) ?? 0.0;
+          final liveBobot =
+              double.tryParse(bobotCtrl.text.replaceAll(',', '.')) ?? 0.0;
 
           return Padding(
             padding: EdgeInsets.only(
@@ -847,7 +1007,11 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                           color: AppColors.primaryBlue.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.assignment_outlined, color: AppColors.primaryBlue, size: 20),
+                        child: const Icon(
+                          Icons.assignment_outlined,
+                          color: AppColors.primaryBlue,
+                          size: 20,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -855,7 +1019,9 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              isEdit ? 'Ubah Item Pekerjaan (RAB)' : 'Tambah Item Pekerjaan (RAB)',
+                              isEdit
+                                  ? 'Ubah Item Pekerjaan (RAB)'
+                                  : 'Tambah Item Pekerjaan (RAB)',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -864,7 +1030,10 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                             ),
                             Text(
                               _rkkDivisiList[divIndex]['namaDivisi'] ?? '',
-                              style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: Color(0xFF64748B),
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -877,14 +1046,22 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
 
                   // ─── BAGIAN 1: IDENTITAS MATA PEMBAYARAN ───
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Text(
                       '1. IDENTITAS MATA PEMBAYARAN',
-                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF475569), letterSpacing: 0.5),
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF475569),
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -908,14 +1085,22 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
 
                   // ─── BAGIAN 2: KUANTITAS & HARGA SATUAN ───
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Text(
                       '2. KUANTITAS & HARGA SATUAN',
-                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF475569), letterSpacing: 0.5),
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF475569),
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -930,7 +1115,9 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                           controller: volumeCtrl,
                           label: 'Volume Pekerjaan *',
                           hintText: 'Misal: 118.79 (0 jika taksiran)',
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           onChanged: (_) {
                             setSheetState(() {
                               recomputeFields();
@@ -960,15 +1147,29 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                         return Padding(
                           padding: const EdgeInsets.only(right: 6),
                           child: ActionChip(
-                            label: Text(s, style: const TextStyle(fontSize: 11)),
-                            backgroundColor: isSel ? AppColors.blueLight : const Color(0xFFF8FAFC),
+                            label: Text(
+                              s,
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            backgroundColor: isSel
+                                ? AppColors.blueLight
+                                : const Color(0xFFF8FAFC),
                             labelStyle: TextStyle(
-                              color: isSel ? AppColors.primaryBlue : const Color(0xFF475569),
-                              fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                              color: isSel
+                                  ? AppColors.primaryBlue
+                                  : const Color(0xFF475569),
+                              fontWeight: isSel
+                                  ? FontWeight.bold
+                                  : FontWeight.w500,
                             ),
                             padding: EdgeInsets.zero,
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            side: BorderSide(color: isSel ? AppColors.primaryBlue : const Color(0xFFE2E8F0)),
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            side: BorderSide(
+                              color: isSel
+                                  ? AppColors.primaryBlue
+                                  : const Color(0xFFE2E8F0),
+                            ),
                             onPressed: () {
                               setSheetState(() {
                                 satuanCtrl.text = s;
@@ -986,7 +1187,9 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                     controller: hargaSatuanCtrl,
                     label: 'Harga Satuan (Rp) *',
                     hintText: 'Misal: 25958 atau 2139059.32',
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     onChanged: (_) {
                       setSheetState(() {
                         recomputeFields();
@@ -1018,7 +1221,11 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                           children: [
                             const Row(
                               children: [
-                                Icon(Icons.calculate_outlined, size: 16, color: Color(0xFF0F172A)),
+                                Icon(
+                                  Icons.calculate_outlined,
+                                  size: 16,
+                                  color: Color(0xFF0F172A),
+                                ),
                                 SizedBox(width: 6),
                                 Text(
                                   'HASIL KALKULASI OTOMATIS',
@@ -1032,15 +1239,24 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                               ],
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2.5,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFECFDF5),
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFFA7F3D0)),
+                                border: Border.all(
+                                  color: const Color(0xFFA7F3D0),
+                                ),
                               ),
                               child: const Text(
                                 'Otomatis',
-                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF059669),
+                                ),
                               ),
                             ),
                           ],
@@ -1054,10 +1270,19 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('TOTAL HARGA (RP)', style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                                  const Text(
+                                    'TOTAL HARGA (RP)',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: Color(0xFF64748B),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    effectiveTotal > 0 ? formatRupiah(effectiveTotal) : '-',
+                                    effectiveTotal > 0
+                                        ? formatRupiah(effectiveTotal)
+                                        : '-',
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w900,
@@ -1067,16 +1292,31 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                                 ],
                               ),
                             ),
-                            Container(width: 1, height: 38, color: const Color(0xFFCBD5E1)),
+                            Container(
+                              width: 1,
+                              height: 38,
+                              color: const Color(0xFFCBD5E1),
+                            ),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('NILAI BOBOT (%)', style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                                  const Text(
+                                    'NILAI BOBOT (%)',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: Color(0xFF64748B),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    liveBobot > 0 ? '${liveBobot.toStringAsFixed(3)}%' : (bobotCtrl.text.isNotEmpty ? '${bobotCtrl.text}%' : '-'),
+                                    liveBobot > 0
+                                        ? '${liveBobot.toStringAsFixed(3)}%'
+                                        : (bobotCtrl.text.isNotEmpty
+                                              ? '${bobotCtrl.text}%'
+                                              : '-'),
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w900,
@@ -1090,7 +1330,10 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                         ),
                         const SizedBox(height: 10),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(8),
@@ -1098,12 +1341,19 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.info_outline, size: 13, color: Color(0xFF64748B)),
+                              const Icon(
+                                Icons.info_outline,
+                                size: 13,
+                                color: Color(0xFF64748B),
+                              ),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
                                   'Rumus: Volume (${liveVol > 0 ? liveVol.toString() : '0'} ${satuanCtrl.text}) × Harga Satuan = ${formatRupiah(effectiveTotal)}',
-                                  style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    color: Color(0xFF64748B),
+                                  ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -1122,7 +1372,10 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                     child: TextButton.icon(
                       style: TextButton.styleFrom(
                         foregroundColor: const Color(0xFF64748B),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
@@ -1131,10 +1384,18 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                           isCustomOverride = !isCustomOverride;
                         });
                       },
-                      icon: Icon(isCustomOverride ? Icons.lock_open : Icons.tune, size: 14),
+                      icon: Icon(
+                        isCustomOverride ? Icons.lock_open : Icons.tune,
+                        size: 14,
+                      ),
                       label: Text(
-                        isCustomOverride ? 'Tutup Penyesuaian Manual' : 'Penyesuaian Manual / Pembulatan',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                        isCustomOverride
+                            ? 'Tutup Penyesuaian Manual'
+                            : 'Penyesuaian Manual / Pembulatan',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -1147,7 +1408,9 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                             controller: totalHargaCtrl,
                             label: 'Override Total (Rp)',
                             hintText: 'Misal: 10267484.74',
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -1156,7 +1419,9 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                             controller: bobotCtrl,
                             label: 'Override Bobot (%)',
                             hintText: 'Misal: 3.561',
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                           ),
                         ),
                       ],
@@ -1173,7 +1438,9 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       onPressed: () {
                         final uraian = uraianCtrl.text.trim();
@@ -1187,20 +1454,31 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                           tot = hs * vol;
                         }
 
-                        var bbt = double.tryParse(bobotCtrl.text.trim().replaceAll(',', '.')) ?? 0.0;
+                        var bbt =
+                            double.tryParse(
+                              bobotCtrl.text.trim().replaceAll(',', '.'),
+                            ) ??
+                            0.0;
                         if (bbt == 0.0 && tot > 0) {
-                          final ref = _totalHargaRkk > 0 ? _totalHargaRkk : _nilaiKontrakKegiatan;
+                          final ref = _totalHargaRkk > 0
+                              ? _totalHargaRkk
+                              : _nilaiKontrakKegiatan;
                           if (ref > 0) {
-                            bbt = double.parse(((tot / ref) * 100.0).toStringAsFixed(3));
+                            bbt = double.parse(
+                              ((tot / ref) * 100.0).toStringAsFixed(3),
+                            );
                           }
                         }
 
                         setState(() {
                           final itemData = {
-                            'no': '${isEdit ? (existing?['no'] ?? ((itemIndex ?? 0) + 1)) : (items.length + 1)}',
+                            'no':
+                                '${isEdit ? (existing?['no'] ?? ((itemIndex ?? 0) + 1)) : (items.length + 1)}',
                             'noMataPembayaran': noMata,
                             'uraian': uraian,
-                            'satuan': satuanCtrl.text.trim().isNotEmpty ? satuanCtrl.text.trim() : 'Ls',
+                            'satuan': satuanCtrl.text.trim().isNotEmpty
+                                ? satuanCtrl.text.trim()
+                                : 'Ls',
                             'hargaSatuan': hs,
                             'volume': vol,
                             'totalHarga': tot,
@@ -1220,7 +1498,9 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                       },
                       icon: const Icon(Icons.check, size: 18),
                       label: Text(
-                        isEdit ? 'Simpan Perubahan Item' : 'Tambahkan Item ke Divisi',
+                        isEdit
+                            ? 'Simpan Perubahan Item'
+                            : 'Tambahkan Item ke Divisi',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -1236,7 +1516,8 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
 
   void _showDivisiActionSheet(int divIndex) {
     final div = _rkkDivisiList[divIndex];
-    final romawi = div['nomorRomawi']?.toString().toUpperCase() ?? toRoman(divIndex + 1);
+    final romawi =
+        div['nomorRomawi']?.toString().toUpperCase() ?? toRoman(divIndex + 1);
     final namaDiv = div['namaDivisi'] ?? 'DIVISI $romawi';
     final itemsCount = (div['items'] as List? ?? []).length;
 
@@ -1269,7 +1550,10 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF0F172A),
                         borderRadius: BorderRadius.circular(6),
@@ -1290,13 +1574,20 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                         children: [
                           Text(
                             namaDiv,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Color(0xFF0F172A),
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
                             '$itemsCount Item Pekerjaan',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF64748B),
+                            ),
                           ),
                         ],
                       ),
@@ -1313,10 +1604,20 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                     color: AppColors.primaryBlue.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.edit_outlined, color: AppColors.primaryBlue, size: 20),
+                  child: const Icon(
+                    Icons.edit_outlined,
+                    color: AppColors.primaryBlue,
+                    size: 20,
+                  ),
                 ),
-                title: const Text('Ubah Nama / Nomor Divisi', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-                subtitle: const Text('Sesuaikan nomor romawi atau nama divisi', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                title: const Text(
+                  'Ubah Nama / Nomor Divisi',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                ),
+                subtitle: const Text(
+                  'Sesuaikan nomor romawi atau nama divisi',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _showAddEditDivisiSheet(index: divIndex);
@@ -1329,10 +1630,24 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                     color: const Color(0xFFFEE2E2),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
+                  child: const Icon(
+                    Icons.delete_outline,
+                    color: Color(0xFFEF4444),
+                    size: 20,
+                  ),
                 ),
-                title: const Text('Hapus Divisi', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: Color(0xFFEF4444))),
-                subtitle: const Text('Hapus divisi beserta seluruh item pekerjaan di dalamnya', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                title: const Text(
+                  'Hapus Divisi',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13.5,
+                    color: Color(0xFFEF4444),
+                  ),
+                ),
+                subtitle: const Text(
+                  'Hapus divisi beserta seluruh item pekerjaan di dalamnya',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _confirmDeleteDivisi(divIndex);
@@ -1349,7 +1664,8 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
     final item = _rkkDivisiList[divIndex]['items'][itemIndex];
     final noMata = item['noMataPembayaran']?.toString() ?? '';
     final uraian = item['uraian'] ?? 'Item Pekerjaan';
-    final vol = (item['volume'] ?? item['volumeCCO'] as num?)?.toDouble() ?? 0.0;
+    final vol =
+        (item['volume'] ?? item['volumeCCO'] as num?)?.toDouble() ?? 0.0;
     final satuan = item['satuan'] ?? '';
 
     showModalBottomSheet(
@@ -1382,11 +1698,17 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                   children: [
                     if (noMata.isNotEmpty) ...[
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFEFF6FF),
                           borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: const Color(0xFFBFDBFE), width: 0.8),
+                          border: Border.all(
+                            color: const Color(0xFFBFDBFE),
+                            width: 0.8,
+                          ),
                         ),
                         child: Text(
                           noMata,
@@ -1402,7 +1724,11 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                     Expanded(
                       child: Text(
                         uraian,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF0F172A)),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.5,
+                          color: Color(0xFF0F172A),
+                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1415,7 +1741,10 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                   padding: const EdgeInsets.only(left: 8, top: 4),
                   child: Text(
                     'Volume: $vol $satuan',
-                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: Color(0xFF64748B),
+                    ),
                   ),
                 ),
               const SizedBox(height: 12),
@@ -1427,10 +1756,20 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                     color: AppColors.primaryBlue.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.edit_outlined, color: AppColors.primaryBlue, size: 20),
+                  child: const Icon(
+                    Icons.edit_outlined,
+                    color: AppColors.primaryBlue,
+                    size: 20,
+                  ),
                 ),
-                title: const Text('Ubah Item Pekerjaan', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-                subtitle: const Text('Edit volume, harga satuan, atau uraian pekerjaan', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                title: const Text(
+                  'Ubah Item Pekerjaan',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                ),
+                subtitle: const Text(
+                  'Edit volume, harga satuan, atau uraian pekerjaan',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _showAddEditItemSheet(divIndex, itemIndex: itemIndex);
@@ -1443,10 +1782,24 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                     color: const Color(0xFFFEE2E2),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
+                  child: const Icon(
+                    Icons.delete_outline,
+                    color: Color(0xFFEF4444),
+                    size: 20,
+                  ),
                 ),
-                title: const Text('Hapus Item Pekerjaan', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: Color(0xFFEF4444))),
-                subtitle: const Text('Hapus item ini dari rincian kuantitas', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                title: const Text(
+                  'Hapus Item Pekerjaan',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13.5,
+                    color: Color(0xFFEF4444),
+                  ),
+                ),
+                subtitle: const Text(
+                  'Hapus item ini dari rincian kuantitas',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _confirmDeleteItem(divIndex, itemIndex);
@@ -1469,12 +1822,17 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
           'Seluruh item pekerjaan di dalam "${_rkkDivisiList[index]['namaDivisi']}" akan ikut terhapus.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () {
               Navigator.pop(ctx);
@@ -1492,7 +1850,8 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
 
   void _confirmDeleteItem(int divIndex, int itemIndex) {
     setState(() {
-      final items = _rkkDivisiList[divIndex]['items'] as List<Map<String, dynamic>>;
+      final items =
+          _rkkDivisiList[divIndex]['items'] as List<Map<String, dynamic>>;
       items.removeAt(itemIndex);
       for (int i = 0; i < items.length; i++) {
         items[i]['no'] = '${i + 1}';
@@ -1521,30 +1880,46 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0F172A), size: 18),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Color(0xFF0F172A),
+            size: 18,
+          ),
           onPressed: () {
             if (_isModified && !isReadOnly) {
               showDialog(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   title: const Text('Perubahan Belum Disimpan'),
-                  content: const Text('Anda memiliki perubahan yang belum disimpan. Simpan sebelum kembali?'),
+                  content: const Text(
+                    'Anda memiliki perubahan yang belum disimpan. Simpan sebelum kembali?',
+                  ),
                   actions: [
                     TextButton(
                       onPressed: () {
                         Navigator.pop(ctx);
                         Navigator.pop(context);
                       },
-                      child: const Text('Tinggalkan', style: TextStyle(color: Colors.red)),
+                      child: const Text(
+                        'Tinggalkan',
+                        style: TextStyle(color: Colors.red),
+                      ),
                     ),
                     ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryBlue),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryBlue,
+                      ),
                       onPressed: () {
                         Navigator.pop(ctx);
                         _saveRkk();
                       },
-                      child: const Text('Simpan', style: TextStyle(color: Colors.white)),
+                      child: const Text(
+                        'Simpan',
+                        style: TextStyle(color: Colors.white),
+                      ),
                     ),
                   ],
                 ),
@@ -1559,7 +1934,11 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
           children: [
             const Text(
               'Rincian Kuantitas Kontrak',
-              style: TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Color(0xFF0F172A),
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             Text(
               _namaKegiatan,
@@ -1577,8 +1956,13 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                 style: TextButton.styleFrom(
                   backgroundColor: AppColors.primaryBlue,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 onPressed: _saveRkk,
                 icon: const Icon(Icons.save_outlined, size: 16),
@@ -1611,7 +1995,11 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.info_outline, color: Color(0xFF1D4ED8), size: 22),
+                      const Icon(
+                        Icons.info_outline,
+                        color: Color(0xFF1D4ED8),
+                        size: 22,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -1643,538 +2031,742 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
               ],
 
               // ─── 1. EXECUTIVE PROGRESS CARD (TOTAL HARGA & BOBOT SESUAI KEGIATAN) ───
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top: Total Nilai Kontrak vs Total RAB
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'TOTAL HARGA PEKERJAAN (RAB)',
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF64748B),
-                              letterSpacing: 0.6,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            totalRkkHarga > 0 ? formatRupiah(totalRkkHarga) : 'Rp 0',
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF0F172A),
-                            ),
-                          ),
-                          if (_nilaiKontrakKegiatan > 0 && (_nilaiKontrakKegiatan - totalRkkHarga).abs() > 1.0) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              'Target Kegiatan: ${formatRupiah(_nilaiKontrakKegiatan)}',
-                              style: const TextStyle(fontSize: 11, color: Color(0xFFB45309), fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            '${_rkkDivisiList.length} Divisi',
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF0F172A)),
-                          ),
-                          Text(
-                            '$_totalItems Item',
-                            style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-                          ),
-                        ],
-                      ),
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                const SizedBox(height: 12),
-
-                // Middle: Total Bobot & Status Sesuai 100%
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Top: Total Nilai Kontrak vs Total RAB
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Total Bobot: ',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
-                        ),
-                        Text(
-                          totalBobotVal.toStringAsFixed(3),
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            color: is100Percent ? const Color(0xFF10B981) : const Color(0xFF0F172A),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'TOTAL HARGA PEKERJAAN (RAB)',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF64748B),
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                totalRkkHarga > 0
+                                    ? formatRupiah(totalRkkHarga)
+                                    : 'Rp 0',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              if (_nilaiKontrakKegiatan > 0 &&
+                                  (_nilaiKontrakKegiatan - totalRkkHarga)
+                                          .abs() >
+                                      1.0) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Target Kegiatan: ${formatRupiah(_nilaiKontrakKegiatan)}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFFB45309),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 3),
-                        const Text(
-                          '%',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                '${_rkkDivisiList.length} Divisi',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              Text(
+                                '$_totalItems Item',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: Color(0xFF64748B),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: is100Percent ? const Color(0xFFECFDF5) : const Color(0xFFFEF3C7),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: is100Percent ? const Color(0xFFA7F3D0) : const Color(0xFFFDE68A),
-                          width: 0.8,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            is100Percent ? Icons.check_circle : Icons.info_outline,
-                            size: 12,
-                            color: is100Percent ? const Color(0xFF059669) : const Color(0xFFB45309),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            is100Percent ? 'Sesuai 100%' : 'Belum 100%',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: is100Percent ? const Color(0xFF059669) : const Color(0xFFB45309),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: (totalBobotVal / 100.0).clamp(0.0, 1.0),
-                    minHeight: 7,
-                    backgroundColor: const Color(0xFFF1F5F9),
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      is100Percent ? const Color(0xFF10B981) : AppColors.primaryBlue,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
+                    const SizedBox(height: 16),
+                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                    const SizedBox(height: 12),
 
-                // Helper Quick Buttons
-                if (!isReadOnly)
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF0F172A),
-                          side: const BorderSide(color: Color(0xFFCBD5E1)),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        onPressed: () => _recalculateAllBobot(notify: true),
-                        icon: const Icon(Icons.calculate_outlined, size: 14),
-                        label: const Text('Hitung Ulang Bobot Otomatis', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                      ),
-                      if (totalRkkHarga > 0 && (_nilaiKontrakKegiatan - totalRkkHarga).abs() > 1.0)
-                        OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF059669),
-                            side: const BorderSide(color: Color(0xFFA7F3D0)),
-                            backgroundColor: const Color(0xFFECFDF5),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          onPressed: _syncNilaiKegiatan,
-                          icon: const Icon(Icons.sync, size: 14),
-                          label: const Text('Samakan Nilai Kegiatan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // ─── 2. EMPTY STATE ───
-          if (_rkkDivisiList.isEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: const Icon(Icons.account_tree_outlined, size: 30, color: Color(0xFF64748B)),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    isReadOnly ? 'Belum Ada Rincian Kuantitas (RKK)' : 'Mulai Susun Rincian Kuantitas (RKK)',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    isReadOnly
-                        ? 'Rincian kuantitas pekerjaan (BoQ) belum diinput oleh konsultan pengawas.'
-                        : 'Tambahkan divisi pekerjaan sesuai BoQ kontrak. Urutan divisi dapat melompat sesuai dengan jenis pekerjaan proyek Anda.',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B), height: 1.4),
-                  ),
-                  if (!isReadOnly) ...[
-                    const SizedBox(height: 20),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F172A),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      onPressed: () => _showAddEditDivisiSheet(),
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text(
-                        'Tambah Divisi Pertama',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-
-          // ─── 3. DAFTAR DIVISI & ITEM PEKERJAAN (KARTU ELEGAN) ───
-          if (_rkkDivisiList.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
-              child: Row(
-                children: [
-                  Icon(isReadOnly ? Icons.visibility_outlined : Icons.touch_app_outlined, size: 14, color: const Color(0xFF64748B)),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      isReadOnly
-                          ? 'Mode Lihat Saja (Read-Only) • Rincian kuantitas & bobot pekerjaan resmi.'
-                          : 'Ketuk untuk edit, tekan & tahan (hold) divisi atau item untuk opsi hapus.',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          ..._rkkDivisiList.asMap().entries.map((divEntry) {
-            final divIndex = divEntry.key;
-            final div = divEntry.value;
-            final items = div['items'] as List<Map<String, dynamic>>? ?? [];
-            final romawi = div['nomorRomawi']?.toString().toUpperCase() ?? toRoman(divIndex + 1);
-            final namaDiv = div['namaDivisi'] ?? 'DIVISI $romawi';
-            final subtotalHarga = _getDivisiSubtotalHarga(div);
-            final subtotalBobot = _getDivisiSubtotalBobot(div);
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Divisi Header (Tap / Hold untuk opsi divisi)
-                  InkWell(
-                    onTap: isReadOnly ? null : () => _showDivisiActionSheet(divIndex),
-                    onLongPress: isReadOnly ? null : () => _showDivisiActionSheet(divIndex),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      color: const Color(0xFFF8FAFC),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0F172A),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              romawi,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
+                    // Middle: Total Bobot & Status Sesuai 100%
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            const Text(
+                              'Total Bobot: ',
+                              style: TextStyle(
                                 fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                            Text(
+                              totalBobotVal.toStringAsFixed(3),
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                                color: is100Percent
+                                    ? const Color(0xFF10B981)
+                                    : const Color(0xFF0F172A),
+                              ),
+                            ),
+                            const SizedBox(width: 3),
+                            const Text(
+                              '%',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: is100Percent
+                                ? const Color(0xFFECFDF5)
+                                : const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: is100Percent
+                                  ? const Color(0xFFA7F3D0)
+                                  : const Color(0xFFFDE68A),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                is100Percent
+                                    ? Icons.check_circle
+                                    : Icons.info_outline,
+                                size: 12,
+                                color: is100Percent
+                                    ? const Color(0xFF059669)
+                                    : const Color(0xFFB45309),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                is100Percent ? 'Sesuai 100%' : 'Belum 100%',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: is100Percent
+                                      ? const Color(0xFF059669)
+                                      : const Color(0xFFB45309),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: (totalBobotVal / 100.0).clamp(0.0, 1.0),
+                        minHeight: 7,
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          is100Percent
+                              ? const Color(0xFF10B981)
+                              : AppColors.primaryBlue,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Helper Quick Buttons
+                    if (!isReadOnly)
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF0F172A),
+                              side: const BorderSide(color: Color(0xFFCBD5E1)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            onPressed: () => _recalculateAllBobot(notify: true),
+                            icon: const Icon(
+                              Icons.calculate_outlined,
+                              size: 14,
+                            ),
+                            label: const Text(
+                              'Hitung Ulang Bobot Otomatis',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  namaDiv,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13.5,
-                                    color: Color(0xFF0F172A),
-                                  ),
+                          if (totalRkkHarga > 0 &&
+                              (_nilaiKontrakKegiatan - totalRkkHarga).abs() >
+                                  1.0)
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF059669),
+                                side: const BorderSide(
+                                  color: Color(0xFFA7F3D0),
                                 ),
-                                const SizedBox(height: 1),
-                                Text(
-                                  '${items.length} Item • Subtotal: ${formatRupiah(subtotalHarga)} • Bobot: ${subtotalBobot.toStringAsFixed(3)}%',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF64748B),
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                backgroundColor: const Color(0xFFECFDF5),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
                                 ),
-                              ],
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              onPressed: _syncNilaiKegiatan,
+                              icon: const Icon(Icons.sync, size: 14),
+                              label: const Text(
+                                'Samakan Nilai Kegiatan',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                          ),
-                          if (!isReadOnly) ...[
-                            const SizedBox(width: 4),
-                            const Icon(Icons.more_vert, size: 18, color: Color(0xFF94A3B8)),
-                          ],
                         ],
                       ),
-                    ),
-                  ),
-                  const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
 
-                  // Items List
-                  if (items.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                      child: Center(
-                        child: Text(
-                          'Belum ada item pekerjaan di divisi ini.',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+              // ─── 2. EMPTY STATE ───
+              if (_rkkDivisiList.isEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 36,
+                    horizontal: 24,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: const Icon(
+                          Icons.account_tree_outlined,
+                          size: 30,
+                          color: Color(0xFF64748B),
                         ),
                       ),
-                    )
-                  else
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: items.length,
-                      separatorBuilder: (ctx, i) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                      itemBuilder: (ctx, itemIndex) {
-                        final item = items[itemIndex];
-                        final noMata = item['noMataPembayaran']?.toString() ?? '';
-                        final uraian = item['uraian'] ?? '-';
-                        final satuan = item['satuan'] ?? '-';
-                        final vol = (item['volume'] ?? item['volumeCCO'] as num?)?.toDouble() ?? 0.0;
-                        final hs = (item['hargaSatuan'] as num?)?.toDouble() ?? 0.0;
-                        final tot = (item['totalHarga'] as num?)?.toDouble() ?? (hs * vol);
-                        final bbt = (item['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
-
-                        return InkWell(
-                          onTap: isReadOnly ? null : () => _showAddEditItemSheet(divIndex, itemIndex: itemIndex),
-                          onLongPress: isReadOnly ? null : () => _showItemActionSheet(divIndex, itemIndex),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Number
-                                Container(
-                                  width: 22,
-                                  height: 22,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    '${itemIndex + 1}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 10.5,
-                                      color: Color(0xFF475569),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-
-                                // Content (7 Kolom Data)
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          if (noMata.isNotEmpty) ...[
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFEFF6FF),
-                                                borderRadius: BorderRadius.circular(4),
-                                                border: Border.all(color: const Color(0xFFBFDBFE), width: 0.8),
-                                              ),
-                                              child: Text(
-                                                noMata,
-                                                style: const TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: Color(0xFF1D4ED8),
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                          ],
-                                          Expanded(
-                                            child: Text(
-                                              uraian,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 13,
-                                                color: Color(0xFF0F172A),
-                                                height: 1.3,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Wrap(
-                                        spacing: 8,
-                                        runSpacing: 4,
-                                        children: [
-                                          _buildMetricTag('Satuan', satuan),
-                                          _buildMetricTag('Volume', vol > 0 ? (vol == vol.toInt() ? vol.toInt().toString() : vol.toString()) : '-'),
-                                          if (hs > 0) _buildMetricTag('Harga Satuan', formatRupiah(hs)),
-                                          if (tot > 0) _buildMetricTag('Total', formatRupiah(tot)),
-                                          _buildMetricTag(
-                                            'Bobot',
-                                            bbt > 0 ? '${bbt.toStringAsFixed(3)}%' : '-',
-                                            highlight: true,
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                      const SizedBox(height: 16),
+                      Text(
+                        isReadOnly
+                            ? 'Belum Ada Rincian Kuantitas (RKK)'
+                            : 'Mulai Susun Rincian Kuantitas (RKK)',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        isReadOnly
+                            ? 'Rincian kuantitas pekerjaan (BoQ) belum diinput oleh konsultan pengawas.'
+                            : 'Tambahkan divisi pekerjaan sesuai BoQ kontrak. Urutan divisi dapat melompat sesuai dengan jenis pekerjaan proyek Anda.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: Color(0xFF64748B),
+                          height: 1.4,
+                        ),
+                      ),
+                      if (!isReadOnly) ...[
+                        const SizedBox(height: 20),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F172A),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 13,
+                            ),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                        );
-                      },
-                    ),
-
-                  // Button Tambah Item ke Divisi
-                  if (!isReadOnly)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF8FAFC),
-                        border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
-                      ),
-                      child: TextButton.icon(
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.primaryBlue,
-                          alignment: Alignment.centerLeft,
+                          onPressed: () => _showAddEditDivisiSheet(),
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text(
+                            'Tambah Divisi Pertama',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
                         ),
-                        onPressed: () => _showAddEditItemSheet(divIndex),
-                        icon: const Icon(Icons.add_circle_outline, size: 16),
-                        label: const Text(
-                          'Tambah Item Pekerjaan',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      ],
+                    ],
+                  ),
+                ),
+
+              // ─── 3. DAFTAR DIVISI & ITEM PEKERJAAN (KARTU ELEGAN) ───
+              if (_rkkDivisiList.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isReadOnly
+                            ? Icons.visibility_outlined
+                            : Icons.touch_app_outlined,
+                        size: 14,
+                        color: const Color(0xFF64748B),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          isReadOnly
+                              ? 'Mode Lihat Saja (Read-Only) • Rincian kuantitas & bobot pekerjaan resmi.'
+                              : 'Ketuk untuk edit, tekan & tahan (hold) divisi atau item untuk opsi hapus.',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-            );
-          }),
+                    ],
+                  ),
+                ),
 
-          // ─── 4. TOMBOL TAMBAH DIVISI BARU ───
-          if (_rkkDivisiList.isNotEmpty && !isReadOnly)
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF0F172A),
-                side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.2),
-                backgroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () => _showAddEditDivisiSheet(),
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text(
-                'Tambah Divisi Pekerjaan',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-              ),
-            ),
-          const SizedBox(height: 36),
-        ],
-      );
-    },
-  ),
-);
+              ..._rkkDivisiList.asMap().entries.map((divEntry) {
+                final divIndex = divEntry.key;
+                final div = divEntry.value;
+                final items = div['items'] as List<Map<String, dynamic>>? ?? [];
+                final romawi =
+                    div['nomorRomawi']?.toString().toUpperCase() ??
+                    toRoman(divIndex + 1);
+                final namaDiv = div['namaDivisi'] ?? 'DIVISI $romawi';
+                final subtotalHarga = _getDivisiSubtotalHarga(div);
+                final subtotalBobot = _getDivisiSubtotalBobot(div);
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 18),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.02),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Divisi Header (Tap / Hold untuk opsi divisi)
+                      InkWell(
+                        onTap: isReadOnly
+                            ? null
+                            : () => _showDivisiActionSheet(divIndex),
+                        onLongPress: isReadOnly
+                            ? null
+                            : () => _showDivisiActionSheet(divIndex),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          color: const Color(0xFFF8FAFC),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 9,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0F172A),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  romawi,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      namaDiv,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13.5,
+                                        color: Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 1),
+                                    Text(
+                                      '${items.length} Item • Subtotal: ${formatRupiah(subtotalHarga)} • Bobot: ${subtotalBobot.toStringAsFixed(3)}%',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF64748B),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (!isReadOnly) ...[
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.more_vert,
+                                  size: 18,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Divider(height: 1, color: Color(0xFFE2E8F0)),
+
+                      // Items List
+                      if (items.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 24,
+                            horizontal: 16,
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Belum ada item pekerjaan di divisi ini.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade400,
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: items.length,
+                          separatorBuilder: (ctx, i) => const Divider(
+                            height: 1,
+                            color: Color(0xFFF1F5F9),
+                          ),
+                          itemBuilder: (ctx, itemIndex) {
+                            final item = items[itemIndex];
+                            final noMata =
+                                item['noMataPembayaran']?.toString() ?? '';
+                            final uraian = item['uraian'] ?? '-';
+                            final satuan = item['satuan'] ?? '-';
+                            final vol =
+                                (item['volume'] ?? item['volumeCCO'] as num?)
+                                    ?.toDouble() ??
+                                0.0;
+                            final hs =
+                                (item['hargaSatuan'] as num?)?.toDouble() ??
+                                0.0;
+                            final tot =
+                                (item['totalHarga'] as num?)?.toDouble() ??
+                                (hs * vol);
+                            final bbt =
+                                (item['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
+
+                            return InkWell(
+                              onTap: isReadOnly
+                                  ? null
+                                  : () => _showAddEditItemSheet(
+                                      divIndex,
+                                      itemIndex: itemIndex,
+                                    ),
+                              onLongPress: isReadOnly
+                                  ? null
+                                  : () => _showItemActionSheet(
+                                      divIndex,
+                                      itemIndex,
+                                    ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Number
+                                    Container(
+                                      width: 22,
+                                      height: 22,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        '${itemIndex + 1}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 10.5,
+                                          color: Color(0xFF475569),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+
+                                    // Content (7 Kolom Data)
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              if (noMata.isNotEmpty) ...[
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(
+                                                      0xFFEFF6FF,
+                                                    ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          4,
+                                                        ),
+                                                    border: Border.all(
+                                                      color: const Color(
+                                                        0xFFBFDBFE,
+                                                      ),
+                                                      width: 0.8,
+                                                    ),
+                                                  ),
+                                                  child: Text(
+                                                    noMata,
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      color: Color(0xFF1D4ED8),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                              ],
+                                              Expanded(
+                                                child: Text(
+                                                  uraian,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 13,
+                                                    color: Color(0xFF0F172A),
+                                                    height: 1.3,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 4,
+                                            children: [
+                                              _buildMetricTag('Satuan', satuan),
+                                              _buildMetricTag(
+                                                'Volume',
+                                                vol > 0
+                                                    ? (vol == vol.toInt()
+                                                          ? vol
+                                                                .toInt()
+                                                                .toString()
+                                                          : vol.toString())
+                                                    : '-',
+                                              ),
+                                              if (hs > 0)
+                                                _buildMetricTag(
+                                                  'Harga Satuan',
+                                                  formatRupiah(hs),
+                                                ),
+                                              if (tot > 0)
+                                                _buildMetricTag(
+                                                  'Total',
+                                                  formatRupiah(tot),
+                                                ),
+                                              _buildMetricTag(
+                                                'Bobot',
+                                                bbt > 0
+                                                    ? '${bbt.toStringAsFixed(3)}%'
+                                                    : '-',
+                                                highlight: true,
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+
+                      // Button Tambah Item ke Divisi
+                      if (!isReadOnly)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF8FAFC),
+                            border: Border(
+                              top: BorderSide(color: Color(0xFFF1F5F9)),
+                            ),
+                          ),
+                          child: TextButton.icon(
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.primaryBlue,
+                              alignment: Alignment.centerLeft,
+                            ),
+                            onPressed: () => _showAddEditItemSheet(divIndex),
+                            icon: const Icon(
+                              Icons.add_circle_outline,
+                              size: 16,
+                            ),
+                            label: const Text(
+                              'Tambah Item Pekerjaan',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              }),
+
+              // ─── 4. TOMBOL TAMBAH DIVISI BARU ───
+              if (_rkkDivisiList.isNotEmpty && !isReadOnly)
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0F172A),
+                    side: const BorderSide(
+                      color: Color(0xFFCBD5E1),
+                      width: 1.2,
+                    ),
+                    backgroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () => _showAddEditDivisiSheet(),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text(
+                    'Tambah Divisi Pekerjaan',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ),
+              const SizedBox(height: 36),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   Widget _buildMetricTag(String label, String value, {bool highlight = false}) {
@@ -2184,7 +2776,9 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
         color: highlight ? AppColors.slateLighter : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(4),
         border: Border.all(
-          color: highlight ? AppColors.navySlate.withOpacity(0.25) : const Color(0xFFE2E8F0),
+          color: highlight
+              ? AppColors.navySlate.withOpacity(0.25)
+              : const Color(0xFFE2E8F0),
           width: 0.6,
         ),
       ),

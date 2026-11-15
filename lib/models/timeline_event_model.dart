@@ -67,7 +67,6 @@ class TimelineEventModel {
         return 'Lainnya';
     }
   }
-
   /// Icon representatif untuk jenis event
   IconData get icon {
     switch (entityType.toUpperCase()) {
@@ -215,4 +214,3 @@ class TimelineEventModel {
     );
   }
 }
-

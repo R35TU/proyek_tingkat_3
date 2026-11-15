@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/providers/timeline_provider.dart';
+import 'package:tata_saka_app/widgets/responsive_layout.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,6 +42,9 @@ class TataSakaApp extends StatelessWidget {
         return MaterialApp(
           title: 'Tata Saka Consultant',
           debugShowCheckedModeBanner: false,
+          builder: (context, child) => child == null
+              ? const SizedBox.shrink()
+              : ResponsiveAppFrame(child: child),
           themeMode: userProf.flutterThemeMode,
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,

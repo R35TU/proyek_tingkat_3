@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:tata_saka_app/widgets/responsive_layout.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,7 +13,11 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   String selectedRole = 'Konsultan';
-  final roles = ['Konsultan', 'Kontraktor', 'Dinas']; // Eksternal dihapus sesuai instruksi
+  final roles = [
+    'Konsultan',
+    'Kontraktor',
+    'Dinas',
+  ]; // Eksternal dihapus sesuai instruksi
   bool obscurePassword = true;
   bool rememberMe = true;
 
@@ -69,6 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = ResponsiveBreakpoints.isDesktop(context);
     final isiLogin = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -140,8 +145,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: isSelected
                               ? Colors.white
                               : const Color(0xFF475569),
-                          fontWeight:
-                              isSelected ? FontWeight.bold : FontWeight.w600,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.w600,
                           fontSize: 13,
                         ),
                       ),
@@ -251,8 +257,10 @@ class _LoginScreenState extends State<LoginScreen> {
             hintText: 'Masukkan username',
             filled: true,
             fillColor: AppColors.inputBackground,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -286,8 +294,10 @@ class _LoginScreenState extends State<LoginScreen> {
             hintText: '••••••',
             filled: true,
             fillColor: AppColors.inputBackground,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -360,10 +370,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           child: const Text(
             'Masuk ke Sistem',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
           ),
         ),
         const SizedBox(height: 20),
@@ -372,8 +379,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       // Web: latar abu-abu, Mobile: putih
-      backgroundColor: kIsWeb ? AppColors.slateLighter : Colors.white,
-      body: kIsWeb
+      backgroundColor: isDesktop ? AppColors.slateLighter : Colors.white,
+      body: isDesktop
           // Versi web: card di tengah
           ? Center(
               child: SingleChildScrollView(

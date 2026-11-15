@@ -7,6 +7,7 @@ import 'package:tata_saka_app/screens/laporan_screen.dart';
 import 'package:tata_saka_app/screens/setting_screen.dart';
 import 'package:tata_saka_app/screens/timeline_screen.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/widgets/responsive_layout.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -110,7 +111,7 @@ class _MainLayoutState extends State<MainLayout> {
       _currentIndex = 0;
     }
 
-    final bool isWeb = MediaQuery.of(context).size.width >= 900;
+    final bool isWeb = ResponsiveBreakpoints.isDesktop(context);
 
     return Scaffold(
       body: screens[_currentIndex],

@@ -8,7 +8,6 @@ import 'package:tata_saka_app/screens/buat_laporan_screen.dart';
 import 'package:tata_saka_app/screens/detail_kegiatan_screen.dart';
 import 'package:tata_saka_app/screens/detail_kontrak_screen.dart';
 import 'package:tata_saka_app/screens/kontrak_screen.dart';
-import 'package:tata_saka_app/screens/laporan_screen.dart';
 import 'package:tata_saka_app/screens/data_laporan_screen.dart';
 import 'package:tata_saka_app/screens/login_screen.dart';
 
@@ -22,6 +21,7 @@ import 'package:tata_saka_app/screens/edit_profil_screen.dart';
 import 'package:tata_saka_app/screens/kelola_addendum_screen.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/widgets/responsive_layout.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -175,7 +175,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .where((c) => c.status == 'Selesai')
         .length;
 
-    final bool isWeb = MediaQuery.of(context).size.width >= 900;
+    final bool isWeb = ResponsiveBreakpoints.isDesktop(context);
 
     final Widget mainBody = SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
@@ -436,16 +436,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       backgroundColor: AppColors.getBackground(context),
       appBar: AppBar(
-        backgroundColor: AppColors.getCardBackground(context),
+        backgroundColor: isWeb
+            ? AppColors.navySlate
+            : AppColors.getCardBackground(context),
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Divider(height: 1, color: AppColors.getBorder(context)),
+          child: Divider(
+            height: 1,
+            color: isWeb ? AppColors.slateDark : AppColors.getBorder(context),
+          ),
         ),
         leading: Builder(
           builder: (scaffoldCtx) => IconButton(
-            icon: Icon(Icons.menu, color: AppColors.getTextDark(context)),
+            icon: Icon(
+              Icons.menu,
+              color: isWeb ? Colors.white : AppColors.getTextDark(context),
+            ),
             tooltip: isWeb
                 ? (_isWebSidebarOpen ? 'Ciutkan Sidebar' : 'Buka Sidebar')
                 : 'Buka Menu',
@@ -463,7 +471,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: Text(
           safeUserProf.tr('nav_dashboard'),
           style: TextStyle(
-            color: AppColors.getTextDark(context),
+            color: isWeb ? Colors.white : AppColors.getTextDark(context),
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
@@ -473,7 +481,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           IconButton(
             icon: Icon(
               Icons.notifications_none,
-              color: AppColors.getTextDark(context),
+              color: isWeb ? Colors.white : AppColors.getTextDark(context),
             ),
             onPressed: () {},
           ),
@@ -906,7 +914,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ? (sumProgress / myKegiatans.length)
         : 0.0;
 
-    final bool isWeb = MediaQuery.of(context).size.width >= 900;
+    final bool isWeb = ResponsiveBreakpoints.isDesktop(context);
 
     final Widget contractorBody = SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
@@ -1249,16 +1257,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: isWeb ? AppColors.navySlate : Colors.white,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: AppColors.border),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(
+            height: 1,
+            color: isWeb ? AppColors.slateDark : AppColors.border,
+          ),
         ),
         leading: Builder(
           builder: (scaffoldCtx) => IconButton(
-            icon: const Icon(Icons.menu, color: AppColors.navySlate),
+            icon: Icon(
+              Icons.menu,
+              color: isWeb ? Colors.white : AppColors.navySlate,
+            ),
             tooltip: isWeb
                 ? (_isWebSidebarOpen ? 'Ciutkan Sidebar' : 'Buka Sidebar')
                 : 'Buka Menu',
@@ -1275,17 +1289,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         title: Column(
           children: [
-            const Text(
+            Text(
               'Dashboard Kontraktor',
               style: TextStyle(
-                color: AppColors.navySlate,
+                color: isWeb ? Colors.white : AppColors.navySlate,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
             ),
             Text(
               userProf.namaLengkap,
-              style: const TextStyle(color: AppColors.slate, fontSize: 11),
+              style: TextStyle(
+                color: isWeb ? AppColors.slateLight : AppColors.slate,
+                fontSize: 11,
+              ),
             ),
           ],
         ),
@@ -1376,7 +1393,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ─── DESAIN & PENGEMBANGAN SIDEBAR DASHBOARD WEB (CORPORATE SLATE PALETTE) ───
+  // ─── SIDEBAR DASHBOARD WEB ───
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildWebSidebar(
     BuildContext context, {
@@ -1385,11 +1402,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     bool isDrawer = false,
   }) {
     final double sidebarWidth = isDrawer ? 300 : (isCollapsed ? 76 : 260);
+    final sidebarBackground = isDrawer
+        ? const Color(0xFF0F172A)
+        : AppColors.navySlate;
+    final headerDividerColor = isDrawer
+        ? const Color(0xFF1E293B)
+        : AppColors.slateDark;
+    final mutedIconColor = isDrawer
+        ? const Color(0xFF94A3B8)
+        : AppColors.slateLight;
 
     return Container(
       width: sidebarWidth,
       height: double.infinity,
-      color: const Color(0xFF0F172A), // Corporate Slate 900
+      color: sidebarBackground,
       child: SafeArea(
         child: Column(
           children: [
@@ -1399,9 +1425,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 horizontal: isCollapsed ? 12 : 16,
                 vertical: 16,
               ),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(
-                  bottom: BorderSide(color: Color(0xFF1E293B), width: 1),
+                  bottom: BorderSide(color: headerDividerColor, width: 1),
                 ),
               ),
               child: isCollapsed
@@ -1418,18 +1444,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: Image.asset(
                             'assets/images/logoRev.png',
                             fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => const Icon(
+                            errorBuilder: (_, __, ___) => Icon(
                               Icons.business,
-                              color: Color(0xFF0F172A),
+                              color: sidebarBackground,
                               size: 24,
                             ),
                           ),
                         ),
                         const SizedBox(height: 10),
                         IconButton(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.chevron_right,
-                            color: Color(0xFF94A3B8),
+                            color: mutedIconColor,
                             size: 20,
                           ),
                           tooltip: 'Buka Sidebar',
@@ -1461,15 +1487,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: Image.asset(
                             'assets/images/logoRev.png',
                             fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => const Icon(
+                            errorBuilder: (_, __, ___) => Icon(
                               Icons.business,
-                              color: Color(0xFF0F172A),
+                              color: sidebarBackground,
                               size: 24,
                             ),
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1486,7 +1512,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               Text(
                                 'Consultant Engineer',
                                 style: TextStyle(
-                                  color: Color(0xFF38BDF8),
+                                  color: isDrawer
+                                      ? const Color(0xFF38BDF8)
+                                      : AppColors.slateLight,
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -1496,9 +1524,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         if (!isDrawer)
                           IconButton(
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.chevron_left,
-                              color: Color(0xFF94A3B8),
+                              color: mutedIconColor,
                               size: 22,
                             ),
                             tooltip: 'Ciutkan Sidebar',
@@ -1518,10 +1546,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 margin: const EdgeInsets.all(12),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1E293B),
+                  color: isDrawer
+                      ? const Color(0xFF1E293B)
+                      : AppColors.slateDark,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: const Color(0xFF334155),
+                    color: isDrawer ? const Color(0xFF334155) : AppColors.slate,
                     width: 0.8,
                   ),
                 ),
@@ -1529,13 +1559,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     CircleAvatar(
                       radius: 18,
-                      backgroundColor: const Color(0xFF38BDF8).withOpacity(0.2),
+                      backgroundColor: isDrawer
+                          ? const Color(0xFF38BDF8).withOpacity(0.2)
+                          : AppColors.slate,
                       child: Text(
                         userProf.namaLengkap.isNotEmpty
                             ? userProf.namaLengkap[0].toUpperCase()
                             : 'U',
-                        style: const TextStyle(
-                          color: Color(0xFF38BDF8),
+                        style: TextStyle(
+                          color: isDrawer
+                              ? const Color(0xFF38BDF8)
+                              : AppColors.navySlate,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -1563,21 +1597,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: userProf.isKontraktor
-                                  ? const Color(0xFFFEF3C7)
-                                  : (userProf.isDinas
-                                        ? const Color(0xFFDCFCE7)
-                                        : const Color(0xFFDBEAFE)),
+                              color: isDrawer
+                                  ? (userProf.isKontraktor
+                                        ? const Color(0xFFFEF3C7)
+                                        : (userProf.isDinas
+                                              ? const Color(0xFFDCFCE7)
+                                              : const Color(0xFFDBEAFE)))
+                                  : AppColors.slate,
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               userProf.role.toUpperCase(),
                               style: TextStyle(
-                                color: userProf.isKontraktor
-                                    ? const Color(0xFFB45309)
-                                    : (userProf.isDinas
-                                          ? const Color(0xFF15803D)
-                                          : const Color(0xFF1D4ED8)),
+                                color: isDrawer
+                                    ? (userProf.isKontraktor
+                                          ? const Color(0xFFB45309)
+                                          : (userProf.isDinas
+                                                ? const Color(0xFF15803D)
+                                                : const Color(0xFF1D4ED8)))
+                                    : Colors.white,
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0.3,
@@ -1597,13 +1635,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   message: '${userProf.namaLengkap} (${userProf.role})',
                   child: CircleAvatar(
                     radius: 18,
-                    backgroundColor: const Color(0xFF1E293B),
+                    backgroundColor: isDrawer
+                        ? const Color(0xFF1E293B)
+                        : AppColors.slateDark,
                     child: Text(
                       userProf.namaLengkap.isNotEmpty
                           ? userProf.namaLengkap[0].toUpperCase()
                           : 'U',
-                      style: const TextStyle(
-                        color: Color(0xFF38BDF8),
+                      style: TextStyle(
+                        color: isDrawer
+                            ? const Color(0xFF38BDF8)
+                            : AppColors.slateLight,
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -1621,8 +1663,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 children: [
                   // 1. KATEGORI UTAMA
-                  _buildSidebarCategory('UTAMA', isCollapsed),
+                  _buildSidebarCategory('UTAMA', isCollapsed, isDrawer),
                   _buildSidebarItem(
+                    isDrawer: isDrawer,
                     key: 'dashboard',
                     label: userProf.tr('nav_dashboard'),
                     icon: Icons.dashboard_rounded,
@@ -1635,6 +1678,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   if (!userProf.isKontraktor)
                     _buildSidebarItem(
+                      isDrawer: isDrawer,
                       key: 'kontrak',
                       label: userProf.tr('nav_kontrak'),
                       icon: Icons.folder_shared_rounded,
@@ -1652,7 +1696,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   // 3. KATEGORI PELAPORAN (Hanya Konsultan & Dinas)
                   if (!userProf.isKontraktor) ...[
                     const SizedBox(height: 14),
-                    _buildSidebarCategory('PELAPORAN', isCollapsed),
+                    _buildSidebarCategory('PELAPORAN', isCollapsed, isDrawer),
                     _buildSidebarItem(
                       key: 'laporan',
                       label: 'Laporan',
@@ -1690,6 +1734,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                     _buildSidebarItem(
+                      isDrawer: isDrawer,
                       key: 'laporan_mingguan',
                       label: 'Laporan Mingguan',
                       icon: Icons.date_range_rounded,
@@ -1702,6 +1747,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                     _buildSidebarItem(
+                      isDrawer: isDrawer,
                       key: 'laporan_bulanan',
                       label: 'Laporan Bulanan',
                       icon: Icons.calendar_month_rounded,
@@ -1720,6 +1766,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   // 4. KATEGORI DOKUMEN & HISTORI
                   _buildSidebarCategory('HISTORI', isCollapsed),
                   _buildSidebarItem(
+                    isDrawer: isDrawer,
                     key: 'timeline',
                     label: 'Timeline & Histori',
                     icon: Icons.timeline_rounded,
@@ -1735,8 +1782,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(height: 14),
 
                   // 5. KATEGORI AKUN
-                  _buildSidebarCategory('AKUN & PENGATURAN', isCollapsed),
+                  _buildSidebarCategory(
+                    'AKUN & PENGATURAN',
+                    isCollapsed,
+                    isDrawer,
+                  ),
                   _buildSidebarItem(
+                    isDrawer: isDrawer,
                     key: 'pengaturan',
                     label: 'Pengaturan Akun',
                     icon: Icons.settings_rounded,
@@ -1749,6 +1801,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                   _buildSidebarItem(
+                    isDrawer: isDrawer,
                     key: 'keamanan',
                     label: 'Keamanan & Sandi',
                     icon: Icons.security_rounded,
@@ -1761,6 +1814,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                   _buildSidebarItem(
+                    isDrawer: isDrawer,
                     key: 'edit_profil',
                     label: 'Edit Profil',
                     icon: Icons.person_outline_rounded,
@@ -1855,11 +1909,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildSidebarCategory(String title, bool isCollapsed) {
+  Widget _buildSidebarCategory(String title, bool isCollapsed, bool isDrawer) {
     if (isCollapsed) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 6),
-        child: Divider(color: Color(0xFF1E293B), height: 1),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Divider(
+          color: isDrawer ? const Color(0xFF1E293B) : AppColors.slateDark,
+          height: 1,
+        ),
       );
     }
     return Padding(
@@ -1867,7 +1924,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Text(
         title,
         style: const TextStyle(
-          color: Color(0xFF64748B),
+          color: AppColors.slate,
           fontSize: 10.5,
           fontWeight: FontWeight.w800,
           letterSpacing: 1.0,
@@ -1877,6 +1934,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildSidebarItem({
+    required bool isDrawer,
     required String key,
     required String label,
     required IconData icon,
@@ -1884,11 +1942,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required bool isCollapsed,
     required VoidCallback onTap,
   }) {
-    const activeBg = Color(0xFF1E293B);
-    const activeBorder = Color(0xFF38BDF8);
-    const activeIconColor = Color(0xFF38BDF8);
-    const inactiveIconColor = Color(0xFF94A3B8);
-    const inactiveTextColor = Color(0xFFCBD5E1);
+    final activeBg = isDrawer ? const Color(0xFF1E293B) : AppColors.white;
+    final activeBorder = isDrawer ? const Color(0xFF38BDF8) : AppColors.white;
+    final activeIconColor = isDrawer
+        ? const Color(0xFF38BDF8)
+        : AppColors.navySlate;
+    final inactiveIconColor = isDrawer ? const Color(0xFF94A3B8) : Colors.white;
+    final inactiveTextColor = isDrawer
+        ? const Color(0xFFCBD5E1)
+        : AppColors.slateLight;
 
     if (isCollapsed) {
       return Padding(
@@ -1947,7 +2009,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Text(
                   label,
                   style: TextStyle(
-                    color: isActive ? Colors.white : inactiveTextColor,
+                    color: isActive
+                        ? (isDrawer ? Colors.white : AppColors.navySlate)
+                        : inactiveTextColor,
                     fontSize: 13,
                     fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                   ),
@@ -1959,8 +2023,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Container(
                   width: 6,
                   height: 6,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF38BDF8),
+                  decoration: BoxDecoration(
+                    color: isDrawer
+                        ? const Color(0xFF38BDF8)
+                        : AppColors.navySlate,
                     shape: BoxShape.circle,
                   ),
                 ),

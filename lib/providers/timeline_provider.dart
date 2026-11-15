@@ -17,7 +17,6 @@ class TimelineProvider with ChangeNotifier {
   TimelineProvider() {
     loadEvents();
   }
-
   /// Memuat riwayat timeline dari local persistence (SharedPreferences)
   Future<void> loadEvents() async {
     _isLoading = true;
@@ -806,4 +805,3 @@ class TimelineProvider with ChangeNotifier {
     ];
   }
 }
-

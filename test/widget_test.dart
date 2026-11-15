@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tata_saka_app/main.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
+import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 
 void main() {
@@ -19,6 +20,7 @@ void main() {
         providers: [
           ChangeNotifierProvider(create: (_) => ContractProvider()),
           ChangeNotifierProvider(create: (_) => UserProfileProvider()),
+          ChangeNotifierProvider(create: (_) => TimelineProvider()),
         ],
         child: const TataSakaApp(),
       ),
