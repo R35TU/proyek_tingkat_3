@@ -122,7 +122,9 @@ class _AdminPageState extends State<AdminPage> {
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               content: SizedBox(
-                width: 450,
+                width: MediaQuery.sizeOf(context).width < 500
+                    ? MediaQuery.sizeOf(context).width - 64
+                    : 450,
                 child: Form(
                   key: formKey,
                   child: SingleChildScrollView(
@@ -350,303 +352,386 @@ class _AdminPageState extends State<AdminPage> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isCompact = MediaQuery.sizeOf(context).width < 700;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E3A8A),
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.admin_panel_settings, size: 26),
-            SizedBox(width: 10),
+            const Icon(
+              Icons.admin_panel_settings,
+              size: 26,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Dashboard Admin',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: isCompact ? 16 : 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white70,
+                  ),
                 ),
-                Text(
-                  'Manajemen Akun Konsultan, Kontraktor & Dinas',
-                  style: TextStyle(fontSize: 12, color: Colors.white70),
-                ),
+                if (!isCompact)
+                  const Text(
+                    'Manajemen akun',
+                    style: TextStyle(fontSize: 12, color: Colors.white70),
+                  ),
               ],
             ),
           ],
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+            padding: EdgeInsets.symmetric(
+              vertical: 8,
+              horizontal: isCompact ? 8 : 16,
+            ),
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red.shade600,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.symmetric(horizontal: isCompact ? 10 : 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
               onPressed: _confirmLogout,
               icon: const Icon(Icons.logout, size: 18),
-              label: const Text(
-                'Logout',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
+              label: isCompact
+                  ? const SizedBox.shrink()
+                  : const Text(
+                      'Logout',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
             ),
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Kartu Ringkasan Jumlah Akun
-            LayoutBuilder(
-              builder: (context, constraints) {
-                return Wrap(
-                  spacing: 16,
-                  runSpacing: 16,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 700;
+          final horizontalPadding = isCompact ? 12.0 : 20.0;
+
+          return Center(
+            child: SizedBox(
+              width: constraints.maxWidth > 1400 ? 1400 : constraints.maxWidth,
+              child: Padding(
+                padding: EdgeInsets.all(horizontalPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildStatCard(
-                      'Total Akun',
-                      _accounts.length.toString(),
-                      Icons.people,
-                      const Color(0xFF1E3A8A),
-                    ),
-                    _buildStatCard(
-                      'Konsultan',
-                      _countByRole('Konsultan').toString(),
-                      Icons.engineering,
-                      const Color(0xFF2563EB),
-                    ),
-                    _buildStatCard(
-                      'Kontraktor',
-                      _countByRole('Kontraktor').toString(),
-                      Icons.construction,
-                      const Color(0xFFD97706),
-                    ),
-                    _buildStatCard(
-                      'Dinas',
-                      _countByRole('Dinas').toString(),
-                      Icons.account_balance,
-                      const Color(0xFF059669),
-                    ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 24),
+                    LayoutBuilder(
+                      builder: (context, statsConstraints) {
+                        final columns = statsConstraints.maxWidth >= 1000
+                            ? 4
+                            : 2;
+                        final spacing = isCompact ? 12.0 : 16.0;
+                        final cardWidth =
+                            (statsConstraints.maxWidth -
+                                spacing * (columns - 1)) /
+                            columns;
 
-            // Bar Pencarian, Filter & Tombol Tambah
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (val) => setState(() => _searchQuery = val),
-                    decoration: InputDecoration(
-                      hintText: 'Cari nama, email, atau instansi...',
-                      prefixIcon: const Icon(Icons.search),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E3A8A),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 16,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  onPressed: () => _showAccountFormDialog(),
-                  icon: const Icon(Icons.person_add),
-                  label: const Text('Tambah Akun'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Tab Filter Role
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: ['Semua', 'Konsultan', 'Kontraktor', 'Dinas'].map((
-                  role,
-                ) {
-                  final isSelected = _selectedRoleFilter == role;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(role),
-                      selected: isSelected,
-                      selectedColor: const Color(0xFF1E3A8A),
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight: isSelected
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                      ),
-                      onSelected: (_) {
-                        setState(() => _selectedRoleFilter = role);
-                      },
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Daftar Akun
-            Expanded(
-              child: _filteredAccounts.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'Tidak ada akun yang ditemukan.',
-                        style: TextStyle(color: Colors.grey, fontSize: 16),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: _filteredAccounts.length,
-                      itemBuilder: (context, index) {
-                        final acc = _filteredAccounts[index];
-                        final roleColor = _getRoleColor(acc.role);
-
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 1,
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 10,
+                        return Wrap(
+                          spacing: spacing,
+                          runSpacing: spacing,
+                          children: [
+                            _buildStatCard(
+                              'Total Akun',
+                              _accounts.length.toString(),
+                              Icons.people,
+                              const Color(0xFF1E3A8A),
+                              width: cardWidth,
+                              compact: isCompact,
                             ),
-                            leading: CircleAvatar(
-                              backgroundColor: roleColor.withOpacity(0.15),
-                              child: Text(
-                                acc.name.isNotEmpty
-                                    ? acc.name[0].toUpperCase()
-                                    : '?',
-                                style: TextStyle(
-                                  color: roleColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                            _buildStatCard(
+                              'Konsultan',
+                              _countByRole('Konsultan').toString(),
+                              Icons.engineering,
+                              const Color(0xFF2563EB),
+                              width: cardWidth,
+                              compact: isCompact,
                             ),
-                            title: Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    acc.name,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: roleColor.withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    acc.role,
-                                    style: TextStyle(
-                                      color: roleColor,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                if (!acc.isActive)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.withOpacity(0.12),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: const Text(
-                                      'Nonaktif',
-                                      style: TextStyle(
-                                        color: Colors.red,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                            _buildStatCard(
+                              'Kontraktor',
+                              _countByRole('Kontraktor').toString(),
+                              Icons.construction,
+                              const Color(0xFFD97706),
+                              width: cardWidth,
+                              compact: isCompact,
                             ),
-                            subtitle: Padding(
-                              padding: const EdgeInsets.only(top: 6),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('${acc.instansi} • ${acc.email}'),
-                                  Text(
-                                    'Password: ${acc.password}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            _buildStatCard(
+                              'Dinas',
+                              _countByRole('Dinas').toString(),
+                              Icons.account_balance,
+                              const Color(0xFF059669),
+                              width: cardWidth,
+                              compact: isCompact,
                             ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  tooltip: 'Edit Akun',
-                                  icon: const Icon(
-                                    Icons.edit_outlined,
-                                    color: Colors.blue,
-                                  ),
-                                  onPressed: () => _showAccountFormDialog(
-                                    existingAccount: acc,
-                                  ),
-                                ),
-                                IconButton(
-                                  tooltip: 'Hapus Akun',
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    color: Colors.red,
-                                  ),
-                                  onPressed: () => _confirmDelete(acc),
-                                ),
-                              ],
-                            ),
-                          ),
+                          ],
                         );
                       },
                     ),
+                    SizedBox(height: isCompact ? 16 : 24),
+                    if (isCompact)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildSearchField(),
+                          const SizedBox(height: 10),
+                          _buildAddAccountButton(compact: true),
+                        ],
+                      )
+                    else
+                      Row(
+                        children: [
+                          Expanded(child: _buildSearchField()),
+                          const SizedBox(width: 12),
+                          _buildAddAccountButton(),
+                        ],
+                      ),
+                    const SizedBox(height: 12),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: ['Semua', 'Konsultan', 'Kontraktor', 'Dinas']
+                            .map((role) {
+                              final isSelected = _selectedRoleFilter == role;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: ChoiceChip(
+                                  label: Text(role),
+                                  selected: isSelected,
+                                  selectedColor: const Color(0xFF1E3A8A),
+                                  checkmarkColor: Colors.white,
+                                  labelStyle: TextStyle(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.black87,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                  onSelected: (_) {
+                                    setState(() => _selectedRoleFilter = role);
+                                  },
+                                ),
+                              );
+                            })
+                            .toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: _filteredAccounts.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'Tidak ada akun yang ditemukan.',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: _filteredAccounts.length,
+                              itemBuilder: (context, index) =>
+                                  _buildAccountCard(
+                                    _filteredAccounts[index],
+                                    compact: isCompact,
+                                  ),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return TextField(
+      controller: _searchController,
+      onChanged: (val) => setState(() => _searchQuery = val),
+      decoration: InputDecoration(
+        hintText: 'Cari nama, email, atau instansi...',
+        prefixIcon: const Icon(Icons.search),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 0),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddAccountButton({bool compact = false}) {
+    return ElevatedButton.icon(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF1E3A8A),
+        foregroundColor: Colors.white,
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 16 : 20,
+          vertical: 16,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      onPressed: () => _showAccountFormDialog(),
+      icon: const Icon(Icons.person_add),
+      label: const Text('Tambah Akun'),
+    );
+  }
+
+  Widget _buildAccountCard(UserAccount acc, {required bool compact}) {
+    final roleColor = _getRoleColor(acc.role);
+    final avatar = CircleAvatar(
+      backgroundColor: roleColor.withOpacity(0.15),
+      child: Text(
+        acc.name.isNotEmpty ? acc.name[0].toUpperCase() : '?',
+        style: TextStyle(color: roleColor, fontWeight: FontWeight.bold),
+      ),
+    );
+    final badges = Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _buildAccountBadge(acc.role, roleColor),
+        if (!acc.isActive) _buildAccountBadge('Nonaktif', Colors.red),
+      ],
+    );
+    final details = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(acc.instansi, maxLines: 2, overflow: TextOverflow.ellipsis),
+        Text(acc.email, maxLines: 1, overflow: TextOverflow.ellipsis),
+        Text(
+          'Password: ${acc.password}',
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+      ],
+    );
+    final actions = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: 'Edit Akun',
+          icon: const Icon(Icons.edit_outlined, color: Colors.blue),
+          onPressed: () => _showAccountFormDialog(existingAccount: acc),
+        ),
+        IconButton(
+          tooltip: 'Hapus Akun',
+          icon: const Icon(Icons.delete_outline, color: Colors.red),
+          onPressed: () => _confirmDelete(acc),
+        ),
+      ],
+    );
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 1,
+      child: compact
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 8, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      avatar,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              acc.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            badges,
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 2),
+                    child: details,
+                  ),
+                  Align(alignment: Alignment.centerRight, child: actions),
+                ],
+              ),
+            )
+          : ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 10,
+              ),
+              leading: avatar,
+              title: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    acc.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  badges,
+                ],
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: details,
+              ),
+              trailing: actions,
+            ),
+    );
+  }
+
+  Widget _buildAccountBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -656,45 +741,78 @@ class _AdminPageState extends State<AdminPage> {
     String title,
     String count,
     IconData icon,
-    Color color,
-  ) {
+    Color color, {
+    required double width,
+    required bool compact,
+  }) {
     return Container(
-      width: 200,
-      padding: const EdgeInsets.all(16),
+      width: width,
+      padding: EdgeInsets.all(compact ? 12 : 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade200),
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                count,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+      child: compact
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: color, size: 20),
                 ),
-              ),
-              Text(
-                title,
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-              ),
-            ],
-          ),
-        ],
-      ),
+                const SizedBox(height: 8),
+                Text(
+                  count,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const SizedBox(width: 14),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      count,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
     );
   }
 }
