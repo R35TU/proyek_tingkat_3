@@ -4,6 +4,8 @@ import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 
+import 'admin_page.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -55,6 +57,16 @@ class _LoginScreenState extends State<LoginScreen> {
   void _performLogin() {
     final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();
+
+    // Cek login khusus Admin (langsung masuk ke AdminPage)
+    if (username.toLowerCase() == 'admin' && password == 'password123') {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const AdminPage()),
+        (route) => false,
+      );
+      return;
+    }
 
     final userProf = context.read<UserProfileProvider>();
     final success = userProf.login(username, password, roleHint: selectedRole);
