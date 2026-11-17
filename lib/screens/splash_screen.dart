@@ -13,27 +13,11 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 3), () async {
+    Future.delayed(const Duration(seconds: 2), () {
       if (!mounted) return;
-      final user = AuthService.currentUser;
-      if (user == null) {
-        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-        return;
-      }
-      // Sesi masih ada → pastikan akun belum dinonaktifkan/hapus oleh Admin.
-      try {
-        final doc = await AuthService.fetchUserDoc(user.uid);
-        if (doc == null || doc['isActive'] == false) {
-          await AuthService.signOut();
-          if (!mounted) return;
-          Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-          return;
-        }
-      } catch (_) {
-        // Offline / Firestore tak terjangkau → biarkan sesi berlanjut.
-      }
-      if (!mounted) return;
-      Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+      // Jika route saat ini bukan splash (misal user langsung akses /#/login), jangan interupsi
+      if (ModalRoute.of(context)?.isCurrent != true) return;
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
     });
   }
 

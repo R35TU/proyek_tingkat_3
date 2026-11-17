@@ -402,9 +402,9 @@ class _AdminPageState extends State<AdminPage> {
                 await AuthService.signOut();
               } catch (_) {}
               if (!mounted) return;
-              Navigator.pushAndRemoveUntil(
+              Navigator.pushNamedAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                '/login',
                 (route) => false,
               );
             },
