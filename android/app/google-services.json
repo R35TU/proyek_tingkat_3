@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "673715678272",
+    "project_id": "tatasakaconsultant-id",
+    "storage_bucket": "tatasakaconsultant-id.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:673715678272:android:a1274846838dcb4e8383a5",
+        "android_client_info": {
+          "package_name": "com.example.tata_saka_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAtJaBk7fBM7NHEK4FRu4vl1RqfXORGkis"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

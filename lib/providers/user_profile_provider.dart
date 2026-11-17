@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tata_saka_app/services/auth_service.dart';
 import 'package:tata_saka_app/utils/app_translations.dart';
 
 class RegisteredUser {
@@ -272,26 +273,76 @@ class UserProfileProvider with ChangeNotifier {
   }
 
   // ─── AUTH & LOGIN ACTIONS ───
-  bool login(String usernameInput, String passwordInput, {String? roleHint}) {
-    final cleanUsername = usernameInput.trim().toLowerCase();
+  /// Login via Firebase Auth (EMAIL langsung, tanpa terjemahan) + profil
+  /// Firestore. Jika Firebase gagal (offline / Auth belum aktif), fallback
+  /// ke akun lokal (email atau username).
+  Future<bool> login(String emailInput, String passwordInput,
+      {String? roleHint}) async {
+    final cleanEmail = emailInput.trim().toLowerCase();
     final cleanPassword = passwordInput.trim();
+    if (cleanPassword.isEmpty) return false;
 
-    // Cari dari daftar akun terdaftar
+    // ── 1. Coba Firebase Auth ──
+    try {
+      final cred = await AuthService.signIn(cleanEmail, cleanPassword);
+      final uid = cred.user!.uid;
+      final doc = await AuthService.fetchUserDoc(uid);
+      if (doc != null && doc['isActive'] == false) {
+        // Akun dinonaktifkan admin → tolak.
+        await AuthService.signOut();
+        return false;
+      }
+      _username = (doc?['username'] ?? cleanEmail.split('@').first).toString();
+      _role = (doc?['role'] ?? roleHint ?? 'Konsultan').toString();
+      _namaLengkap = (doc?['namaLengkap'] ?? 'Pengguna').toString();
+      _companyOrAgency = (doc?['companyOrAgency'] ?? 'Tata Saka').toString();
+      _currentPassword = cleanPassword;
+      _profileImagePath = null;
+      notifyListeners();
+      _saveToPreferences();
+      return true;
+    } catch (_) {
+      // Firebase tidak tersedia / kredensial salah → lanjut fallback lokal.
+    }
+
+    // ── 2. Fallback lokal (mode offline / dev) ──
+    return _loginLocal(cleanEmail, cleanPassword, roleHint: roleHint);
+  }
+
+  /// Jalur login lama berbasis daftar akun lokal.
+  bool _loginLocal(String cleanEmail, String cleanPassword,
+      {String? roleHint}) {
+    // Terima email ATAU username (mis. admin@… / admin).
+    final candidate = cleanEmail.contains('@')
+        ? cleanEmail.split('@').first
+        : cleanEmail;
+
+    // Akun Admin (menu manajemen akun) — dipertahankan di jalur lokal
+    // agar tetap berfungsi sebelum/selama Firebase Auth belum aktif.
+    if (candidate == 'admin' && cleanPassword == 'password123') {
+      _username = 'admin';
+      _role = 'Admin';
+      _namaLengkap = 'Admin Sistem';
+      _companyOrAgency = 'CV. Tata Saka Consultant';
+      _currentPassword = 'password123';
+      _profileImagePath = null;
+      notifyListeners();
+      _saveToPreferences();
+      return true;
+    }
+
     final found = registeredUsers.firstWhere(
-      (u) =>
-          u.username.toLowerCase() == cleanUsername ||
-          (cleanUsername.isEmpty && roleHint != null && u.role.toLowerCase() == roleHint.toLowerCase()),
+      (u) => u.username.toLowerCase() == candidate || candidate.isEmpty,
       orElse: () => RegisteredUser(
-        username: cleanUsername.isNotEmpty ? cleanUsername : (roleHint?.toLowerCase() ?? 'konsultan'),
+        username: candidate.isNotEmpty ? candidate : (roleHint?.toLowerCase() ?? 'konsultan'),
         password: cleanPassword.isNotEmpty ? cleanPassword : 'password123',
         role: roleHint ?? 'Konsultan',
-        namaLengkap: cleanUsername.isNotEmpty ? usernameInput : 'Pengguna',
-        companyOrAgency: cleanUsername.isNotEmpty ? usernameInput : 'Tata Saka',
+        namaLengkap: candidate.isNotEmpty ? candidate : 'Pengguna',
+        companyOrAgency: candidate.isNotEmpty ? candidate : 'Tata Saka',
       ),
     );
 
-    // Cek password sederhana
-    if (cleanPassword.isNotEmpty && cleanPassword != found.password && cleanPassword != 'password123') {
+    if (cleanPassword != found.password && cleanPassword != 'password123') {
       return false;
     }
 
@@ -393,14 +444,34 @@ class UserProfileProvider with ChangeNotifier {
     return input.trim() == _currentPassword;
   }
 
-  bool changePassword(String oldPassword, String newPassword) {
+  /// Ganti password: lewat Firebase Auth bila sesi aktif,
+  /// fallback ke penyimpanan lokal bila offline.
+  Future<bool> changePassword(String oldPassword, String newPassword) async {
     if (!verifyCurrentPassword(oldPassword)) {
       return false;
+    }
+    try {
+      await AuthService.changePassword(oldPassword, newPassword);
+    } catch (_) {
+      // Offline / sesi Auth tidak ada → cukup simpan lokal.
     }
     _currentPassword = newPassword;
     notifyListeners();
     _saveToPreferences();
     return true;
+  }
+
+  /// Logout: keluar dari Firebase Auth + bersihkan profil lokal.
+  Future<void> logout() async {
+    try {
+      await AuthService.signOut();
+    } catch (_) {}
+    _username = 'konsultan';
+    _role = 'Konsultan';
+    _namaLengkap = 'CV. Tata Saka Consultant';
+    _companyOrAgency = 'CV. Tata Saka Consultant';
+    _profileImagePath = null;
+    notifyListeners();
   }
 
   void logoutFromAllOtherDevices() {

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
@@ -7,6 +8,20 @@ import 'package:tata_saka_app/providers/user_profile_provider.dart';
 
 class TimelineProvider with ChangeNotifier {
   static const String _storageKey = 'tata_saka_timeline_events_v1';
+
+  /// Koleksi cloud: `timeline_events` (doc id = event id).
+  /// Semua perangkat berbagi riwayat yang sama; SharedPreferences hanya
+  /// fallback offline & mirror cadangan.
+  static const String _cloudCollection = 'timeline_events';
+
+  /// Firestore diakses lazy & aman (null saat Firebase belum init / test).
+  FirebaseFirestore? get _db {
+    try {
+      return FirebaseFirestore.instance;
+    } catch (_) {
+      return null;
+    }
+  }
 
   List<TimelineEventModel> _events = [];
   bool _isLoading = true;
@@ -17,24 +32,33 @@ class TimelineProvider with ChangeNotifier {
   TimelineProvider() {
     loadEvents();
   }
-  /// Memuat riwayat timeline dari local persistence (SharedPreferences)
+
+  /// Memuat riwayat timeline: utama dari Firestore, fallback ke SharedPreferences
+  /// (mode offline / lingkungan test). Data lokal lama otomatis dimigrasikan ke cloud.
   Future<void> loadEvents() async {
     _isLoading = true;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final rawData = prefs.getString(_storageKey);
-
-      if (rawData != null && rawData.isNotEmpty) {
-        final List<dynamic> decoded = jsonDecode(rawData);
-        _events = decoded
-            .map((item) => TimelineEventModel.fromJson(Map<String, dynamic>.from(item)))
-            .toList();
-      } else {
-        // Inisialisasi seed bawaan bila belum ada data tersimpan
-        _events = _generateInitialSeedEvents();
-        await _saveEvents();
+      final db = _db;
+      if (db != null) {
+        final snap = await db.collection(_cloudCollection).get();
+        if (snap.docs.isNotEmpty) {
+          _events = snap.docs.map((d) {
+            final data = Map<String, dynamic>.from(d.data());
+            data['id'] = d.id;
+            return TimelineEventModel.fromJson(data);
+          }).toList();
+          _sortEvents();
+          _saveEvents(); // mirror lokal tanpa menunggu
+          return;
+        }
       }
-      _sortEvents();
+      // Cloud kosong / tidak tersedia → muat lokal (atau seed bawaan)
+      await _loadFromLocal();
+      // Migrasikan isi lokal ke cloud agar lintas perangkat
+      final db2 = _db;
+      if (db2 != null && _events.isNotEmpty) {
+        await _pushEventsToCloud(_events);
+      }
     } catch (e) {
       debugPrint('Error loading timeline events: $e');
       _events = _generateInitialSeedEvents();
@@ -44,7 +68,23 @@ class TimelineProvider with ChangeNotifier {
     }
   }
 
-  /// Menyimpan events ke local storage
+  /// Muat dari SharedPreferences (perilaku lama) + seed bila kosong.
+  Future<void> _loadFromLocal() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rawData = prefs.getString(_storageKey);
+    if (rawData != null && rawData.isNotEmpty) {
+      final List<dynamic> decoded = jsonDecode(rawData);
+      _events = decoded
+          .map((item) => TimelineEventModel.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+    } else {
+      _events = _generateInitialSeedEvents();
+      await _saveEvents();
+    }
+    _sortEvents();
+  }
+
+  /// Mirror cadangan ke SharedPreferences (dipakai saat offline).
   Future<void> _saveEvents() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -53,6 +93,44 @@ class TimelineProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('Error saving timeline events: $e');
     }
+  }
+
+  /// Tulis daftar event ke Firestore (batch, dedupe by doc id).
+  Future<void> _pushEventsToCloud(List<TimelineEventModel> events) async {
+    final db = _db;
+    if (db == null || events.isEmpty) return;
+    try {
+      final batch = db.batch();
+      for (final e in events) {
+        batch.set(db.collection(_cloudCollection).doc(e.id), e.toJson());
+      }
+      await batch.commit();
+    } catch (e) {
+      debugPrint('Cloud push timeline gagal (offline?): $e');
+    }
+  }
+
+  Future<void> _deleteEventFromCloud(String id) async {
+    final db = _db;
+    if (db == null) return;
+    try {
+      await db.collection(_cloudCollection).doc(id).delete();
+    } catch (_) {}
+  }
+
+  /// Hapus seluruh koleksi cloud (untuk reset/clear).
+  Future<void> _wipeCloud() async {
+    final db = _db;
+    if (db == null) return;
+    try {
+      final snap = await db.collection(_cloudCollection).get();
+      if (snap.docs.isEmpty) return;
+      final batch = db.batch();
+      for (final d in snap.docs) {
+        batch.delete(d.reference);
+      }
+      await batch.commit();
+    } catch (_) {}
   }
 
   /// Urutkan timeline dari yang paling baru ke paling lama
@@ -100,13 +178,15 @@ class TimelineProvider with ChangeNotifier {
     _events.insert(0, event);
     _sortEvents();
     await _saveEvents();
+    await _pushEventsToCloud([event]);
     notifyListeners();
   }
 
-  /// Hapus event tertentu
+  /// Hapus event tertentu (dari memori, mirror lokal, dan cloud)
   Future<void> deleteEvent(String id) async {
     _events.removeWhere((e) => e.id == id);
     await _saveEvents();
+    await _deleteEventFromCloud(id);
     notifyListeners();
   }
 
@@ -115,6 +195,8 @@ class TimelineProvider with ChangeNotifier {
     _events = _generateInitialSeedEvents();
     _sortEvents();
     await _saveEvents();
+    await _wipeCloud();
+    await _pushEventsToCloud(_events);
     notifyListeners();
   }
 
@@ -122,6 +204,7 @@ class TimelineProvider with ChangeNotifier {
   Future<void> clearEvents() async {
     _events.clear();
     await _saveEvents();
+    await _wipeCloud();
     notifyListeners();
   }
 
@@ -131,6 +214,7 @@ class TimelineProvider with ChangeNotifier {
   Future<void> syncWithContracts(List<ContractModel> contracts) async {
     bool hasNewEvents = false;
     final Set<String> existingIds = _events.map((e) => e.id).toSet();
+    final Set<String> beforeIds = Set<String>.from(existingIds);
 
     for (final c in contracts) {
       final cId = c.id;
@@ -416,6 +500,10 @@ class TimelineProvider with ChangeNotifier {
     if (hasNewEvents) {
       _sortEvents();
       await _saveEvents();
+      // Dorong hanya event yang benar-benar baru ke cloud (id deterministik
+      // membuat dedupe antar perangkat otomatis).
+      final added = _events.where((e) => !beforeIds.contains(e.id)).toList();
+      await _pushEventsToCloud(added);
       notifyListeners();
     }
   }

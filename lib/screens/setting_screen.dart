@@ -238,8 +238,11 @@ class _SettingScreenState extends State<SettingScreen> {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
+              final userProf = context.read<UserProfileProvider>();
+              await userProf.logout();
+              if (!mounted) return;
               Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
             },
             child: const Text('Keluar'),
