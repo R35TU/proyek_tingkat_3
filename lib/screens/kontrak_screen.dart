@@ -8,9 +8,11 @@ import 'package:tata_saka_app/screens/detail_kegiatan_screen.dart';
 import 'package:tata_saka_app/screens/detail_kontrak_screen.dart';
 import 'package:tata_saka_app/screens/tambah_kontrak_screen.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/utils/progress_calculator.dart';
 
 class KontrakScreen extends StatefulWidget {
-  const KontrakScreen({super.key});
+  final bool isEmbedded;
+  const KontrakScreen({super.key, this.isEmbedded = false});
 
   @override
   State<KontrakScreen> createState() => _KontrakScreenState();
@@ -25,56 +27,8 @@ class _KontrakScreenState extends State<KontrakScreen> {
     super.dispose();
   }
 
-  double _calcKegiatanProgress(Map<String, dynamic> keg) {
-    final activeRkk = (keg['rkkDivisiList'] as List? ?? []);
-    final laporans = (keg['laporans'] as List? ?? []);
-
-    if (activeRkk.isNotEmpty && laporans.isNotEmpty) {
-      double totalRealisasiBobot = 0.0;
-      for (final rep in laporans) {
-        if (rep is! Map) continue;
-        final pList = (rep['pekerjaanList'] as List? ?? []);
-        for (final p in pList) {
-          if (p is! Map) continue;
-          final volStr = (p['volume'] ?? '').toString();
-          final vol = double.tryParse(volStr.split(' ').first.replaceAll(',', '.')) ?? 0.0;
-          final itId = (p['rkkItemId'] ?? '').toString().trim();
-          final noMata = (p['noMataPembayaran'] ?? '').toString().trim();
-          final jenis = (p['uraian'] ?? p['jenisPekerjaan'] ?? '').toString().trim().toLowerCase();
-
-          for (final div in activeRkk) {
-            for (final it in (div['items'] as List? ?? [])) {
-              final bId = (it['id'] ?? '').toString().trim();
-              final bNo = (it['noMataPembayaran'] ?? '').toString().trim();
-              final bUr = (it['uraian'] ?? '').toString().trim().toLowerCase();
-
-              final match = (itId.isNotEmpty && bId.isNotEmpty && itId == bId) ||
-                  (noMata.isNotEmpty && bNo.isNotEmpty && noMata == bNo) ||
-                  (jenis.isNotEmpty && (bUr == jenis || bUr.contains(jenis)));
-
-              if (match) {
-                final targetVol = (it['volumeCCO'] ?? it['volume'] as num?)?.toDouble() ?? 0.0;
-                final bobotItem = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
-                if (targetVol > 0) {
-                  totalRealisasiBobot += (vol / targetVol) * bobotItem;
-                }
-                break;
-              }
-            }
-          }
-        }
-      }
-      return totalRealisasiBobot.clamp(0.0, 100.0);
-    }
-
-    final weekly = (keg['laporanMingguan'] as List? ?? []);
-    if (weekly.isNotEmpty && weekly.last is Map) {
-      final lastW = weekly.last as Map;
-      return (lastW['realisasiPersen'] as num?)?.toDouble() ?? 0.0;
-    }
-
-    return 0.0;
-  }
+  double _calcKegiatanProgress(Map<String, dynamic> keg) =>
+      ProgressCalculator.calculateKegiatanProgress(keg);
 
   @override
   Widget build(BuildContext context) {
@@ -97,20 +51,22 @@ class _KontrakScreenState extends State<KontrakScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        title: Text(
-          titleText,
-          style: const TextStyle(
-            color: AppColors.textDark,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
-      ),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              surfaceTintColor: Colors.transparent,
+              title: Text(
+                titleText,
+                style: const TextStyle(
+                  color: AppColors.textDark,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              centerTitle: true,
+            ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(

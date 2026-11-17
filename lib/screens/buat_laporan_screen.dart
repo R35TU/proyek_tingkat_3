@@ -18,13 +18,16 @@ import 'package:tata_saka_app/services/storage_service.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/utils/plat_nomor_util.dart';
 import 'package:tata_saka_app/widgets/clean_text_form_field.dart';
+import 'package:tata_saka_app/widgets/responsive_layout.dart';
 import 'package:tata_saka_app/widgets/signature_pad_widget.dart';
+import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 
 class BuatLaporanScreen extends StatefulWidget {
   final ContractModel? initialContract;
   final int? initialKegiatanIndex;
   final DateTime? initialDate;
   final Map<String, dynamic>? editReport; // Null jika buat laporan baru
+  final bool isEmbedded;
 
   const BuatLaporanScreen({
     super.key,
@@ -32,6 +35,7 @@ class BuatLaporanScreen extends StatefulWidget {
     this.initialKegiatanIndex,
     this.initialDate,
     this.editReport,
+    this.isEmbedded = false,
   });
 
   @override
@@ -1816,64 +1820,37 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     final String lokasiAuto = currentKeg?['lokasi'] ?? '-';
     final String sumberDanaAuto = _selectedContract?.sumberDana ?? '-';
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF111827)),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/main',
-                (route) => false,
-              );
-            }
-          },
+    final isDesktop = ResponsiveBreakpoints.isDesktop(context);
+    final pageTitle = widget.editReport != null
+        ? 'Edit Buku Harian Standar'
+        : 'Form Buku Harian Standar';
+
+    final saveButton = Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: TextButton(
+        onPressed: _simpanLaporan,
+        style: TextButton.styleFrom(
+          backgroundColor: isDesktop ? AppColors.primaryBlue : const Color(0xFF1F2937),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
         ),
-        title: Text(
-          widget.editReport != null
-              ? 'Edit Buku Harian Standar'
-              : 'Form Buku Harian Standar',
-          style: const TextStyle(
-            color: Color(0xFF111827),
-            fontSize: 16,
+        child: const Text(
+          'Simpan',
+          style: TextStyle(
             fontWeight: FontWeight.w700,
+            color: Colors.white,
+            fontSize: 13,
           ),
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: TextButton(
-              onPressed: _simpanLaporan,
-              style: TextButton.styleFrom(
-                backgroundColor: const Color(0xFF1F2937),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Simpan',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
-      body: SingleChildScrollView(
+    );
+
+    final mainBody = SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1950,7 +1927,53 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             const SizedBox(height: 36),
           ],
         ),
+      );
+
+    if (widget.isEmbedded) {
+      return mainBody;
+    }
+
+    if (isDesktop) {
+      return WebDashboardLayout(
+        title: pageTitle,
+        activeMenu: 'laporan',
+        showBackButton: true,
+        actions: [saveButton],
+        child: mainBody,
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF111827)),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                '/main',
+                (route) => false,
+              );
+            }
+          },
+        ),
+        title: Text(
+          pageTitle,
+          style: const TextStyle(
+            color: Color(0xFF111827),
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        actions: [saveButton],
       ),
+      body: mainBody,
     );
   }
 

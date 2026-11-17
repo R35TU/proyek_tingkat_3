@@ -72,10 +72,10 @@ void main() {
         expect(find.text('Consultant Engineer'), findsOneWidget);
         for (final category in [
           'UTAMA',
-          'TEKNIS & ANGGARAN',
           'PELAPORAN',
           'DOKUMEN & HISTORI',
           'AKUN & PENGATURAN',
+          'BANTUAN',
         ]) {
           var scrollAttempts = 0;
           while (find.text(category).evaluate().isEmpty && scrollAttempts < 5) {
@@ -88,6 +88,11 @@ void main() {
           }
           expect(find.text(category), findsOneWidget);
         }
+        // Pastikan menu yang dihapus TIDAK ada di mobile drawer
+        expect(find.text('TEKNIS & ANGGARAN'), findsNothing);
+        expect(find.text('RAB / BoQ'), findsNothing);
+        expect(find.text('Addendum CCO'), findsNothing);
+        expect(find.text('Administrasi Dokumen'), findsNothing);
       },
     );
 
@@ -125,9 +130,12 @@ void main() {
         expect(find.text('CV. TATA SAKA'), findsOneWidget);
         expect(find.text('Consultant Engineer'), findsOneWidget);
         expect(find.text('UTAMA'), findsOneWidget);
-        expect(find.text('TEKNIS & ANGGARAN'), findsOneWidget);
-        expect(find.text('RAB / BoQ'), findsOneWidget);
-        expect(find.text('Addendum CCO'), findsOneWidget);
+        expect(find.text('PELAPORAN'), findsOneWidget);
+        // Menu yang dihapus TIDAK ada di Web sidebar
+        expect(find.text('TEKNIS & ANGGARAN'), findsNothing);
+        expect(find.text('RAB / BoQ'), findsNothing);
+        expect(find.text('Addendum CCO'), findsNothing);
+        expect(find.text('Administrasi Dokumen'), findsNothing);
 
         // Tap collapse button (chevron_left)
         final collapseBtn = find.byIcon(Icons.chevron_left);
@@ -161,6 +169,13 @@ void main() {
         });
 
         final kontraktorProfile = UserProfileProvider();
+        kontraktorProfile.loginAs(const RegisteredUser(
+          username: 'kontraktor1',
+          password: 'password123',
+          role: 'Kontraktor',
+          namaLengkap: 'CV. Divan Insan Cemerlang',
+          companyOrAgency: 'CV. Divan Insan Cemerlang',
+        ));
         final contractProvider = ContractProvider();
         final timelineProvider = TimelineProvider();
 

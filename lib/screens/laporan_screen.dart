@@ -5,12 +5,105 @@ import 'package:tata_saka_app/screens/buat_laporan_screen.dart';
 import 'package:tata_saka_app/screens/buat_laporan_mingguan_screen.dart';
 import 'package:tata_saka_app/screens/laporan_bulanan_screen.dart';
 import 'package:tata_saka_app/screens/dashboard_screen.dart';
+import 'package:tata_saka_app/widgets/responsive_layout.dart';
+import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 
 class LaporanScreen extends StatelessWidget {
-  const LaporanScreen({super.key});
+  final bool isEmbedded;
+  const LaporanScreen({super.key, this.isEmbedded = false});
 
   @override
   Widget build(BuildContext context) {
+    final bool isDesktop = ResponsiveBreakpoints.isDesktop(context);
+
+    final Widget mainBody = SingleChildScrollView(
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        children: [
+          _buildMenuCard(
+            title: 'Data Laporan',
+            description:
+                'Lihat daftar proyek dan semua data\nlaporan harian & mingguan',
+            icon: Icons.folder_outlined,
+            iconBgColor: AppColors.blueLight,
+            iconColor: AppColors.primaryBlue,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const DataLaporanScreen(),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          _buildMenuCard(
+            title: 'Buat Laporan Harian',
+            description:
+                'Buku Harian Standar (pekerjaan, material, alat,\npersonil, cuaca & kejadian)',
+            icon: Icons.edit_note,
+            iconBgColor: const Color(0xFFE6F4EA),
+            iconColor: AppColors.successGreen,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const BuatLaporanScreen(),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          _buildMenuCard(
+            title: 'Buat Laporan Mingguan',
+            description:
+                'Ringkasan Kegiatan Mingguan (bobot rencana,\nrealisasi fisik, deviasi, & tabel mingguan)',
+            icon: Icons.analytics_outlined,
+            iconBgColor: const Color(0xFFFEF3C7),
+            iconColor: const Color(0xFFD97706),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const BuatLaporanMingguanScreen(),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          _buildMenuCard(
+            title: 'Laporan Bulanan',
+            description:
+                'Rekapitulasi Fisik Bulanan (Otomatis per 4 minggu,\nkemajuan fisik CCO, bulan lalu, bulan ini & sisa)',
+            icon: Icons.calendar_month_outlined,
+            iconBgColor: const Color(0xFFEDE9FE),
+            iconColor: const Color(0xFF7C3AED),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LaporanBulananScreen(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+
+    if (isEmbedded) {
+      return mainBody;
+    }
+
+    if (isDesktop) {
+      return WebDashboardLayout(
+        title: 'Laporan Proyek',
+        activeMenu: 'laporan',
+        showBackButton: false,
+        child: mainBody,
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -39,87 +132,8 @@ class LaporanScreen extends StatelessWidget {
           ),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_none,
-              color: AppColors.textDark,
-            ),
-            onPressed: () {},
-          ),
-        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          children: [
-            _buildMenuCard(
-              title: 'Data Laporan',
-              description: 'Lihat daftar proyek dan semua data\nlaporan harian & mingguan',
-              icon: Icons.folder_outlined,
-              iconBgColor: AppColors.blueLight,
-              iconColor: AppColors.primaryBlue,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const DataLaporanScreen(),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            _buildMenuCard(
-              title: 'Buat Laporan Harian',
-              description: 'Buku Harian Standar (pekerjaan, material, alat,\npersonil, cuaca & kejadian)',
-              icon: Icons.edit_note,
-              iconBgColor: const Color(0xFFE6F4EA),
-              iconColor: AppColors.successGreen,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const BuatLaporanScreen(),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            _buildMenuCard(
-              title: 'Buat Laporan Mingguan',
-              description: 'Ringkasan Kegiatan Mingguan (bobot rencana,\nrealisasi fisik, deviasi, & tabel mingguan)',
-              icon: Icons.analytics_outlined,
-              iconBgColor: const Color(0xFFFEF3C7),
-              iconColor: const Color(0xFFD97706),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const BuatLaporanMingguanScreen(),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            _buildMenuCard(
-              title: 'Laporan Bulanan',
-              description: 'Rekapitulasi Fisik Bulanan (Otomatis per 4 minggu,\nkemajuan fisik CCO, bulan lalu, bulan ini & sisa)',
-              icon: Icons.calendar_month_outlined,
-              iconBgColor: const Color(0xFFEDE9FE),
-              iconColor: const Color(0xFF7C3AED),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const LaporanBulananScreen(),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
+      body: mainBody,
     );
   }
 

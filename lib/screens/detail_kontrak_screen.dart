@@ -18,6 +18,8 @@ import 'package:tata_saka_app/services/file_downloader.dart';
 import 'package:tata_saka_app/screens/detail_kegiatan_screen.dart';
 import 'package:tata_saka_app/screens/tambah_kontrak_screen.dart';
 import 'package:tata_saka_app/screens/form_kegiatan_screen.dart';
+import 'package:tata_saka_app/widgets/responsive_layout.dart';
+import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 
 class _DocumentData {
   String id;
@@ -103,8 +105,13 @@ class _KegiatanData {
 
 class DetailKontrakScreen extends StatefulWidget {
   final ContractModel contract;
+  final bool isEmbedded;
 
-  const DetailKontrakScreen({super.key, required this.contract});
+  const DetailKontrakScreen({
+    super.key,
+    required this.contract,
+    this.isEmbedded = false,
+  });
 
   @override
   State<DetailKontrakScreen> createState() => _DetailKontrakScreenState();
@@ -1166,6 +1173,110 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
       userProf = null;
     }
     final isKonsultan = userProf?.isKonsultan ?? true;
+    final isDesktop = ResponsiveBreakpoints.isDesktop(context);
+
+    final headerActions = [
+      if (isKonsultan)
+        PopupMenuButton<String>(
+          icon: Icon(Icons.more_vert, color: (isDesktop && !widget.isEmbedded) ? Colors.white : AppColors.textDark),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          onSelected: (value) async {
+            if (value == 'edit') {
+              final updated = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TambahKontrakScreen(contractToEdit: widget.contract),
+                ),
+              );
+              if (updated == true && mounted) {
+                setState(() {});
+              }
+            } else if (value == 'delete') {
+              _confirmDeleteContract();
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'edit',
+              child: Row(
+                children: [
+                  Icon(Icons.edit_outlined, size: 20, color: AppColors.primaryBlue),
+                  SizedBox(width: 12),
+                  Text('Edit Kontrak', style: TextStyle(fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'delete',
+              child: Row(
+                children: [
+                  Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                  SizedBox(width: 12),
+                  Text('Hapus Kontrak', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red)),
+                ],
+              ),
+            ),
+          ],
+        ),
+    ];
+
+    final tabBarWidget = Container(
+      color: Colors.white,
+      child: TabBar(
+        controller: _tabController,
+        labelColor: AppColors.primaryBlue,
+        unselectedLabelColor: AppColors.textLight,
+        indicatorColor: AppColors.primaryBlue,
+        indicatorWeight: 3,
+        indicatorSize: TabBarIndicatorSize.tab,
+        labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+        tabs: const [
+          Tab(text: 'Umum'),
+          Tab(text: 'Administrasi'),
+        ],
+      ),
+    );
+
+    final mainBody = Column(
+      children: [
+        if (isDesktop || widget.isEmbedded) ...[
+          tabBarWidget,
+          const Divider(height: 1, thickness: 1, color: AppColors.border),
+        ],
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildUmumTab(),
+              _buildAdministrasiTab(),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    final fab = (_tabController.index == 1 && isKonsultan)
+        ? FloatingActionButton(
+            onPressed: _addFolder,
+            backgroundColor: AppColors.primaryBlue,
+            child: const Icon(Icons.add, color: Colors.white),
+          )
+        : null;
+
+    if (widget.isEmbedded) {
+      return mainBody;
+    }
+
+    if (isDesktop) {
+      return WebDashboardLayout(
+        title: 'Detail Kontrak: ${widget.contract.namaKontrak}',
+        activeMenu: 'kontrak',
+        showBackButton: true,
+        actions: headerActions,
+        floatingActionButton: fab,
+        child: mainBody,
+      );
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -1191,50 +1302,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
           ),
         ),
         centerTitle: false,
-        actions: [
-          if (isKonsultan)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: AppColors.textDark),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              onSelected: (value) async {
-                if (value == 'edit') {
-                  final updated = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => TambahKontrakScreen(contractToEdit: widget.contract),
-                    ),
-                  );
-                  if (updated == true && mounted) {
-                    setState(() {});
-                  }
-                } else if (value == 'delete') {
-                  _confirmDeleteContract();
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit_outlined, size: 20, color: AppColors.primaryBlue),
-                      SizedBox(width: 12),
-                      Text('Edit Kontrak', style: TextStyle(fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                      SizedBox(width: 12),
-                      Text('Hapus Kontrak', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-        ],
+        actions: headerActions,
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.primaryBlue,
@@ -1256,13 +1324,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
           _buildAdministrasiTab(),
         ],
       ),
-      floatingActionButton: (_tabController.index == 1 && isKonsultan)
-          ? FloatingActionButton(
-              onPressed: _addFolder,
-              backgroundColor: AppColors.primaryBlue,
-              child: const Icon(Icons.add, color: Colors.white),
-            )
-          : null,
+      floatingActionButton: fab,
     );
   }
 

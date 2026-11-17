@@ -3,7 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 
 class KeamananScreen extends StatefulWidget {
-  const KeamananScreen({super.key});
+  final bool isEmbedded;
+  const KeamananScreen({super.key, this.isEmbedded = false});
 
   @override
   State<KeamananScreen> createState() => _KeamananScreenState();
@@ -267,8 +268,10 @@ class _KeamananScreenState extends State<KeamananScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              backgroundColor: Colors.white,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(

@@ -10,6 +10,8 @@ import 'package:tata_saka_app/screens/edit_profil_screen.dart';
 import 'package:tata_saka_app/screens/keamanan_screen.dart';
 import 'package:tata_saka_app/screens/pengaturan_screen.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/widgets/responsive_layout.dart';
+import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 
 class SettingScreen extends StatefulWidget {
   const SettingScreen({super.key});
@@ -257,37 +259,23 @@ class _SettingScreenState extends State<SettingScreen> {
     return Consumer<UserProfileProvider>(
       builder: (context, userProf, _) {
         final profileImage = userProf.profileImagePath;
+        final isDesktop = ResponsiveBreakpoints.isDesktop(context);
 
-        return Scaffold(
-          backgroundColor: AppColors.getBackground(context),
-          appBar: AppBar(
-            backgroundColor: AppColors.getCardBackground(context),
-            elevation: 0,
-            surfaceTintColor: Colors.transparent,
-            title: Text(
-              userProf.tr('nav_account'),
-              style: TextStyle(
-                color: AppColors.getTextDark(context),
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            centerTitle: true,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.edit_outlined, color: Color(0xFF2563EB)),
-                tooltip: 'Edit Profil',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const EditProfilScreen()),
-                  );
-                },
-              ),
-              const SizedBox(width: 4),
-            ],
+        final headerActions = [
+          IconButton(
+            icon: Icon(Icons.edit_outlined, color: isDesktop ? Colors.white : const Color(0xFF2563EB)),
+            tooltip: 'Edit Profil',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const EditProfilScreen()),
+              );
+            },
           ),
-          body: SingleChildScrollView(
+          const SizedBox(width: 4),
+        ];
+
+        final mainBody = SingleChildScrollView(
             padding: const EdgeInsets.all(20.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -511,7 +499,35 @@ class _SettingScreenState extends State<SettingScreen> {
                 const SizedBox(height: 36),
               ],
             ),
+          );
+
+        if (isDesktop) {
+          return WebDashboardLayout(
+            title: userProf.tr('nav_account'),
+            activeMenu: 'pengaturan',
+            actions: headerActions,
+            child: mainBody,
+          );
+        }
+
+        return Scaffold(
+          backgroundColor: AppColors.getBackground(context),
+          appBar: AppBar(
+            backgroundColor: AppColors.getCardBackground(context),
+            elevation: 0,
+            surfaceTintColor: Colors.transparent,
+            title: Text(
+              userProf.tr('nav_account'),
+              style: TextStyle(
+                color: AppColors.getTextDark(context),
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            centerTitle: true,
+            actions: headerActions,
           ),
+          body: mainBody,
         );
       },
     );

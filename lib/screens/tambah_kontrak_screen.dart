@@ -8,6 +8,8 @@ import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter/services.dart';
 import '../utils/rupiah_input_formatter.dart';
+import 'package:tata_saka_app/widgets/responsive_layout.dart';
+import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 
 class TambahKontrakScreen extends StatefulWidget {
   final ContractModel? contractToEdit;
@@ -201,26 +203,10 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          widget.contractToEdit != null ? 'Edit Kontrak' : 'Tambah Kontrak Baru',
-          style: const TextStyle(
-            color: AppColors.textDark,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: false,
-      ),
-      body: SingleChildScrollView(
+    final isDesktop = ResponsiveBreakpoints.isDesktop(context);
+    final pageTitle = widget.contractToEdit != null ? 'Edit Kontrak' : 'Tambah Kontrak Baru';
+
+    final mainBody = SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -715,7 +701,37 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
             const SizedBox(height: 20),
           ],
         ),
+      );
+
+    if (isDesktop) {
+      return WebDashboardLayout(
+        title: pageTitle,
+        activeMenu: 'kontrak',
+        showBackButton: true,
+        child: mainBody,
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          pageTitle,
+          style: const TextStyle(
+            color: AppColors.textDark,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: false,
       ),
+      body: mainBody,
     );
   }
 

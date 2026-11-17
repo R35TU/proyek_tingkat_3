@@ -12,12 +12,14 @@ class KelolaRkkScreen extends StatefulWidget {
   final ContractModel contract;
   final int kegiatanIndex;
   final bool? readOnly;
+  final bool isEmbedded;
 
   const KelolaRkkScreen({
     super.key,
     required this.contract,
     required this.kegiatanIndex,
     this.readOnly,
+    this.isEmbedded = false,
   });
 
   /// Format angka ke Rupiah dengan penanganan desimal sen (contoh: Rp 288.350.703,03)
@@ -1875,8 +1877,10 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(

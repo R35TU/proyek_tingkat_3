@@ -9,15 +9,19 @@ import 'package:tata_saka_app/widgets/lembar_laporan_bulanan_widget.dart';
 import 'package:pdf/pdf.dart';
 import 'package:tata_saka_app/screens/pdf_viewer_screen.dart';
 import 'package:tata_saka_app/services/pdf_report_service.dart';
+import 'package:tata_saka_app/widgets/responsive_layout.dart';
+import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 
 class LaporanBulananScreen extends StatefulWidget {
   final ContractModel? initialContract;
   final int initialKegiatanIndex;
+  final bool isEmbedded;
 
   const LaporanBulananScreen({
     super.key,
     this.initialContract,
     this.initialKegiatanIndex = 0,
+    this.isEmbedded = false,
   });
 
   @override
@@ -277,8 +281,21 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
   Widget build(BuildContext context) {
     final contractProvider = Provider.of<ContractProvider>(context);
     final contracts = contractProvider.contracts;
+    final isDesktop = ResponsiveBreakpoints.isDesktop(context);
 
     if (contracts.isEmpty) {
+      const emptyBody = Center(
+        child: Text('Belum ada kontrak kegiatan yang terdaftar.'),
+      );
+      if (widget.isEmbedded) return emptyBody;
+      if (isDesktop) {
+        return const WebDashboardLayout(
+          title: 'Laporan Bulanan',
+          activeMenu: 'laporan',
+          showBackButton: true,
+          child: emptyBody,
+        );
+      }
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
@@ -287,9 +304,7 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
           foregroundColor: AppColors.textDark,
           elevation: 0,
         ),
-        body: const Center(
-          child: Text('Belum ada kontrak kegiatan yang terdaftar.'),
-        ),
+        body: emptyBody,
       );
     }
 
@@ -308,39 +323,15 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
       kegiatan: kegModel,
     );
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Laporan Bulanan',
-          style: TextStyle(
-            color: AppColors.textDark,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
-            }
-          },
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Ganti Kegiatan',
-            icon: const Icon(Icons.swap_horiz, color: AppColors.primaryBlue),
-            onPressed: () => _showPilihKegiatanSheet(context, contracts),
-          ),
-        ],
+    final headerActions = [
+      IconButton(
+        tooltip: 'Ganti Kegiatan',
+        icon: Icon(Icons.swap_horiz, color: (isDesktop && !widget.isEmbedded) ? Colors.white : AppColors.primaryBlue),
+        onPressed: () => _showPilihKegiatanSheet(context, contracts),
       ),
-      body: SingleChildScrollView(
+    ];
+
+    final mainBody = SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -407,7 +398,49 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
             const SizedBox(height: 24),
           ],
         ),
+      );
+
+    if (widget.isEmbedded) {
+      return mainBody;
+    }
+
+    if (isDesktop) {
+      return WebDashboardLayout(
+        title: 'Laporan Bulanan',
+        activeMenu: 'laporan',
+        showBackButton: true,
+        actions: headerActions,
+        child: mainBody,
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          'Laporan Bulanan',
+          style: TextStyle(
+            color: AppColors.textDark,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+            }
+          },
+        ),
+        actions: headerActions,
       ),
+      body: mainBody,
     );
   }
 

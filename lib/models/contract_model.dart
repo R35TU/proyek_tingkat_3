@@ -1,3 +1,5 @@
+import 'package:tata_saka_app/utils/progress_calculator.dart';
+
 class ContractModel {
   String id;
   final String jenisKegiatan;
@@ -16,7 +18,21 @@ class ContractModel {
   final List<String> instansiDinas;
   final String sumberDana;
   final String deskripsi;
-  final double progressFisik;
+  final double _storedProgressFisik;
+
+  /// Nilai rasio progres fisik (0.0 sampai 1.0) untuk progress indicators.
+  /// Dihitung secara dinamis dari rata-rata seluruh kegiatan di bawah kontrak.
+  /// Jika belum ada kegiatan, menggunakan nilai fallback _storedProgressFisik.
+  double get progressFisik => ProgressCalculator.calculateContractProgressRatio(
+        kegiatans,
+        fallbackProgress: _storedProgressFisik,
+      );
+
+  /// Nilai persentase progres fisik (0.0 s.d. 100.0%).
+  double get progressPercent => ProgressCalculator.calculateContractProgressPercent(
+        kegiatans,
+        fallbackProgress: _storedProgressFisik,
+      );
   
   // Folders for administrasi
   List<Map<String, dynamic>> folders;
@@ -60,12 +76,13 @@ class ContractModel {
     required this.instansiDinas,
     required this.sumberDana,
     required this.deskripsi,
-    this.progressFisik = 0.0,
+    double progressFisik = 0.0,
     List<Map<String, dynamic>>? folders,
     List<Map<String, dynamic>>? kegiatans,
     List<Map<String, dynamic>>? pakets,
     this.strukturOrganisasi,
-  }) : folders = folders ?? [
+  }) : _storedProgressFisik = progressFisik,
+  folders = folders ?? [
     {'name': 'SPK', 'isExpanded': false, 'documents': []},
     {'name': 'SPMK', 'isExpanded': false, 'documents': []},
     {'name': 'Adendum Konsultan', 'isExpanded': false, 'documents': []},

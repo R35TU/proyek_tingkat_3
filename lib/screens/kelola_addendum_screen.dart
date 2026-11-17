@@ -18,12 +18,14 @@ class KelolaAddendumScreen extends StatefulWidget {
   final ContractModel contract;
   final int kegiatanIndex;
   final bool? readOnly;
+  final bool isEmbedded;
 
   const KelolaAddendumScreen({
     super.key,
     required this.contract,
     required this.kegiatanIndex,
     this.readOnly,
+    this.isEmbedded = false,
   });
 
   @override
@@ -374,8 +376,10 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(

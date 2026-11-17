@@ -4,6 +4,8 @@ import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/kegiatan_model.dart';
 import 'package:tata_saka_app/screens/kelola_rkk_screen.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/widgets/responsive_layout.dart';
+import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 
 class FormAddendumScreen extends StatefulWidget {
   final ContractModel contract;
@@ -245,40 +247,27 @@ class _FormAddendumScreenState extends State<FormAddendumScreen> {
     final tambahBobot = baseTotal > 0 ? (tambahTotal / baseTotal) * 100.0 : 0.0;
     final kurangBobot = baseTotal > 0 ? (kurangTotal / baseTotal) * 100.0 : 0.0;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0F172A), size: 18),
-          onPressed: () => Navigator.pop(context),
+    final isDesktop = ResponsiveBreakpoints.isDesktop(context);
+    final pageTitle = widget.initialAddendum != null
+        ? 'Edit Addendum ${_nomorAddendumCtrl.text}'
+        : 'Buat Addendum Baru (CCO)';
+
+    final saveButton = Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryBlue,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
-        title: Text(
-          widget.initialAddendum != null
-              ? 'Edit Addendum ${_nomorAddendumCtrl.text}'
-              : 'Buat Addendum Baru (CCO)',
-          style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: _saveAddendum,
-              icon: const Icon(Icons.check, size: 16),
-              label: const Text('Simpan Addendum', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-            ),
-          ),
-        ],
+        onPressed: _saveAddendum,
+        icon: const Icon(Icons.check, size: 16),
+        label: const Text('Simpan Addendum', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
       ),
-      body: ListView(
+    );
+
+    final mainBody = ListView(
         padding: const EdgeInsets.all(16),
         children: [
           // ─── 1. KARTU INFORMASI ADDENDUM ───
@@ -633,7 +622,35 @@ class _FormAddendumScreenState extends State<FormAddendumScreen> {
             );
           }),
         ],
+      );
+
+    if (isDesktop) {
+      return WebDashboardLayout(
+        title: pageTitle,
+        activeMenu: 'addendum',
+        showBackButton: true,
+        actions: [saveButton],
+        child: mainBody,
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0F172A), size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          pageTitle,
+          style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        actions: [saveButton],
       ),
+      body: mainBody,
     );
   }
 
