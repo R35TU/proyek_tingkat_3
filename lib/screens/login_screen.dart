@@ -29,10 +29,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _emailController = TextEditingController(
-      text: 'konsultan@tatasakaconsultant.id',
-    );
-    _passwordController = TextEditingController(text: 'password123');
+    _emailController = TextEditingController();
+    _passwordController = TextEditingController();
   }
 
   @override
@@ -45,14 +43,8 @@ class _LoginScreenState extends State<LoginScreen> {
   void _onRoleChanged(String role) {
     setState(() {
       selectedRole = role;
-      if (role == 'Konsultan') {
-        _emailController.text = 'konsultan@tatasakaconsultant.id';
-      } else if (role == 'Kontraktor') {
-        _emailController.text = 'kontraktor1@tatasakaconsultant.id';
-      } else if (role == 'Dinas') {
-        _emailController.text = 'dinas@tatasakaconsultant.id';
-      }
-      _passwordController.text = 'password123';
+      _emailController.clear();
+      _passwordController.clear();
     });
   }
 
@@ -183,96 +175,6 @@ class _LoginScreenState extends State<LoginScreen> {
             );
           }).toList(),
         ),
-
-        // Sub-chips jika Kontraktor (Pilihan Kontraktor 1 atau Kontraktor 2)
-        if (selectedRole == 'Kontraktor') ...[
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFBFDBFE)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Pilih Akun Demo Kontraktor Pelaksana:',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E40AF),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ChoiceChip(
-                        label: const Text(
-                          'Kontraktor 1\n(CV. Divan Insan)',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 11),
-                        ),
-                        selected:
-                            _emailController.text ==
-                            'kontraktor1@tatasakaconsultant.id',
-                        selectedColor: const Color(0xFF2563EB),
-                        labelStyle: TextStyle(
-                          color:
-                              _emailController.text ==
-                                  'kontraktor1@tatasakaconsultant.id'
-                              ? Colors.white
-                              : const Color(0xFF1E293B),
-                          fontWeight: FontWeight.bold,
-                        ),
-                        onSelected: (val) {
-                          if (val) {
-                            setState(() {
-                              _emailController.text =
-                                  'kontraktor1@tatasakaconsultant.id';
-                            });
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ChoiceChip(
-                        label: const Text(
-                          'Kontraktor 2\n(CV. Langgeng)',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 11),
-                        ),
-                        selected:
-                            _emailController.text ==
-                            'kontraktor2@tatasakaconsultant.id',
-                        selectedColor: const Color(0xFF2563EB),
-                        labelStyle: TextStyle(
-                          color:
-                              _emailController.text ==
-                                  'kontraktor2@tatasakaconsultant.id'
-                              ? Colors.white
-                              : const Color(0xFF1E293B),
-                          fontWeight: FontWeight.bold,
-                        ),
-                        onSelected: (val) {
-                          if (val) {
-                            setState(() {
-                              _emailController.text =
-                                  'kontraktor2@tatasakaconsultant.id';
-                            });
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
 
         const SizedBox(height: 20),
 

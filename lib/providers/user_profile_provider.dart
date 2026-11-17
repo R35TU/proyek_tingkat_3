@@ -66,60 +66,22 @@ class UserProfileProvider with ChangeNotifier {
   static const String _prefSettingsKey = 'app_settings_data';
 
   // ─── MASTER AKUN TERDAFTAR RESMI ───
-  static const List<RegisteredUser> registeredUsers = [
-    RegisteredUser(
-      username: 'konsultan',
-      password: 'password123',
-      role: 'Konsultan',
-      namaLengkap: 'CV. Tata Saka Consultant',
-      companyOrAgency: 'CV. Tata Saka Consultant',
-      description: 'Konsultan Pengawas (Akses Penuh)',
-    ),
-    RegisteredUser(
-      username: 'kontraktor1',
-      password: 'password123',
-      role: 'Kontraktor',
-      namaLengkap: 'CV. Divan Insan Cemerlang',
-      companyOrAgency: 'CV. Divan Insan Cemerlang',
-      description: 'Kontraktor 1 (Ruas MT Haryono)',
-    ),
-    RegisteredUser(
-      username: 'kontraktor2',
-      password: 'password123',
-      role: 'Kontraktor',
-      namaLengkap: 'CV. Langgeng',
-      companyOrAgency: 'CV. Langgeng',
-      description: 'Kontraktor 2 (Ruas Kapten Piere Tendean)',
-    ),
-    RegisteredUser(
-      username: 'dinas',
-      password: 'password123',
-      role: 'Dinas',
-      namaLengkap: 'DPU-PR Kabupaten Purbalingga',
-      companyOrAgency: 'DPU-PR',
-      description: 'Dinas PU-PR (Pengawas Pemilik / Read-Only)',
-    ),
-  ];
+  // Akun didaftarkan dan dikelola melalui Firebase Auth & Firestore.
+  static const List<RegisteredUser> registeredUsers = [];
 
   static List<String> get registeredContractors => registeredContractorNames;
 
-  static List<String> get registeredContractorNames => [
-    'CV. Divan Insan Cemerlang',
-    'CV. Langgeng',
-  ];
+  static List<String> get registeredContractorNames => [];
 
-  static List<String> get registeredAgencyNames => [
-    'DPU-PR Kabupaten Purbalingga',
-    'DPU-PR',
-  ];
+  static List<String> get registeredAgencyNames => [];
 
   // ─── 1. ACTIVE USER PROFILE & ROLE ───
-  String _namaLengkap = 'CV. Tata Saka Consultant';
-  String _username = 'konsultan';
-  String _role = 'Konsultan';
-  String _companyOrAgency = 'CV. Tata Saka Consultant';
+  String _namaLengkap = '';
+  String _username = '';
+  String _role = '';
+  String _companyOrAgency = '';
   String? _profileImagePath;
-  String _currentPassword = 'password123';
+  String _currentPassword = '';
 
   // ─── 2. APP PREFERENCES ───
   String _themeMode = 'Terang'; // 'Terang', 'Gelap', 'Mengikuti Sistem'
@@ -134,36 +96,11 @@ class UserProfileProvider with ChangeNotifier {
   // ─── 4. LAINNYA ───
   bool _reminderLaporanHarian = true;
   String _reminderTime = '17:00';
-  String _lastBackupDate = '31 Des 2025 10:30';
-  String _cacheSize = '12.4 MB';
+  String _lastBackupDate = '';
+  String _cacheSize = '0 KB';
 
   // ─── 5. AKTIVITAS LOGIN ───
-  final List<LoginActivityItem> _loginActivities = [
-    LoginActivityItem(
-      id: 'act-1',
-      deviceName: 'iPhone 11',
-      location: 'Jakarta, Indonesia',
-      time: '01 Januari 2025 10:30 WIB',
-      isCurrent: true,
-      icon: Icons.smartphone,
-    ),
-    LoginActivityItem(
-      id: 'act-2',
-      deviceName: 'Windows - Brave',
-      location: 'Semarang, Indonesia',
-      time: '25 November 2024 17:23 WIB',
-      isCurrent: false,
-      icon: Icons.computer,
-    ),
-    LoginActivityItem(
-      id: 'act-3',
-      deviceName: 'Android - Chrome',
-      location: 'Purbalingga, Indonesia',
-      time: '15 Oktober 2024 14:10 WIB',
-      isCurrent: false,
-      icon: Icons.smartphone,
-    ),
-  ];
+  final List<LoginActivityItem> _loginActivities = [];
 
   // Getters Profile & Roles
   String get namaLengkap => _namaLengkap;
@@ -309,53 +246,10 @@ class UserProfileProvider with ChangeNotifier {
     return _loginLocal(cleanEmail, cleanPassword, roleHint: roleHint);
   }
 
-  /// Jalur login lama berbasis daftar akun lokal.
+  /// Jalur login lokal dinonaktifkan — autentikasi sepenuhnya melalui Firebase Auth.
   bool _loginLocal(String cleanEmail, String cleanPassword,
       {String? roleHint}) {
-    // Terima email ATAU username (mis. admin@… / admin).
-    final candidate = cleanEmail.contains('@')
-        ? cleanEmail.split('@').first
-        : cleanEmail;
-
-    // Akun Admin (menu manajemen akun) — dipertahankan di jalur lokal
-    // agar tetap berfungsi sebelum/selama Firebase Auth belum aktif.
-    if (candidate == 'admin' && cleanPassword == 'password123') {
-      _username = 'admin';
-      _role = 'Admin';
-      _namaLengkap = 'Admin Sistem';
-      _companyOrAgency = 'CV. Tata Saka Consultant';
-      _currentPassword = 'password123';
-      _profileImagePath = null;
-      notifyListeners();
-      _saveToPreferences();
-      return true;
-    }
-
-    final found = registeredUsers.firstWhere(
-      (u) => u.username.toLowerCase() == candidate || candidate.isEmpty,
-      orElse: () => RegisteredUser(
-        username: candidate.isNotEmpty ? candidate : (roleHint?.toLowerCase() ?? 'konsultan'),
-        password: cleanPassword.isNotEmpty ? cleanPassword : 'password123',
-        role: roleHint ?? 'Konsultan',
-        namaLengkap: candidate.isNotEmpty ? candidate : 'Pengguna',
-        companyOrAgency: candidate.isNotEmpty ? candidate : 'Tata Saka',
-      ),
-    );
-
-    if (cleanPassword != found.password && cleanPassword != 'password123') {
-      return false;
-    }
-
-    _username = found.username;
-    _role = found.role;
-    _namaLengkap = found.namaLengkap;
-    _companyOrAgency = found.companyOrAgency;
-    _currentPassword = found.password;
-    _profileImagePath = null;
-
-    notifyListeners();
-    _saveToPreferences();
-    return true;
+    return false;
   }
 
   void loginAs(RegisteredUser user) {
