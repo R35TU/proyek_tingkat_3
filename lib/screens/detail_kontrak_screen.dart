@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
@@ -848,6 +849,12 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(ctx);
+                        // Web: buka langsung dari URL Cloudflare di tab baru
+                        // (PDF/gambar tampil di viewer bawaan browser).
+                        if (kIsWeb && (doc.remoteUrl ?? '').isNotEmpty) {
+                          openRemoteInNewTab(doc.remoteUrl!);
+                          return;
+                        }
                         if (doc.type == 'IMG' && doc.localPath != null && File(doc.localPath!).existsSync()) {
                           showDialog(
                             context: context,

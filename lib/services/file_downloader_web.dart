@@ -7,3 +7,9 @@ Future<void> downloadAndOpenRemote(String url, String fileName) async {
     ..click();
   anchor.remove();
 }
+
+/// Web: membuka [url] langsung di tab baru — PDF/gambar tampil di viewer
+/// bawaan browser, tanpa unduhan, tanpa file lokal.
+Future<void> openRemoteInNewTabImpl(String url) async {
+  html.window.open(url, '_blank');
+}
