@@ -216,6 +216,10 @@ class TimelineProvider with ChangeNotifier {
     final Set<String> existingIds = _events.map((e) => e.id).toSet();
     final Set<String> beforeIds = Set<String>.from(existingIds);
 
+    // Semua id event laporan yang diharapkan ada setelah sync ini —
+    // dipakai untuk membersihkan event basi/duplikat/terhapus.
+    final expectedReportEventIds = <String>{};
+
     for (final c in contracts) {
       final cId = c.id;
       final cName = c.namaKontrak;
@@ -323,13 +327,25 @@ class TimelineProvider with ChangeNotifier {
               final repId = rep['id']?.toString() ?? 'rep_$rIdx';
               final tglStr = rep['tanggal']?.toString() ?? '';
               final tglFormatted = rep['tanggalFormatted']?.toString() ?? tglStr;
-              final evId = 'timeline_daily_${cId}_${kIdx}_$repId';
+              // ID stabil: TANPA kIdx — urutan kegiatan bergeser tidak lagi
+              // meregenerasi event duplikat.
+              final evId = 'timeline_daily_${cId}_$repId';
+              expectedReportEventIds.add(evId);
 
               if (!existingIds.contains(evId)) {
-                DateTime repDate = DateTime.tryParse(tglStr) ??
-                    DateTime(2026, 4, 20 + (rIdx % 10), 16, 30);
-                if (repDate.hour == 0 && repDate.minute == 0) {
-                  repDate = DateTime(repDate.year, repDate.month, repDate.day, 16, 30);
+                // Waktu kejadian sebenarnya: waktu pembuatan dokumen di
+                // Firestore → createdAt → tanggal+jam laporan.
+                DateTime? repDate = DateTime.tryParse(rep['docCreateTime']?.toString() ?? '')?.toLocal() ??
+                    DateTime.tryParse(rep['createdAt']?.toString() ?? '')?.toLocal();
+                if (repDate == null) {
+                  repDate = DateTime.tryParse(tglStr) ?? DateTime.now();
+                  final jamStr = rep['jam']?.toString() ?? '';
+                  final jm = jamStr.split(':');
+                  if (jm.length == 2) {
+                    final h = int.tryParse(jm[0].trim()) ?? 0;
+                    final m = int.tryParse(jm[1].trim()) ?? 0;
+                    repDate = DateTime(repDate.year, repDate.month, repDate.day, h, m);
+                  }
                 }
 
                 final cuaca = rep['cuaca']?.toString() ?? 'Cerah';
@@ -385,10 +401,15 @@ class TimelineProvider with ChangeNotifier {
             if (wRep is Map) {
               final wId = wRep['id']?.toString() ?? 'w_$wIdx';
               final mKe = wRep['mingguKe'] ?? wRep['nomorMinggu'] ?? (wIdx + 1);
-              final evId = 'timeline_weekly_${cId}_${kIdx}_$wId';
+              // ID stabil: TANPA kIdx.
+              final evId = 'timeline_weekly_${cId}_$wId';
+              expectedReportEventIds.add(evId);
 
               if (!existingIds.contains(evId)) {
-                DateTime wTime = DateTime(2026, 4, 26).add(Duration(days: 7 * wIdx));
+                // Waktu kejadian sebenarnya (waktu buat dokumen di Firestore).
+                DateTime wTime = DateTime.tryParse(wRep['docCreateTime']?.toString() ?? '')?.toLocal() ??
+                    DateTime.tryParse(wRep['createdAt']?.toString() ?? '')?.toLocal() ??
+                    DateTime(2026, 4, 26).add(Duration(days: 7 * wIdx));
                 _events.add(TimelineEventModel(
                   id: evId,
                   timestamp: wTime,
@@ -505,6 +526,36 @@ class TimelineProvider with ChangeNotifier {
       final added = _events.where((e) => !beforeIds.contains(e.id)).toList();
       await _pushEventsToCloud(added);
       notifyListeners();
+    }
+
+    // ── Reconcile: bersihkan event laporan basi/duplikat/terhapus ──
+    // Menghapus event tersimpan (format lama berkIdx, event laporan yang
+    // sudah dihapus user, dsb.) yang tidak lagi cocok dengan daftar
+    // laporan sekarang. Hanya menyentuh event berpola laporan — event
+    // aksi user (logEvent) dan event lain tidak tersentuh.
+    final staleReportEvents = _events
+        .where((e) =>
+            (e.id.startsWith('timeline_daily_') ||
+                e.id.startsWith('timeline_weekly_')) &&
+            !expectedReportEventIds.contains(e.id))
+        .toList();
+    if (staleReportEvents.isNotEmpty) {
+      final db = _db;
+      if (db == null) return;
+      try {
+        final batch = db.batch();
+        for (final e in staleReportEvents) {
+          batch.delete(db.collection('timeline_events').doc(e.id));
+          _events.remove(e);
+        }
+        await batch.commit();
+        _sortEvents();
+        notifyListeners();
+        debugPrint(
+            '[TimelineProvider] ${staleReportEvents.length} event laporan basi dibersihkan');
+      } catch (e) {
+        debugPrint('[TimelineProvider] Reconcile gagal: $e');
+      }
     }
   }
 
