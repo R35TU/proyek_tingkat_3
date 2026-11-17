@@ -25,10 +25,8 @@ class PdfViewerScreen extends StatelessWidget {
     final safeFileName = fileName.endsWith('.pdf') ? fileName : '$fileName.pdf';
 
     if (kIsWeb) {
-      // Di Web, gunakan Printing.sharePdf agar otomatis terunduh melalui browser
       await Printing.sharePdf(bytes: bytes, filename: safeFileName);
     } else {
-      // Di Mobile (Android/iOS), gunakan service penyimpanan lokal
       if (context.mounted) {
         await PdfReportService.downloadAndOpenPdf(
           context: context,

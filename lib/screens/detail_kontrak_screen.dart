@@ -11,6 +11,7 @@ import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/services/storage_service.dart';
 import 'package:tata_saka_app/screens/detail_kegiatan_screen.dart';
 import 'package:tata_saka_app/screens/tambah_kontrak_screen.dart';
 import 'package:tata_saka_app/screens/form_kegiatan_screen.dart';
@@ -23,6 +24,7 @@ class _DocumentData {
   String sizeFormatted;
   DateTime uploadDate;
   String? localPath;
+  String? remoteUrl;
 
   _DocumentData({
     String? id,
@@ -32,6 +34,7 @@ class _DocumentData {
     this.sizeFormatted = '',
     DateTime? uploadDate,
     this.localPath,
+    this.remoteUrl,
   })  : id = id ?? 'doc_${DateTime.now().millisecondsSinceEpoch}',
         uploadDate = uploadDate ?? DateTime.now();
 
@@ -43,6 +46,7 @@ class _DocumentData {
         'sizeFormatted': sizeFormatted,
         'uploadDate': uploadDate.toIso8601String(),
         'localPath': localPath,
+        'remoteUrl': remoteUrl,
       };
 
   factory _DocumentData.fromJson(Map<String, dynamic> json) => _DocumentData(
@@ -55,6 +59,7 @@ class _DocumentData {
             ? (DateTime.tryParse(json['uploadDate']) ?? DateTime.now())
             : DateTime.now(),
         localPath: json['localPath']?.toString(),
+        remoteUrl: json['remoteUrl']?.toString(),
       );
 }
 
@@ -587,6 +592,25 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                                     savedPath = targetFile.path;
                                   }
 
+                                  // Unggah salinan ke Cloudflare R2 (URL publik).
+                                  String? remoteUrl;
+                                  if (savedPath != null) {
+                                    try {
+                                      remoteUrl = await StorageService
+                                          .uploadBytes(
+                                            bytes: await File(
+                                              savedPath,
+                                            ).readAsBytes(),
+                                            remotePath:
+                                                'dokumen/${widget.contract.id}/'
+                                                '${DateTime.now().millisecondsSinceEpoch}_$pickedFileName',
+                                            contentType: detectedType == 'IMG'
+                                                ? 'image/jpeg'
+                                                : 'application/pdf',
+                                          );
+                                    } catch (_) {}
+                                  }
+
                                   final formattedSize = _formatFileSize(pickedFileBytes > 0 ? pickedFileBytes : 1024 * 350);
                                   final newDoc = _DocumentData(
                                     id: 'doc_contract_${DateTime.now().millisecondsSinceEpoch}',
@@ -596,6 +620,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                                     sizeFormatted: formattedSize,
                                     uploadDate: DateTime.now(),
                                     localPath: savedPath,
+                                    remoteUrl: remoteUrl,
                                   );
 
                                   final targetFolder = _folders[selectedFolderIdx];

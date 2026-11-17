@@ -14,6 +14,7 @@ import 'package:provider/provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/timeline_provider.dart';
+import 'package:tata_saka_app/services/storage_service.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/utils/plat_nomor_util.dart';
 import 'package:tata_saka_app/widgets/clean_text_form_field.dart';
@@ -1112,7 +1113,35 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     return null;
   }
 
-  void _simpanLaporan() {
+  /// Unggah foto & TTD base64 ke Cloudflare R2, ganti isi list dengan URL publik.
+  /// Gagal unggah → biarkan base64 (laporan tetap tersimpan).
+  Future<void> _uploadMediaKeR2(String folderBase) async {
+    final folder = 'laporan-harian/$folderBase';
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    for (int i = 0; i < _fotoList.length; i++) {
+      if (!_fotoList[i].startsWith('data:')) continue;
+      final ext = _fotoList[i].contains('image/png') ? 'png' : 'jpg';
+      try {
+        _fotoList[i] = await StorageService.uploadBase64Image(
+          base64String: _fotoList[i],
+          remotePath: '$folder/foto-$stamp-$i.$ext',
+        );
+      } catch (_) {}
+    }
+    for (int i = 0; i < _ttdPengawasList.length; i++) {
+      final s = _ttdPengawasList[i].signatureBase64;
+      if (s == null || !s.startsWith('data:')) continue;
+      try {
+        _ttdPengawasList[i].signatureBase64 =
+            await StorageService.uploadBase64Image(
+              base64String: s,
+              remotePath: '$folder/ttd-$stamp-$i.png',
+            );
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _simpanLaporan() async {
     if (_selectedContract == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Silakan pilih kontrak terlebih dahulu')),
@@ -1296,6 +1325,12 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         }
       }
     }
+
+    // Unggah foto & TTD ke Cloudflare R2 (ganti base64 → URL) sebelum menyusun payload.
+    final kegIdRaw = (keg['id'] ?? keg['namaKegiatan'] ?? 'keg').toString();
+    final kegId = kegIdRaw.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    await _uploadMediaKeR2('${_selectedContract!.id}/$kegId/$reportId');
+    if (!mounted) return;
 
     // A. Clean Pekerjaan (dengan sub-items Material, Peralatan, Personil)
     final cleanPekerjaan = _pekerjaanList
@@ -3694,6 +3729,17 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     double? width,
     double? height,
   }) {
+    if (b64.startsWith('http')) {
+      return Image.network(
+        b64,
+        fit: fit,
+        width: width,
+        height: height,
+        errorBuilder: (context, error, stackTrace) => const Center(
+          child: Icon(Icons.broken_image, size: 24, color: Colors.grey),
+        ),
+      );
+    }
     try {
       String clean = b64;
       if (clean.contains(',')) {
