@@ -34,7 +34,13 @@ void main() {
       (tester) async {
         SharedPreferences.setMockInitialValues({});
         final konsultanProfile = UserProfileProvider();
-        konsultanProfile.loginAs(UserProfileProvider.registeredUsers[0]);
+        konsultanProfile.loginAs(const RegisteredUser(
+          username: 'konsultan',
+          password: 'password123',
+          role: 'Konsultan',
+          namaLengkap: 'CV. Tata Saka Consultant',
+          companyOrAgency: 'CV. Tata Saka Consultant',
+        ));
         final contractProvider = ContractProvider();
         final timelineProvider = TimelineProvider();
 
@@ -90,7 +96,13 @@ void main() {
       (tester) async {
         SharedPreferences.setMockInitialValues({});
         final konsultanProfile = UserProfileProvider();
-        konsultanProfile.loginAs(UserProfileProvider.registeredUsers[0]);
+        konsultanProfile.loginAs(const RegisteredUser(
+          username: 'konsultan',
+          password: 'password123',
+          role: 'Konsultan',
+          namaLengkap: 'CV. Tata Saka Consultant',
+          companyOrAgency: 'CV. Tata Saka Consultant',
+        ));
         final contractProvider = ContractProvider();
         final timelineProvider = TimelineProvider();
 

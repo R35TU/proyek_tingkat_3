@@ -22,10 +22,6 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Pastikan akun demo (admin/konsultan/kontraktor/dinas) ada di Firebase
-  // Auth + Firestore. Aman offline: dilewati bila Auth belum aktif.
-  await AuthService.ensureSeededAccounts();
-
   await initializeDateFormatting('id_ID', null);
 
   runApp(

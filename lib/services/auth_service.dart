@@ -19,14 +19,8 @@ class AuthService {
 
   static const String _emailDomain = 'tatasakaconsultant.id';
 
-  /// Email demo bawaan (seed) — password sama: `password123`.
-  static const List<Map<String, String>> seedAccounts = [
-    {'email': 'admin@$_emailDomain', 'username': 'admin', 'password': 'password123', 'role': 'Admin', 'nama': 'Admin Sistem', 'instansi': 'CV. Tata Saka Consultant'},
-    {'email': 'konsultan@$_emailDomain', 'username': 'konsultan', 'password': 'password123', 'role': 'Konsultan', 'nama': 'CV. Tata Saka Consultant', 'instansi': 'CV. Tata Saka Consultant'},
-    {'email': 'kontraktor1@$_emailDomain', 'username': 'kontraktor1', 'password': 'password123', 'role': 'Kontraktor', 'nama': 'CV. Divan Insan Cemerlang', 'instansi': 'CV. Divan Insan Cemerlang'},
-    {'email': 'kontraktor2@$_emailDomain', 'username': 'kontraktor2', 'password': 'password123', 'role': 'Kontraktor', 'nama': 'CV. Langgeng', 'instansi': 'CV. Langgeng'},
-    {'email': 'dinas@$_emailDomain', 'username': 'dinas', 'password': 'password123', 'role': 'Dinas', 'nama': 'DPU-PR Kabupaten Purbalingga', 'instansi': 'DPU-PR'},
-  ];
+  /// Akun demo dinonaktifkan — akun pengguna dikelola melalui menu Admin atau Firebase Auth / Firestore.
+  static const List<Map<String, String>> seedAccounts = [];
 
   static FirebaseAuth get auth => FirebaseAuth.instance;
   static FirebaseFirestore get _db => FirebaseFirestore.instance;
@@ -127,65 +121,8 @@ class AuthService {
     await user.updatePassword(newPassword);
   }
 
-  /// Pastikan akun demo (5 email sintetis) ada di Firebase Auth + Firestore.
-  /// Dijalankan sekali saat aplikasi start; aman dipanggil berkali-kali:
-  /// hanya melakukan sesuatu bila collection `users` masih kosong.
+  /// Akun demo dinonaktifkan — akun pengguna dikelola melalui menu Admin atau Firebase Console.
   static Future<void> ensureSeededAccounts() async {
-    try {
-      final users = await _db.collection('users').limit(1).get();
-      if (users.docs.isNotEmpty) return; // sudah ada profil — selesai
-
-      for (final acc in seedAccounts) {
-        final email = acc['email']!;
-        String uid;
-        try {
-          // Buat akun Auth via instance sekunder agar sesi aktif tidak berubah.
-          final tempApp = await Firebase.initializeApp(
-            name: 'seed-${DateTime.now().millisecondsSinceEpoch}',
-            options: DefaultFirebaseOptions.currentPlatform,
-          );
-          try {
-            final cred = await FirebaseAuth.instanceFor(app: tempApp)
-                .createUserWithEmailAndPassword(
-              email: email,
-              password: acc['password']!,
-            );
-            uid = cred.user!.uid;
-          } finally {
-            await tempApp.delete();
-          }
-        } on FirebaseAuthException catch (e) {
-          if (e.code == 'email-already-in-use') {
-            // Akun Auth sudah ada (mis. dari import) → login utk ambil uid.
-            final tempApp = await Firebase.initializeApp(
-              name: 'seed-in-${DateTime.now().millisecondsSinceEpoch}',
-              options: DefaultFirebaseOptions.currentPlatform,
-            );
-            try {
-              final cred = await FirebaseAuth.instanceFor(app: tempApp)
-                  .signInWithEmailAndPassword(email: email, password: acc['password']!);
-              uid = cred.user!.uid;
-            } finally {
-              await tempApp.delete();
-            }
-          } else {
-            rethrow;
-          }
-        }
-        await _db.collection('users').doc(uid).set({
-          'email': email,
-          'username': acc['username'],
-          'role': acc['role'],
-          'namaLengkap': acc['nama'],
-          'companyOrAgency': acc['instansi'],
-          'isActive': true,
-          'createdAt': DateTime.now().toIso8601String(),
-        });
-      }
-      debugPrint('[AuthService] Akun demo ter-seed (Auth + users).');
-    } catch (e) {
-      // Email/Password belum diaktifkan / offline → biarkan login lokal.
-      debugPrint('[AuthService] Seed dilewati: $e');
-    }
+    return;
   }
 }
