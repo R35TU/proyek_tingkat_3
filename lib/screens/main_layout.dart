@@ -26,9 +26,13 @@ class _MainLayoutState extends State<MainLayout> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final userProf = context.read<UserProfileProvider>();
-      final isAuth = AuthService.currentUser != null || userProf.username.isNotEmpty;
+      final isAuth = AuthService.currentUser != null && userProf.username.isNotEmpty;
       if (!isAuth) {
         Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+        return;
+      }
+      if (userProf.role.toLowerCase() == 'admin') {
+        Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);
       }
     });
   }

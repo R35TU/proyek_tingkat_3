@@ -59,6 +59,12 @@ class _AdminPageState extends State<AdminPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (AuthService.currentUser == null) {
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      }
+    });
     try {
       _usersSub = FirebaseFirestore.instance
           .collection('users')
