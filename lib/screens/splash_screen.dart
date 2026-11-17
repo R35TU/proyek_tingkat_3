@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tata_saka_app/services/auth_service.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -12,11 +13,27 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // Simulate loading and navigate to login
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
+    Future.delayed(const Duration(seconds: 3), () async {
+      if (!mounted) return;
+      final user = AuthService.currentUser;
+      if (user == null) {
         Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+        return;
       }
+      // Sesi masih ada → pastikan akun belum dinonaktifkan/hapus oleh Admin.
+      try {
+        final doc = await AuthService.fetchUserDoc(user.uid);
+        if (doc == null || doc['isActive'] == false) {
+          await AuthService.signOut();
+          if (!mounted) return;
+          Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+          return;
+        }
+      } catch (_) {
+        // Offline / Firestore tak terjangkau → biarkan sesi berlanjut.
+      }
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
     });
   }
 

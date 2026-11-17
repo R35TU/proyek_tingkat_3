@@ -1,17 +1,19 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:tata_saka_app/services/auth_service.dart';
 
 import 'login_screen.dart';
 
-// Sesuaikan import provider/model dan login_screen dengan nama project di pubspec.yaml kamu
-// import '../providers/auth_provider.dart';
-// import 'login_screen.dart';
-
+/// Akun pengguna tersimpan di Firestore collection `users` (doc id = uid Auth).
+/// Password TIDAK tersimpan di Firestore — dikelola Firebase Auth.
 class UserAccount {
-  final String id;
+  final String id; // uid Firebase Auth
   String name;
   String email;
-  String password;
-  String role; // 'Konsultan', 'Kontraktor', 'Dinas'
+  String role; // 'Konsultan', 'Kontraktor', 'Dinas', 'Admin'
   String instansi; // Nama CV/PT/Dinas
   bool isActive;
 
@@ -19,11 +21,22 @@ class UserAccount {
     required this.id,
     required this.name,
     required this.email,
-    required this.password,
     required this.role,
     required this.instansi,
     this.isActive = true,
   });
+
+  factory UserAccount.fromDoc(DocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>? ?? {};
+    return UserAccount(
+      id: doc.id,
+      name: (d['namaLengkap'] ?? d['username'] ?? '-').toString(),
+      email: (d['email'] ?? '-').toString(),
+      role: (d['role'] ?? 'Konsultan').toString(),
+      instansi: (d['companyOrAgency'] ?? '-').toString(),
+      isActive: d['isActive'] ?? true,
+    );
+  }
 }
 
 class AdminPage extends StatefulWidget {
@@ -38,33 +51,42 @@ class _AdminPageState extends State<AdminPage> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
-  // Data dummy sementara (nanti bisa dipindahkan ke Provider / Firebase / API)
-  final List<UserAccount> _accounts = [
-    UserAccount(
-      id: '1',
-      name: 'Budi Santoso, S.T.',
-      email: 'konsultan@tatasaka.id',
-      password: '123',
-      role: 'Konsultan',
-      instansi: 'CV. Tata Saka Consultant',
-    ),
-    UserAccount(
-      id: '2',
-      name: 'Andi Wijaya',
-      email: 'kontraktor@karyamandiri.id',
-      password: '123',
-      role: 'Kontraktor',
-      instansi: 'PT. Karya Mandiri Konstruksi',
-    ),
-    UserAccount(
-      id: '3',
-      name: 'Ir. Siti Aminah',
-      email: 'dinas@pupr.go.id',
-      password: '123',
-      role: 'Dinas',
-      instansi: 'Dinas Pekerjaan Umum (PUPR)',
-    ),
-  ];
+  // Daftar akun langsung dari Firestore `users` (real-time).
+  final List<UserAccount> _accounts = [];
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _usersSub;
+  bool _loadingAccounts = true;
+
+  @override
+  void initState() {
+    super.initState();
+    try {
+      _usersSub = FirebaseFirestore.instance
+          .collection('users')
+          .orderBy('createdAt')
+          .snapshots()
+          .listen((snap) {
+        if (!mounted) return;
+        setState(() {
+          _accounts
+            ..clear()
+            ..addAll(snap.docs.map(UserAccount.fromDoc));
+          _loadingAccounts = false;
+        });
+      }, onError: (_) {
+        if (mounted) setState(() => _loadingAccounts = false);
+      });
+    } catch (_) {
+      // Firestore tidak tersedia (mis. lingkungan test) → daftar kosong.
+      _loadingAccounts = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _usersSub?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
 
   List<UserAccount> get _filteredAccounts {
     return _accounts.where((acc) {
@@ -98,14 +120,13 @@ class _AdminPageState extends State<AdminPage> {
     final isEdit = existingAccount != null;
     final nameCtrl = TextEditingController(text: existingAccount?.name ?? '');
     final emailCtrl = TextEditingController(text: existingAccount?.email ?? '');
-    final passCtrl = TextEditingController(
-      text: existingAccount?.password ?? '',
-    );
+    final passCtrl = TextEditingController();
     final instansiCtrl = TextEditingController(
       text: existingAccount?.instansi ?? '',
     );
     String selectedRole = existingAccount?.role ?? 'Konsultan';
     bool isActive = existingAccount?.isActive ?? true;
+    bool isSaving = false;
     final formKey = GlobalKey<FormState>();
 
     showDialog(
@@ -190,17 +211,27 @@ class _AdminPageState extends State<AdminPage> {
                               : null,
                         ),
                         const SizedBox(height: 14),
-                        TextFormField(
-                          controller: passCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Password',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.lock_outline),
+                        if (isEdit)
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              'Password diubah oleh pengguna sendiri lewat menu Keamanan.',
+                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          )
+                        else
+                          TextFormField(
+                            controller: passCtrl,
+                            obscureText: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Password',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.lock_outline),
+                            ),
+                            validator: (v) => v == null || v.length < 6
+                                ? 'Password minimal 6 karakter (ketentuan Firebase)'
+                                : null,
                           ),
-                          validator: (v) => v == null || v.length < 3
-                              ? 'Password minimal 3 karakter'
-                              : null,
-                        ),
                         const SizedBox(height: 10),
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
@@ -231,44 +262,61 @@ class _AdminPageState extends State<AdminPage> {
                     backgroundColor: const Color(0xFF1E3A8A),
                     foregroundColor: Colors.white,
                   ),
-                  onPressed: () {
-                    if (formKey.currentState!.validate()) {
-                      setState(() {
-                        if (isEdit) {
-                          existingAccount.name = nameCtrl.text.trim();
-                          existingAccount.email = emailCtrl.text.trim();
-                          existingAccount.password = passCtrl.text.trim();
-                          existingAccount.role = selectedRole;
-                          existingAccount.instansi = instansiCtrl.text.trim();
-                          existingAccount.isActive = isActive;
-                        } else {
-                          _accounts.add(
-                            UserAccount(
-                              id: DateTime.now().millisecondsSinceEpoch
-                                  .toString(),
-                              name: nameCtrl.text.trim(),
-                              email: emailCtrl.text.trim(),
-                              password: passCtrl.text.trim(),
-                              role: selectedRole,
-                              instansi: instansiCtrl.text.trim(),
-                              isActive: isActive,
-                            ),
-                          );
-                        }
-                      });
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            isEdit
-                                ? 'Akun berhasil diperbarui'
-                                : 'Akun baru berhasil ditambahkan',
-                          ),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-                  },
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
+                          setDialogState(() => isSaving = true);
+                          try {
+                            if (isEdit) {
+                              await AuthService.updateUserDoc(
+                                existingAccount.id,
+                                {
+                                  'namaLengkap': nameCtrl.text.trim(),
+                                  'role': selectedRole,
+                                  'companyOrAgency': instansiCtrl.text.trim(),
+                                  'isActive': isActive,
+                                },
+                              );
+                            } else {
+                              await AuthService.createAccount(
+                                email: emailCtrl.text,
+                                password: passCtrl.text.trim(),
+                                role: selectedRole,
+                                namaLengkap: nameCtrl.text,
+                                instansi: instansiCtrl.text,
+                                isActive: isActive,
+                              );
+                            }
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  isEdit
+                                      ? 'Akun berhasil diperbarui'
+                                      : 'Akun baru berhasil ditambahkan ke Firebase',
+                                ),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          } catch (e) {
+                            if (ctx.mounted) {
+                              setDialogState(() => isSaving = false);
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    e is FirebaseAuthException &&
+                                            e.code == 'email-already-in-use'
+                                        ? 'Email sudah dipakai akun lain.'
+                                        : 'Gagal menyimpan: $e',
+                                  ),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        },
                   child: Text(isEdit ? 'Simpan Perubahan' : 'Buat Akun'),
                 ),
               ],
@@ -285,7 +333,8 @@ class _AdminPageState extends State<AdminPage> {
       builder: (ctx) => AlertDialog(
         title: const Text('Hapus Akun?'),
         content: Text(
-          'Apakah Anda yakin ingin menghapus akun "${account.name}" (${account.role})?',
+          'Apakah Anda yakin ingin menghapus akun "${account.name}" (${account.role})?\n\n'
+          'Pengguna tidak akan bisa login lagi ke aplikasi.',
         ),
         actions: [
           TextButton(
@@ -297,14 +346,25 @@ class _AdminPageState extends State<AdminPage> {
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
-            onPressed: () {
-              setState(() {
-                _accounts.removeWhere((item) => item.id == account.id);
-              });
+            onPressed: () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Akun berhasil dihapus')),
-              );
+              try {
+                await AuthService.deleteUserDoc(account.id);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Akun berhasil dihapus')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Gagal menghapus: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
             child: const Text('Hapus'),
           ),
@@ -336,8 +396,12 @@ class _AdminPageState extends State<AdminPage> {
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
+              try {
+                await AuthService.signOut();
+              } catch (_) {}
+              if (!mounted) return;
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -349,12 +413,6 @@ class _AdminPageState extends State<AdminPage> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   @override
@@ -538,7 +596,9 @@ class _AdminPageState extends State<AdminPage> {
                     ),
                     const SizedBox(height: 8),
                     Expanded(
-                      child: _filteredAccounts.isEmpty
+                      child: _loadingAccounts
+                          ? const Center(child: CircularProgressIndicator())
+                          : _filteredAccounts.isEmpty
                           ? const Center(
                               child: Text(
                                 'Tidak ada akun yang ditemukan.',
@@ -625,10 +685,6 @@ class _AdminPageState extends State<AdminPage> {
       children: [
         Text(acc.instansi, maxLines: 2, overflow: TextOverflow.ellipsis),
         Text(acc.email, maxLines: 1, overflow: TextOverflow.ellipsis),
-        Text(
-          'Password: ${acc.password}',
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
-        ),
       ],
     );
     final actions = Row(

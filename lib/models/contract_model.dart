@@ -1,5 +1,5 @@
 class ContractModel {
-  final String id;
+  String id;
   final String jenisKegiatan;
   final String namaKontrak;
   

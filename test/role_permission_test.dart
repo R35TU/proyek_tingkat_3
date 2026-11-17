@@ -15,7 +15,7 @@ void main() {
   });
 
   group('Role-Based Access Control (RBAC) - Authentication & Profiles', () {
-    test('Default user is Konsultan with full access flags', () {
+    test('Default user is Konsultan with full access flags', () async {
       final userProf = UserProfileProvider();
       expect(userProf.isKonsultan, isTrue);
       expect(userProf.isKontraktor, isFalse);
@@ -24,9 +24,9 @@ void main() {
       expect(userProf.companyOrAgency, 'CV. Tata Saka Consultant');
     });
 
-    test('Login as kontraktor1 switches role to Kontraktor (CV. Divan Insan Cemerlang)', () {
+    test('Login as kontraktor1 switches role to Kontraktor (CV. Divan Insan Cemerlang)', () async {
       final userProf = UserProfileProvider();
-      final success = userProf.login('kontraktor1', 'password123');
+      final success = await await userProf.login('kontraktor1', 'password123');
       expect(success, isTrue);
       expect(userProf.isKonsultan, isFalse);
       expect(userProf.isKontraktor, isTrue);
@@ -35,9 +35,9 @@ void main() {
       expect(userProf.companyOrAgency, 'CV. Divan Insan Cemerlang');
     });
 
-    test('Login as kontraktor2 switches role to Kontraktor (CV. Langgeng)', () {
+    test('Login as kontraktor2 switches role to Kontraktor (CV. Langgeng)', () async {
       final userProf = UserProfileProvider();
-      final success = userProf.login('kontraktor2', 'password123');
+      final success = await await userProf.login('kontraktor2', 'password123');
       expect(success, isTrue);
       expect(userProf.isKonsultan, isFalse);
       expect(userProf.isKontraktor, isTrue);
@@ -46,9 +46,9 @@ void main() {
       expect(userProf.companyOrAgency, 'CV. Langgeng');
     });
 
-    test('Login as dinas switches role to Dinas (DPU-PR)', () {
+    test('Login as dinas switches role to Dinas (DPU-PR)', () async {
       final userProf = UserProfileProvider();
-      final success = userProf.login('dinas', 'password123');
+      final success = await await userProf.login('dinas', 'password123');
       expect(success, isTrue);
       expect(userProf.isKonsultan, isFalse);
       expect(userProf.isKontraktor, isFalse);
@@ -57,14 +57,14 @@ void main() {
       expect(userProf.companyOrAgency, 'DPU-PR');
     });
 
-    test('Invalid credentials do not switch role', () {
+    test('Invalid credentials do not switch role', () async {
       final userProf = UserProfileProvider();
-      final success = userProf.login('kontraktor1', 'wrongpass');
+      final success = await await userProf.login('kontraktor1', 'wrongpass');
       expect(success, isFalse);
       expect(userProf.isKonsultan, isTrue);
     });
 
-    test('Registered contractors list contains both valid partner companies', () {
+    test('Registered contractors list contains both valid partner companies', () async {
       expect(UserProfileProvider.registeredContractors, contains('CV. Divan Insan Cemerlang'));
       expect(UserProfileProvider.registeredContractors, contains('CV. Langgeng'));
     });
@@ -86,7 +86,7 @@ void main() {
 
     testWidgets('Kontraktor bottom navigation has 4 tabs without Laporan', (tester) async {
       final userProf = UserProfileProvider();
-      userProf.login('kontraktor1', 'password123');
+      await userProf.login('kontraktor1', 'password123');
 
       await tester.pumpWidget(buildNavTestWidget(userProf));
       await tester.pumpAndSettle();
@@ -124,7 +124,7 @@ void main() {
 
     testWidgets('Dinas bottom navigation has 5 tabs including Kontrak and Laporan', (tester) async {
       final userProf = UserProfileProvider();
-      userProf.login('dinas', 'password123');
+      await userProf.login('dinas', 'password123');
 
       await tester.pumpWidget(buildNavTestWidget(userProf));
       await tester.pumpAndSettle();
@@ -142,7 +142,7 @@ void main() {
   });
 
   group('Data Scoping and Isolation Tests', () {
-    test('Contractor data scoping correctly filters activities by contractor company', () {
+    test('Contractor data scoping correctly filters activities by contractor company', () async {
       final contract = SampleContractData.getDemoContract();
       expect(contract.kegiatans.isNotEmpty, isTrue);
 
@@ -172,7 +172,7 @@ void main() {
       }
     });
 
-    test('Dinas data scoping correctly matches DPU-PR agency in contracts', () {
+    test('Dinas data scoping correctly matches DPU-PR agency in contracts', () async {
       final contract = SampleContractData.getDemoContract();
       final isMatchingDinas = contract.instansiDinas.any((d) {
         final up = d.toUpperCase();
@@ -186,7 +186,7 @@ void main() {
     testWidgets('KelolaRkkScreen in readOnly mode displays banner and hides mutation buttons', (tester) async {
       final contract = SampleContractData.getDemoContract();
       final userProf = UserProfileProvider();
-      userProf.login('kontraktor1', 'password123');
+      await userProf.login('kontraktor1', 'password123');
 
       await tester.pumpWidget(
         MultiProvider(
@@ -216,7 +216,7 @@ void main() {
     testWidgets('KelolaAddendumScreen in readOnly mode hides Addendum creation button', (tester) async {
       final contract = SampleContractData.getDemoContract();
       final userProf = UserProfileProvider();
-      userProf.login('dinas', 'password123');
+      await userProf.login('dinas', 'password123');
 
       await tester.pumpWidget(
         MultiProvider(

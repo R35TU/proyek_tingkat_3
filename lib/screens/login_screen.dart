@@ -23,19 +23,19 @@ class _LoginScreenState extends State<LoginScreen> {
   bool obscurePassword = true;
   bool rememberMe = true;
 
-  late TextEditingController _usernameController;
+  late TextEditingController _emailController;
   late TextEditingController _passwordController;
 
   @override
   void initState() {
     super.initState();
-    _usernameController = TextEditingController(text: 'konsultan');
+    _emailController = TextEditingController(text: 'konsultan@tatasakaconsultant.id');
     _passwordController = TextEditingController(text: 'password123');
   }
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -44,39 +44,46 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       selectedRole = role;
       if (role == 'Konsultan') {
-        _usernameController.text = 'konsultan';
+        _emailController.text = 'konsultan@tatasakaconsultant.id';
       } else if (role == 'Kontraktor') {
-        _usernameController.text = 'kontraktor1';
+        _emailController.text = 'kontraktor1@tatasakaconsultant.id';
       } else if (role == 'Dinas') {
-        _usernameController.text = 'dinas';
+        _emailController.text = 'dinas@tatasakaconsultant.id';
       }
       _passwordController.text = 'password123';
     });
   }
 
-  void _performLogin() {
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text.trim();
+  bool _isLoggingIn = false;
 
-    // Cek login khusus Admin (langsung masuk ke AdminPage)
-    if (username.toLowerCase() == 'admin' && password == 'password123') {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const AdminPage()),
-        (route) => false,
-      );
-      return;
-    }
+  Future<void> _performLogin() async {
+    final username = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    if (_isLoggingIn || password.isEmpty) return;
+
+    setState(() => _isLoggingIn = true);
 
     final userProf = context.read<UserProfileProvider>();
-    final success = userProf.login(username, password, roleHint: selectedRole);
+    final success = await userProf.login(username, password, roleHint: selectedRole);
+
+    if (!mounted) return;
+    setState(() => _isLoggingIn = false);
 
     if (success) {
+      // Admin (role Admin) masuk ke dashboard manajemen akun.
+      if (userProf.role.toLowerCase() == 'admin') {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const AdminPage()),
+          (route) => false,
+        );
+        return;
+      }
       Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Username atau password salah. Silakan coba kembali.'),
+          content: Text('Email atau password salah. Silakan coba kembali.'),
           backgroundColor: AppColors.primaryRed,
         ),
       );
@@ -202,10 +209,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 11),
                         ),
-                        selected: _usernameController.text == 'kontraktor1',
+                        selected: _emailController.text == 'kontraktor1@tatasakaconsultant.id',
                         selectedColor: const Color(0xFF2563EB),
                         labelStyle: TextStyle(
-                          color: _usernameController.text == 'kontraktor1'
+                          color: _emailController.text == 'kontraktor1@tatasakaconsultant.id'
                               ? Colors.white
                               : const Color(0xFF1E293B),
                           fontWeight: FontWeight.bold,
@@ -213,7 +220,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         onSelected: (val) {
                           if (val) {
                             setState(() {
-                              _usernameController.text = 'kontraktor1';
+                              _emailController.text = 'kontraktor1@tatasakaconsultant.id';
                             });
                           }
                         },
@@ -227,10 +234,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 11),
                         ),
-                        selected: _usernameController.text == 'kontraktor2',
+                        selected: _emailController.text == 'kontraktor2@tatasakaconsultant.id',
                         selectedColor: const Color(0xFF2563EB),
                         labelStyle: TextStyle(
-                          color: _usernameController.text == 'kontraktor2'
+                          color: _emailController.text == 'kontraktor2@tatasakaconsultant.id'
                               ? Colors.white
                               : const Color(0xFF1E293B),
                           fontWeight: FontWeight.bold,
@@ -238,7 +245,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         onSelected: (val) {
                           if (val) {
                             setState(() {
-                              _usernameController.text = 'kontraktor2';
+                              _emailController.text = 'kontraktor2@tatasakaconsultant.id';
                             });
                           }
                         },
@@ -253,9 +260,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
         const SizedBox(height: 20),
 
-        // Username Field
+        // Email Field
         const Text(
-          'Username Akun',
+          'Email Akun',
           style: TextStyle(
             fontSize: 12.5,
             fontWeight: FontWeight.bold,
@@ -264,9 +271,9 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 6),
         TextFormField(
-          controller: _usernameController,
+          controller: _emailController,
           decoration: InputDecoration(
-            hintText: 'Masukkan username',
+            hintText: 'Masukkan email',
             filled: true,
             fillColor: AppColors.inputBackground,
             contentPadding: const EdgeInsets.symmetric(

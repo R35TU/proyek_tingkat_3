@@ -38,7 +38,7 @@ class _KeamananScreenState extends State<KeamananScreen> {
     super.dispose();
   }
 
-  void _submitChangePassword() {
+  Future<void> _submitChangePassword() async {
     final currentPass = _currentPasswordController.text;
     final newPass = _newPasswordController.text;
     final confirmPass = _confirmPasswordController.text;
@@ -69,7 +69,8 @@ class _KeamananScreenState extends State<KeamananScreen> {
       return;
     }
 
-    final success = provider.changePassword(currentPass, newPass);
+    final success = await provider.changePassword(currentPass, newPass);
+    if (!mounted) return;
     if (success) {
       _currentPasswordController.clear();
       _newPasswordController.clear();
