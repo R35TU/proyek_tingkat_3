@@ -35,11 +35,39 @@ class AuthService {
     }
   }
 
-  /// Login ke Firebase Auth — input langsung berupa EMAIL (tanpa terjemahan).
-  /// Melempar FirebaseAuthException jika gagal.
-  static Future<UserCredential> signIn(String email, String password) {
+  /// Login ke Firebase Auth — menerima EMAIL atau USERNAME.
+  /// Jika input tidak mengandung '@', dicari via Firestore 'users' ATAU
+  /// dipetakan ke domain sistem (username@tatasakaconsultant.id).
+  static Future<UserCredential> signIn(String input, String password) async {
+    final clean = input.trim().toLowerCase();
+    String targetEmail = clean;
+
+    if (!clean.contains('@')) {
+      // 1. Coba cari email dari username di Firestore collection 'users'
+      try {
+        final snap = await _db
+            .collection('users')
+            .where('username', isEqualTo: clean)
+            .limit(1)
+            .get();
+        if (snap.docs.isNotEmpty) {
+          final docEmail = snap.docs.first.data()['email']?.toString();
+          if (docEmail != null && docEmail.contains('@')) {
+            targetEmail = docEmail;
+          }
+        }
+      } catch (_) {
+        // Query ditolak rules / offline → lanjut ke fallback domain sistem.
+      }
+
+      // 2. Fallback: gunakan domain sistem
+      if (!targetEmail.contains('@')) {
+        targetEmail = '$clean@$_emailDomain';
+      }
+    }
+
     return auth.signInWithEmailAndPassword(
-      email: email.trim().toLowerCase(),
+      email: targetEmail.trim().toLowerCase(),
       password: password,
     );
   }

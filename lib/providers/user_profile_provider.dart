@@ -210,18 +210,17 @@ class UserProfileProvider with ChangeNotifier {
   }
 
   // ─── AUTH & LOGIN ACTIONS ───
-  /// Login via Firebase Auth (EMAIL langsung, tanpa terjemahan) + profil
-  /// Firestore. Jika Firebase gagal (offline / Auth belum aktif), fallback
-  /// ke akun lokal (email atau username).
-  Future<bool> login(String emailInput, String passwordInput,
+  /// Login via Firebase Auth (menerima EMAIL atau USERNAME) + profil
+  /// Firestore.
+  Future<bool> login(String input, String passwordInput,
       {String? roleHint}) async {
-    final cleanEmail = emailInput.trim().toLowerCase();
+    final cleanInput = input.trim().toLowerCase();
     final cleanPassword = passwordInput.trim();
     if (cleanPassword.isEmpty) return false;
 
     // ── 1. Coba Firebase Auth ──
     try {
-      final cred = await AuthService.signIn(cleanEmail, cleanPassword);
+      final cred = await AuthService.signIn(cleanInput, cleanPassword);
       final uid = cred.user!.uid;
       final doc = await AuthService.fetchUserDoc(uid);
       if (doc != null && doc['isActive'] == false) {
@@ -229,9 +228,10 @@ class UserProfileProvider with ChangeNotifier {
         await AuthService.signOut();
         return false;
       }
-      _username = (doc?['username'] ?? cleanEmail.split('@').first).toString();
+      final fallbackUsername = cleanInput.contains('@') ? cleanInput.split('@').first : cleanInput;
+      _username = (doc?['username'] ?? fallbackUsername).toString();
       _role = (doc?['role'] ?? roleHint ?? 'Konsultan').toString();
-      _namaLengkap = (doc?['namaLengkap'] ?? 'Pengguna').toString();
+      _namaLengkap = (doc?['namaLengkap'] ?? fallbackUsername).toString();
       _companyOrAgency = (doc?['companyOrAgency'] ?? 'Tata Saka').toString();
       _currentPassword = cleanPassword;
       _profileImagePath = null;
@@ -243,7 +243,7 @@ class UserProfileProvider with ChangeNotifier {
     }
 
     // ── 2. Fallback lokal (mode offline / dev) ──
-    return _loginLocal(cleanEmail, cleanPassword, roleHint: roleHint);
+    return _loginLocal(cleanInput, cleanPassword, roleHint: roleHint);
   }
 
   /// Jalur login lokal dinonaktifkan — autentikasi sepenuhnya melalui Firebase Auth.
