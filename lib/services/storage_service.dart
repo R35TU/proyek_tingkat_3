@@ -42,7 +42,7 @@ class StorageService {
   static const String bucket = 'lapakdir-media';
   static const String region = 'auto';
   static const String publicBaseUrl =
-      'https://pub-8e92a1d103164d3182dd4796ffe1ce9a.r2.dev';
+      'https://cdn.lapakdir.com';
 
   /// Menghasilkan URL publik untuk file di bucket R2
   static String getPublicUrl(String remotePath) {
