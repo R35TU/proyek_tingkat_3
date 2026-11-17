@@ -1,4 +1,7 @@
 import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
@@ -21,6 +24,12 @@ class PdfViewerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isWebDesktop =
+        kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.macOS ||
+            defaultTargetPlatform == TargetPlatform.linux);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -30,36 +39,39 @@ class PdfViewerScreen extends StatelessWidget {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
-        actions: [
-          IconButton(
-            tooltip: 'Simpan / Buka File PDF',
-            icon: const Icon(Icons.file_download_outlined),
-            onPressed: () async {
-              try {
-                final bytes = await buildPdf();
-                if (context.mounted) {
-                  await PdfReportService.downloadAndOpenPdf(
-                    context: context,
-                    bytes: bytes,
-                    fileName: fileName,
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Gagal menyimpan PDF: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-          ),
-        ],
+        actions: isWebDesktop
+            ? []
+            : [
+                IconButton(
+                  tooltip: 'Simpan / Buka File PDF',
+                  icon: const Icon(Icons.file_download_outlined),
+                  onPressed: () async {
+                    try {
+                      final bytes = await buildPdf();
+                      if (context.mounted) {
+                        await PdfReportService.downloadAndOpenPdf(
+                          context: context,
+                          bytes: bytes,
+                          fileName: fileName,
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Gagal menyimpan PDF: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                ),
+              ],
       ),
       body: PdfPreview(
         build: (format) => buildPdf(),
+        allowSharing: !isWebDesktop,
         initialPageFormat: pageFormat,
         pdfFileName: fileName,
         canChangePageFormat: false,
@@ -97,30 +109,36 @@ class PdfViewerScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          PdfPreviewAction(
-            icon: const Icon(Icons.download_rounded),
-            onPressed: (context, buildPdfCallback, previewPageFormat) async {
-              try {
-                final bytes = await buildPdfCallback(previewPageFormat);
-                if (context.mounted) {
-                  await PdfReportService.downloadAndOpenPdf(
-                    context: context,
-                    bytes: bytes,
-                    fileName: fileName,
-                  );
+          if (isWebDesktop)
+            PdfShareAction(
+              icon: const Icon(Icons.download_rounded),
+              filename: fileName,
+            )
+          else
+            PdfPreviewAction(
+              icon: const Icon(Icons.download_rounded),
+              onPressed: (context, buildPdfCallback, previewPageFormat) async {
+                try {
+                  final bytes = await buildPdfCallback(previewPageFormat);
+                  if (context.mounted) {
+                    await PdfReportService.downloadAndOpenPdf(
+                      context: context,
+                      bytes: bytes,
+                      fileName: fileName,
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Gagal mengunduh PDF: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Gagal mengunduh PDF: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-          ),
+              },
+            ),
         ],
       ),
     );
