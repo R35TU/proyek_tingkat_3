@@ -58,6 +58,18 @@ class StorageService {
     return clean.replaceAll(RegExp(r'[^a-zA-Z0-9._\-/]'), '_');
   }
 
+  /// Sanitasi SELURUH path objek per-segment — slash pemisah folder
+  /// dipertahankan, isi tiap segment dibersihkan.
+  /// Contoh: `dokumen/TEST 1/SPK/laporan (1).pdf` → `dokumen/TEST_1/SPK/laporan__1_.pdf`
+  static String safeObjectPath(String path) {
+    final segments = path.split('/');
+    final cleaned = segments
+        .map((s) => s.replaceAll(RegExp(r'[^a-zA-Z0-9._\-]'), '_'))
+        .where((s) => s.isNotEmpty)
+        .toList();
+    return cleaned.join('/');
+  }
+
   /// Mengunggah data bytes (Uint8List) langsung ke Cloudflare R2 menggunakan S3 Signature V4.
   /// Mengembalikan URL publik file yang berhasil diunggah.
   static Future<String> uploadBytes({

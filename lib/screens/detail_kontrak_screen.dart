@@ -613,9 +613,8 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                                       remoteUrl = await StorageService
                                           .uploadBytes(
                                             bytes: uploadBytesData,
-                                            remotePath:
-                                                'dokumen/${widget.contract.id}/'
-                                                '${DateTime.now().millisecondsSinceEpoch}_$pickedFileName',
+                                            remotePath: StorageService.safeObjectPath(
+                                                'dokumen/${widget.contract.namaKontrak}/${_folders[selectedFolderIdx].name}/${DateTime.now().millisecondsSinceEpoch}_$pickedFileName'),
                                             contentType: detectedType == 'IMG'
                                                 ? 'image/jpeg'
                                                 : 'application/pdf',
