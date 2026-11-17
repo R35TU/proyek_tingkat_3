@@ -88,7 +88,7 @@ class ContractProvider with ChangeNotifier {
       final removedIds = <String>{};
       bool anyRealChange = false;
 
-      for (final ch in snap.docChanges()) {
+      for (final ch in snap.docChanges) {
         final id = ch.doc.id;
         if (ch.type == DocumentChangeType.removed) {
           removedIds.add(id);
