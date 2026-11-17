@@ -520,31 +520,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  /// Label waktu relatif yang benar: Hari ini / Kemarin / tanggal lengkap.
+  static String _relativeTimeLabel(String? tglStr, String? jam) {
+    final tgl = DateTime.tryParse(tglStr ?? '');
+    if (tgl == null) return (jam != null && jam.isNotEmpty) ? jam : '';
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(tgl.year, tgl.month, tgl.day);
+    if (day == today) {
+      return (jam != null && jam.isNotEmpty) ? 'Hari ini • $jam' : 'Hari ini';
+    }
+    if (day == today.subtract(const Duration(days: 1))) {
+      return (jam != null && jam.isNotEmpty) ? 'Kemarin • $jam' : 'Kemarin';
+    }
+    return tglStr ?? '';
+  }
+
   List<Map<String, String>> _extractRecentActivities(
     List<ContractModel> contracts,
   ) {
-    final List<Map<String, String>> list = [];
+    final List<Map<String, dynamic>> list = [];
     for (final c in contracts) {
       for (final keg in c.kegiatans) {
         final laporans = keg['laporans'] as List? ?? [];
         for (final rep in laporans) {
           if (rep is Map) {
+            final tglStr = rep['tanggal']?.toString() ?? '';
             list.add({
               'title': 'Laporan Harian Ditambahkan',
               'desc':
                   '${rep['tanggalFormatted'] ?? rep['tanggal'] ?? 'Laporan'} - ${keg['namaKegiatan'] ?? c.namaKontrak}',
-              'time': (rep['jam'] ?? 'Hari ini').toString(),
+              'time': _relativeTimeLabel(tglStr, rep['jam']?.toString()),
+              'sortTs':
+                  DateTime.tryParse(tglStr)?.millisecondsSinceEpoch ?? 0,
             });
           }
         }
         final mingguan = keg['laporanMingguan'] as List? ?? [];
         for (final m in mingguan) {
           if (m is Map) {
+            final periode = m['periodeAkhir']?.toString() ?? '';
+            final periodeTs = DateTime.tryParse(periode)?.millisecondsSinceEpoch ??
+                (DateTime.tryParse(m['docCreateTime']?.toString() ?? '')
+                        ?.millisecondsSinceEpoch ??
+                    0);
             list.add({
               'title': 'Laporan Mingguan Dibuat',
               'desc':
                   'Minggu ke-${m['mingguKe']} - ${keg['namaKegiatan'] ?? c.namaKontrak}',
-              'time': (m['periodeAkhir'] ?? 'Minggu ini').toString(),
+              'time': periode.isNotEmpty ? periode : 'Minggu ini',
+              'sortTs': periodeTs,
             });
           }
         }
@@ -554,10 +579,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             final docs = f['documents'] as List? ?? [];
             for (final d in docs) {
               if (d is Map) {
+                final upTs = DateTime.tryParse(d['uploadDate']?.toString() ?? '')
+                        ?.millisecondsSinceEpoch ??
+                    (d['sortTs'] as num?)?.toInt() ??
+                    0;
                 list.add({
                   'title': 'Dokumen Diunggah',
                   'desc': 'File "${d['name']}" pada ${f['name']}',
                   'time': (d['uploadDate'] ?? '-').toString(),
+                  'sortTs': upTs,
                 });
               }
             }
@@ -565,7 +595,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
       }
     }
-    return list;
+    // Urutkan: terbaru di atas (konsisten dengan Timeline & Histori).
+    list.sort((a, b) =>
+        ((b['sortTs'] as num?) ?? 0).compareTo((a['sortTs'] as num?) ?? 0));
+    return list.map((e) => Map<String, String>.from(e)).toList();
   }
 
   Widget _buildCarouselCard(ContractModel contract) {
