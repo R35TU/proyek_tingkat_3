@@ -20,6 +20,7 @@ class KegiatanModel {
 
   // PENYEDIA JASA / KONTRAKTOR PELAKSANA
   String kontraktor;
+  String kontraktorUid;
   String noSuratPesanan;
   String tglSuratPesanan;
   String noSpmkKontraktor;
@@ -88,6 +89,7 @@ class KegiatanModel {
     this.masaPelaksanaan = '',
     this.waktuBerjalan = '',
     this.kontraktor = '',
+    this.kontraktorUid = '',
     this.noSuratPesanan = '',
     this.tglSuratPesanan = '',
     this.noSpmkKontraktor = '',
@@ -251,6 +253,7 @@ class KegiatanModel {
         : calculateWaktuBerjalan(awalPelaksanaan);
 
     final kontraktor = json['kontraktor'] ?? '';
+    final kontraktorUid = json['kontraktorUid'] ?? '';
     final noSuratPesanan = json['noSuratPesanan'] ?? '';
     final tglSuratPesanan = (json['tglSuratPesanan'] != null && json['tglSuratPesanan'].toString().isNotEmpty)
         ? json['tglSuratPesanan'].toString()
@@ -317,6 +320,7 @@ class KegiatanModel {
       masaPelaksanaan: masaPelaksanaan,
       waktuBerjalan: waktuBerjalan,
       kontraktor: kontraktor,
+      kontraktorUid: kontraktorUid,
       noSuratPesanan: noSuratPesanan,
       tglSuratPesanan: tglSuratPesanan,
       noSpmkKontraktor: noSpmkKontraktor,
@@ -363,6 +367,7 @@ class KegiatanModel {
       'masaPelaksanaan': masaPelaksanaan,
       'waktuBerjalan': waktuBerjalan,
       'kontraktor': kontraktor,
+      'kontraktorUid': kontraktorUid,
       'noSuratPesanan': noSuratPesanan,
       'tglSuratPesanan': tglSuratPesanan,
       'noSpmkKontraktor': noSpmkKontraktor,

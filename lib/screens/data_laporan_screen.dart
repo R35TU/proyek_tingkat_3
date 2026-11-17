@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
@@ -27,6 +28,14 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
     Map<String, dynamic> k,
     UserProfileProvider userProf,
   ) {
+    final currentUserUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final kKontraktorUid = (k['kontraktorUid'] ?? '').toString();
+
+    // FIRST: match by kontraktorUid
+    if (currentUserUid.isNotEmpty && kKontraktorUid.isNotEmpty && kKontraktorUid == currentUserUid) {
+      return true;
+    }
+
     final contractorName = userProf.namaLengkap.toLowerCase();
     final kKontraktor = (k['kontraktor'] ?? '').toString().toLowerCase();
     if (kKontraktor.isEmpty) return false;

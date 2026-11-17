@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
@@ -882,6 +883,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     List<ContractModel> contracts,
   ) {
     final contractorName = userProf.namaLengkap.toLowerCase();
+    final currentUserUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final List<Map<String, dynamic>> myKegiatans = [];
     final List<int> kegIndices = [];
     final List<ContractModel> parentContracts = [];
@@ -890,9 +892,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       for (int i = 0; i < c.kegiatans.length; i++) {
         final k = c.kegiatans[i];
         final kKontraktor = (k['kontraktor'] ?? '').toString().toLowerCase();
+        final kKontraktorUid = (k['kontraktorUid'] ?? '').toString();
 
         bool isMine = false;
-        if (kKontraktor.isNotEmpty) {
+
+        // FIRST: try matching by kontraktorUid (Firebase Auth UID)
+        if (currentUserUid.isNotEmpty && kKontraktorUid.isNotEmpty && kKontraktorUid == currentUserUid) {
+          isMine = true;
+        }
+
+        // FALLBACK: name-based matching for backward compatibility
+        if (!isMine && kKontraktor.isNotEmpty) {
           if (kKontraktor.contains(contractorName) ||
               contractorName.contains(kKontraktor)) {
             isMine = true;
