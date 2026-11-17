@@ -1,12 +1,13 @@
 import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:tata_saka_app/services/pdf_saver_stub.dart'
-    if (dart.library.html) 'package:tata_saka_app/services/pdf_saver_web.dart'
-    if (dart.library.io) 'package:tata_saka_app/services/pdf_saver_native.dart';
+import 'package:tata_saka_app/services/pdf_saver_native.dart'
+    if (dart.library.js_interop) 'package:tata_saka_app/services/pdf_saver_web.dart'
+    if (dart.library.html) 'package:tata_saka_app/services/pdf_saver_web.dart';
 import 'package:tata_saka_app/models/addendum_model.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/kegiatan_model.dart';
@@ -30,7 +31,11 @@ class PdfReportService {
   static String formatRupiah(num value) => _currencyFormat.format(value).trim();
   static String formatNum(num value, {int decimals = 2}) {
     if (decimals == 3) {
-      final f = NumberFormat.currency(locale: 'id_ID', symbol: '', decimalDigits: 3);
+      final f = NumberFormat.currency(
+        locale: 'id_ID',
+        symbol: '',
+        decimalDigits: 3,
+      );
       return f.format(value).trim();
     }
     return _numberFormat.format(value).trim();
@@ -51,19 +56,23 @@ class PdfReportService {
   }) async {
     final pdf = pw.Document();
 
-    final tglFormatted = (report['tanggalFormatted'] ?? report['tanggal'] ?? '-').toString();
-    final pekList = normalizedPekerjaanList ??
+    final tglFormatted =
+        (report['tanggalFormatted'] ?? report['tanggal'] ?? '-').toString();
+    final pekList =
+        normalizedPekerjaanList ??
         ((report['pekerjaanList'] as List?)
                 ?.map((e) => Map<String, dynamic>.from(e is Map ? e : {}))
                 .toList() ??
             []);
-    final cuacaList = cuacaKejadianList ??
+    final cuacaList =
+        cuacaKejadianList ??
         ((report['cuacaKejadianList'] as List?)
                 ?.map((e) => Map<String, dynamic>.from(e is Map ? e : {}))
                 .toList() ??
             []);
 
-    final instruksi = (report['instruksi'] ?? report['instruksiSaran'] ?? '-').toString();
+    final instruksi = (report['instruksi'] ?? report['instruksiSaran'] ?? '-')
+        .toString();
 
     // ── LEMBAR 1: BUKU HARIAN STANDAR (CATATAN HARIAN) ──
     pdf.addPage(
@@ -117,7 +126,9 @@ class PdfReportService {
           pw.SizedBox(height: 12),
 
           // F. INSTRUKSI & SARAN-SARAN
-          _buildPdfSectionTitle('F. INSTRUKSI DAN SARAN-SARAN KONSULTAN SUPERVISI'),
+          _buildPdfSectionTitle(
+            'F. INSTRUKSI DAN SARAN-SARAN KONSULTAN SUPERVISI',
+          ),
           pw.Container(
             width: double.infinity,
             padding: const pw.EdgeInsets.all(8),
@@ -125,9 +136,7 @@ class PdfReportService {
               border: pw.Border.all(color: PdfColors.black, width: 0.8),
             ),
             child: pw.Text(
-              instruksi.trim().isNotEmpty && instruksi != '-'
-                  ? instruksi
-                  : 'Pekerjaan dilaksanakan sesuai dengan gambar kerja, spesifikasi teknis Bina Marga, dan instruksi pengawas lapangan. Utamakan ketepatan elevasi, pemadatan lapis agregat, dan keselamatan K3.',
+              instruksi.trim().isNotEmpty && instruksi != '-' ? instruksi : 'Pekerjaan dilaksanakan sesuai dengan gambar kerja, spesifikasi teknis Bina Marga, dan instruksi pengawas lapangan. Utamakan ketepatan elevasi, pemadatan lapis agregat, dan keselamatan K3.',
               style: const pw.TextStyle(fontSize: 8.5),
             ),
           ),
@@ -170,7 +179,8 @@ class PdfReportService {
             ...pekList.asMap().entries.map((entry) {
               final idx = entry.key + 1;
               final p = entry.value;
-              final pJenis = (p['jenis'] ?? p['uraian'] ?? 'Pekerjaan #$idx').toString();
+              final pJenis = (p['jenis'] ?? p['uraian'] ?? 'Pekerjaan #$idx')
+                  .toString();
               final pVol = (p['volume'] ?? '-').toString();
               final pLok = (p['lokasi'] ?? lokasi).toString();
 
@@ -189,13 +199,19 @@ class PdfReportService {
                   children: [
                     pw.Container(
                       color: PdfColors.grey200,
-                      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 4,
+                      ),
                       child: pw.Row(
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
                           pw.Text(
                             'ITEM #$idx: $pJenis',
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9),
+                            style: pw.TextStyle(
+                              fontWeight: pw.FontWeight.bold,
+                              fontSize: 9,
+                            ),
                           ),
                           pw.Text(
                             'Vol: $pVol  |  Lokasi: $pLok',
@@ -206,18 +222,24 @@ class PdfReportService {
                     ),
                     pw.SizedBox(height: 6),
                     if (mats.isNotEmpty) ...[
-                      pw.Text('Material: ${mats.map((m) => "${m['jenis'] ?? '-'}: ${m['volume'] ?? '-'}").join(', ')}',
-                          style: const pw.TextStyle(fontSize: 8)),
+                      pw.Text(
+                        'Material: ${mats.map((m) => "${m['jenis'] ?? '-'}: ${m['volume'] ?? '-'}").join(', ')}',
+                        style: const pw.TextStyle(fontSize: 8),
+                      ),
                       pw.SizedBox(height: 3),
                     ],
                     if (alats.isNotEmpty) ...[
-                      pw.Text('Peralatan: ${alats.map((a) => "${a['jenis'] ?? '-'}: ${a['jumlah'] ?? a['cacahAktif'] ?? '-'} unit").join(', ')}',
-                          style: const pw.TextStyle(fontSize: 8)),
+                      pw.Text(
+                        'Peralatan: ${alats.map((a) => "${a['jenis'] ?? '-'}: ${a['jumlah'] ?? a['cacahAktif'] ?? '-'} unit").join(', ')}',
+                        style: const pw.TextStyle(fontSize: 8),
+                      ),
                       pw.SizedBox(height: 3),
                     ],
                     if (pers.isNotEmpty) ...[
-                      pw.Text('Personil: ${pers.map((pr) => "${pr['role'] ?? '-'}: ${pr['cacah'] ?? '-'} org").join(', ')}',
-                          style: const pw.TextStyle(fontSize: 8)),
+                      pw.Text(
+                        'Personil: ${pers.map((pr) => "${pr['role'] ?? '-'}: ${pr['cacah'] ?? '-'} org").join(', ')}',
+                        style: const pw.TextStyle(fontSize: 8),
+                      ),
                     ],
                   ],
                 ),
@@ -264,14 +286,29 @@ class PdfReportService {
           _buildPdfMetaBox([
             ['Nama Kegiatan', ':  $namaKegiatan'],
             ['Lokasi Proyek', ':  $lokasi'],
-            ['Nomor Kontrak / SPK', ':  ${report.nomorKontrak.isNotEmpty ? report.nomorKontrak : contract.nomorSpk}'],
-            ['Tanggal Kontrak / SPMK', ':  ${report.tanggalKontrak.isNotEmpty ? report.tanggalKontrak : contract.tglMulaiSpk}'],
-            ['Nilai Kontrak', ':  ${report.nilaiKontrak.isNotEmpty ? report.nilaiKontrak : "Rp ${formatNum(report.nilaiKontrakNumeric)}"}'],
+            [
+              'Nomor Kontrak / SPK',
+              ':  ${report.nomorKontrak.isNotEmpty ? report.nomorKontrak : contract.nomorSpk}',
+            ],
+            [
+              'Tanggal Kontrak / SPMK',
+              ':  ${report.tanggalKontrak.isNotEmpty ? report.tanggalKontrak : contract.tglMulaiSpk}',
+            ],
+            [
+              'Nilai Kontrak',
+              ':  ${report.nilaiKontrak.isNotEmpty ? report.nilaiKontrak : "Rp ${formatNum(report.nilaiKontrakNumeric)}"}',
+            ],
             ['Sumber Dana', ':  $sumberDana'],
             ['Kontraktor Pelaksana', ':  $kontraktor'],
             ['Konsultan Pengawas', ':  CV. TATA SAKA CONSULTANT'],
-            ['Periode Laporan', ':  Minggu Ke-${report.mingguKe} (${report.periodeAwal} s.d. ${report.periodeAkhir})'],
-            ['Waktu Pelaksanaan', ':  ${report.jangkaWaktu} Hari Kalender  (Terpakai: ${report.waktuTerpakai} HK, Sisa: ${report.sisaWaktu} HK)'],
+            [
+              'Periode Laporan',
+              ':  Minggu Ke-${report.mingguKe} (${report.periodeAwal} s.d. ${report.periodeAkhir})',
+            ],
+            [
+              'Waktu Pelaksanaan',
+              ':  ${report.jangkaWaktu} Hari Kalender  (Terpakai: ${report.waktuTerpakai} HK, Sisa: ${report.sisaWaktu} HK)',
+            ],
           ]),
           pw.SizedBox(height: 14),
 
@@ -284,34 +321,84 @@ class PdfReportService {
                 decoration: const pw.BoxDecoration(color: PdfColors.grey200),
                 children: [
                   _cell('URAIAN BOBOT / PROGRES', isHeader: true, flex: 3),
-                  _cell('RENCANA (%)', isHeader: true, flex: 2, align: pw.TextAlign.right),
-                  _cell('REALISASI (%)', isHeader: true, flex: 2, align: pw.TextAlign.right),
-                  _cell('DEVIASI (+/- %)', isHeader: true, flex: 2, align: pw.TextAlign.right),
+                  _cell(
+                    'RENCANA (%)',
+                    isHeader: true,
+                    flex: 2,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    'REALISASI (%)',
+                    isHeader: true,
+                    flex: 2,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    'DEVIASI (+/- %)',
+                    isHeader: true,
+                    flex: 2,
+                    align: pw.TextAlign.right,
+                  ),
                 ],
               ),
               pw.TableRow(
                 children: [
                   _cell('Kemajuan s.d. Minggu Lalu'),
-                  _cell(formatNum(report.rencanaPersen - (report.realisasiPersen - report.rencanaPersen > 0 ? 0.5 : 0)), align: pw.TextAlign.right),
-                  _cell(formatNum((report.realisasiPersen - 2.5).clamp(0.0, 100.0)), align: pw.TextAlign.right),
-                  _cell(formatNum(report.deviasiPersen), align: pw.TextAlign.right),
+                  _cell(
+                    formatNum(
+                      report.rencanaPersen -
+                          (report.realisasiPersen - report.rencanaPersen > 0
+                              ? 0.5
+                              : 0),
+                    ),
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    formatNum((report.realisasiPersen - 2.5).clamp(0.0, 100.0)),
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    formatNum(report.deviasiPersen),
+                    align: pw.TextAlign.right,
+                  ),
                 ],
               ),
               pw.TableRow(
                 children: [
                   _cell('Kemajuan Minggu Ini'),
-                  _cell(formatNum(report.rencanaPersen), align: pw.TextAlign.right),
-                  _cell(formatNum(report.realisasiPersen), align: pw.TextAlign.right),
-                  _cell(formatNum(report.deviasiPersen), align: pw.TextAlign.right),
+                  _cell(
+                    formatNum(report.rencanaPersen),
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    formatNum(report.realisasiPersen),
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    formatNum(report.deviasiPersen),
+                    align: pw.TextAlign.right,
+                  ),
                 ],
               ),
               pw.TableRow(
                 decoration: const pw.BoxDecoration(color: PdfColors.grey100),
                 children: [
                   _cell('KUMULATIF s.d. MINGGU INI', isHeader: true),
-                  _cell('${formatNum(report.rencanaPersen)} %', isHeader: true, align: pw.TextAlign.right),
-                  _cell('${formatNum(report.realisasiPersen)} %', isHeader: true, align: pw.TextAlign.right),
-                  _cell('${formatNum(report.deviasiPersen)} %', isHeader: true, align: pw.TextAlign.right),
+                  _cell(
+                    '${formatNum(report.rencanaPersen)} %',
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    '${formatNum(report.realisasiPersen)} %',
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    '${formatNum(report.deviasiPersen)} %',
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
                 ],
               ),
             ],
@@ -320,28 +407,62 @@ class PdfReportService {
 
           // TABEL JADWAL KUMULATIF MINGGUAN (JIKA ADA DATA)
           if (report.tabelMingguan.isNotEmpty) ...[
-            _buildPdfSectionTitle('REKAPITULASI JADWAL DAN REALISASI SELURUH MINGGU'),
+            _buildPdfSectionTitle(
+              'REKAPITULASI JADWAL DAN REALISASI SELURUH MINGGU',
+            ),
             pw.Table(
               border: pw.TableBorder.all(color: PdfColors.black, width: 0.8),
               children: [
                 pw.TableRow(
                   decoration: const pw.BoxDecoration(color: PdfColors.grey200),
                   children: [
-                    _cell('Minggu Ke', isHeader: true, flex: 1, align: pw.TextAlign.center),
+                    _cell(
+                      'Minggu Ke',
+                      isHeader: true,
+                      flex: 1,
+                      align: pw.TextAlign.center,
+                    ),
                     _cell('Periode', isHeader: true, flex: 3),
-                    _cell('Rencana (%)', isHeader: true, flex: 2, align: pw.TextAlign.right),
-                    _cell('Realisasi (%)', isHeader: true, flex: 2, align: pw.TextAlign.right),
-                    _cell('Deviasi (%)', isHeader: true, flex: 2, align: pw.TextAlign.right),
+                    _cell(
+                      'Rencana (%)',
+                      isHeader: true,
+                      flex: 2,
+                      align: pw.TextAlign.right,
+                    ),
+                    _cell(
+                      'Realisasi (%)',
+                      isHeader: true,
+                      flex: 2,
+                      align: pw.TextAlign.right,
+                    ),
+                    _cell(
+                      'Deviasi (%)',
+                      isHeader: true,
+                      flex: 2,
+                      align: pw.TextAlign.right,
+                    ),
                   ],
                 ),
                 ...report.tabelMingguan.take(15).map((row) {
                   return pw.TableRow(
                     children: [
-                      _cell('Minggu ${row.mingguKe}', align: pw.TextAlign.center),
+                      _cell(
+                        'Minggu ${row.mingguKe}',
+                        align: pw.TextAlign.center,
+                      ),
                       _cell('${row.tglMulai} s.d ${row.tglSelesai}'),
-                      _cell(row.rencana != null ? formatNum(row.rencana!) : '-', align: pw.TextAlign.right),
-                      _cell(row.realisasi != null ? formatNum(row.realisasi!) : '-', align: pw.TextAlign.right),
-                      _cell(row.deviasi != null ? formatNum(row.deviasi!) : '-', align: pw.TextAlign.right),
+                      _cell(
+                        row.rencana != null ? formatNum(row.rencana!) : '-',
+                        align: pw.TextAlign.right,
+                      ),
+                      _cell(
+                        row.realisasi != null ? formatNum(row.realisasi!) : '-',
+                        align: pw.TextAlign.right,
+                      ),
+                      _cell(
+                        row.deviasi != null ? formatNum(row.deviasi!) : '-',
+                        align: pw.TextAlign.right,
+                      ),
                     ],
                   );
                 }).toList(),
@@ -370,8 +491,11 @@ class PdfReportService {
             leftRole: 'Kontraktor Pelaksana',
             leftName: kontraktor,
             centerRole: 'Konsultan Supervisi\nCV. TATA SAKA CONSULTANT',
-            centerName: contract.siteEngineer.isNotEmpty ? contract.siteEngineer : 'SENDAYU GALIH K., ST\n(Site Engineer)',
-            rightRole: 'Pejabat Pembuat Komitmen (PPK)\nDPU-PR Kab. Purbalingga',
+            centerName: contract.siteEngineer.isNotEmpty
+                ? contract.siteEngineer
+                : 'SENDAYU GALIH K., ST\n(Site Engineer)',
+            rightRole:
+                'Pejabat Pembuat Komitmen (PPK)\nDPU-PR Kab. Purbalingga',
             rightName: 'PPK DINAS PU-PR',
             date: report.periodeAkhir,
           ),
@@ -405,20 +529,31 @@ class PdfReportService {
         margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         header: (context) => _buildOfficialDocHeader(
           title: 'LEMBAR EVALUASI KEMAJUAN FISIK PEKERJAAN (BoQ / RKK)',
-          subtitle: 'Periode Minggu Ke-${report.mingguKe} (${report.periodeAwal} s.d. ${report.periodeAkhir})',
+          subtitle:
+              'Periode Minggu Ke-${report.mingguKe} (${report.periodeAwal} s.d. ${report.periodeAkhir})',
           isLandscape: true,
         ),
         footer: (context) => _buildPageFooter(
-          title: 'LEMBAR KEMAJUAN FISIK PEKERJAAN | MINGGU KE-${report.mingguKe}',
+          title:
+              'LEMBAR KEMAJUAN FISIK PEKERJAAN | MINGGU KE-${report.mingguKe}',
           context: context,
         ),
         build: (context) => [
           pw.SizedBox(height: 6),
           _buildPdfMetaBox([
             ['Nama Kegiatan', ':  $namaKegiatan'],
-            ['Lokasi / Dana', ':  $lokasi  |  ${kegiatan['sumberDana'] ?? contract.sumberDana}'],
-            ['Kontraktor / Konsultan', ':  $kontraktor  |  CV. TATA SAKA CONSULTANT'],
-            ['Nilai Kontrak', ':  ${report.nilaiKontrak.isNotEmpty ? report.nilaiKontrak : "Rp ${formatNum(report.nilaiKontrakNumeric)}"}'],
+            [
+              'Lokasi / Dana',
+              ':  $lokasi  |  ${kegiatan['sumberDana'] ?? contract.sumberDana}',
+            ],
+            [
+              'Kontraktor / Konsultan',
+              ':  $kontraktor  |  CV. TATA SAKA CONSULTANT',
+            ],
+            [
+              'Nilai Kontrak',
+              ':  ${report.nilaiKontrak.isNotEmpty ? report.nilaiKontrak : "Rp ${formatNum(report.nilaiKontrakNumeric)}"}',
+            ],
           ]),
           pw.SizedBox(height: 10),
 
@@ -440,14 +575,30 @@ class PdfReportService {
               pw.TableRow(
                 decoration: const pw.BoxDecoration(color: PdfColors.grey200),
                 children: [
-                  _cell('NO. MATA\nBAYAR', isHeader: true, align: pw.TextAlign.center),
+                  _cell(
+                    'NO. MATA\nBAYAR',
+                    isHeader: true,
+                    align: pw.TextAlign.center,
+                  ),
                   _cell('URAIAN PEKERJAAN', isHeader: true),
                   _cell('SAT', isHeader: true, align: pw.TextAlign.center),
                   _cell('VOL', isHeader: true, align: pw.TextAlign.right),
-                  _cell('BOBOT\n(%)', isHeader: true, align: pw.TextAlign.right),
-                  _cell('SD LALU\n(%)', isHeader: true, align: pw.TextAlign.right),
+                  _cell(
+                    'BOBOT\n(%)',
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    'SD LALU\n(%)',
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
                   _cell('INI\n(%)', isHeader: true, align: pw.TextAlign.right),
-                  _cell('SD INI\n(%)', isHeader: true, align: pw.TextAlign.right),
+                  _cell(
+                    'SD INI\n(%)',
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
                   _cell('SISA\n(%)', isHeader: true, align: pw.TextAlign.right),
                 ],
               ),
@@ -459,9 +610,15 @@ class PdfReportService {
                 return [
                   // Divisi Header Row
                   pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey100),
+                    decoration: const pw.BoxDecoration(
+                      color: PdfColors.grey100,
+                    ),
                     children: [
-                      _cell(dCode.toString(), isHeader: true, align: pw.TextAlign.center),
+                      _cell(
+                        dCode.toString(),
+                        isHeader: true,
+                        align: pw.TextAlign.center,
+                      ),
                       _cell(dName.toString(), isHeader: true),
                       _cell(''),
                       _cell(''),
@@ -473,14 +630,24 @@ class PdfReportService {
                     ],
                   ),
                   ...items.map((it) {
-                    final noMata = (it['noMataPembayaran'] ?? it['no'] ?? '').toString();
-                    final uraian = (it['uraian'] ?? it['nama'] ?? '-').toString();
+                    final noMata = (it['noMataPembayaran'] ?? it['no'] ?? '')
+                        .toString();
+                    final uraian = (it['uraian'] ?? it['nama'] ?? '-')
+                        .toString();
                     final sat = (it['satuan'] ?? '-').toString();
-                    final vol = (it['volumeCCO'] ?? it['volume'] as num?)?.toDouble() ?? 0.0;
+                    final vol =
+                        (it['volumeCCO'] ?? it['volume'] as num?)?.toDouble() ??
+                        0.0;
                     final bobot = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
-                    final sdIni = (it['sdMingguIniBobot'] as num?)?.toDouble() ?? (bobot * 0.45);
-                    final ini = (it['mingguIniBobot'] as num?)?.toDouble() ?? (bobot * 0.12);
-                    final lalu = (it['mingguLaluBobot'] as num?)?.toDouble() ?? (sdIni - ini);
+                    final sdIni =
+                        (it['sdMingguIniBobot'] as num?)?.toDouble() ??
+                        (bobot * 0.45);
+                    final ini =
+                        (it['mingguIniBobot'] as num?)?.toDouble() ??
+                        (bobot * 0.12);
+                    final lalu =
+                        (it['mingguLaluBobot'] as num?)?.toDouble() ??
+                        (sdIni - ini);
                     final sisa = (bobot - sdIni).clamp(0.0, 100.0);
 
                     return pw.TableRow(
@@ -489,11 +656,26 @@ class PdfReportService {
                         _cell(uraian),
                         _cell(sat, align: pw.TextAlign.center),
                         _cell(formatNum(vol), align: pw.TextAlign.right),
-                        _cell(formatNum(bobot, decimals: 3), align: pw.TextAlign.right),
-                        _cell(formatNum(lalu, decimals: 3), align: pw.TextAlign.right),
-                        _cell(formatNum(ini, decimals: 3), align: pw.TextAlign.right),
-                        _cell(formatNum(sdIni, decimals: 3), align: pw.TextAlign.right),
-                        _cell(formatNum(sisa, decimals: 3), align: pw.TextAlign.right),
+                        _cell(
+                          formatNum(bobot, decimals: 3),
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          formatNum(lalu, decimals: 3),
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          formatNum(ini, decimals: 3),
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          formatNum(sdIni, decimals: 3),
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          formatNum(sisa, decimals: 3),
+                          align: pw.TextAlign.right,
+                        ),
                       ],
                     );
                   }),
@@ -508,10 +690,26 @@ class PdfReportService {
                   _cell('', isHeader: true),
                   _cell('', isHeader: true),
                   _cell('100.000', isHeader: true, align: pw.TextAlign.right),
-                  _cell(formatNum(report.realisasiPersen - 2.5, decimals: 3), isHeader: true, align: pw.TextAlign.right),
-                  _cell(formatNum(2.5, decimals: 3), isHeader: true, align: pw.TextAlign.right),
-                  _cell(formatNum(report.realisasiPersen, decimals: 3), isHeader: true, align: pw.TextAlign.right),
-                  _cell(formatNum(100.0 - report.realisasiPersen, decimals: 3), isHeader: true, align: pw.TextAlign.right),
+                  _cell(
+                    formatNum(report.realisasiPersen - 2.5, decimals: 3),
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    formatNum(2.5, decimals: 3),
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    formatNum(report.realisasiPersen, decimals: 3),
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    formatNum(100.0 - report.realisasiPersen, decimals: 3),
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
                 ],
               ),
             ],
@@ -523,8 +721,11 @@ class PdfReportService {
             leftRole: 'Kontraktor Pelaksana',
             leftName: kontraktor,
             centerRole: 'Konsultan Supervisi\nCV. TATA SAKA CONSULTANT',
-            centerName: contract.siteEngineer.isNotEmpty ? contract.siteEngineer : 'SENDAYU GALIH K., ST\n(Site Engineer)',
-            rightRole: 'Pejabat Pembuat Komitmen (PPK)\nDPU-PR Kab. Purbalingga',
+            centerName: contract.siteEngineer.isNotEmpty
+                ? contract.siteEngineer
+                : 'SENDAYU GALIH K., ST\n(Site Engineer)',
+            rightRole:
+                'Pejabat Pembuat Komitmen (PPK)\nDPU-PR Kab. Purbalingga',
             rightName: 'PPK DINAS PU-PR',
             date: report.periodeAkhir,
           ),
@@ -550,11 +751,13 @@ class PdfReportService {
         margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         header: (context) => _buildOfficialDocHeader(
           title: 'LAPORAN BULANAN PENGAWASAN LAPANGAN',
-          subtitle: 'Laporan Progres Fisik Bulanan (Bulan ${report.bulanRomawi} | Periode: ${report.periodeFormatted})',
+          subtitle:
+              'Laporan Progres Fisik Bulanan (Bulan ${report.bulanRomawi} | Periode: ${report.periodeFormatted})',
           isLandscape: true,
         ),
         footer: (context) => _buildPageFooter(
-          title: 'LAPORAN BULANAN | BULAN ${report.bulanRomawi} (${report.namaBulan})',
+          title:
+              'LAPORAN BULANAN | BULAN ${report.bulanRomawi} (${report.namaBulan})',
           context: context,
         ),
         build: (context) => [
@@ -567,7 +770,10 @@ class PdfReportService {
             ['Nomor Kontrak', ':  ${report.noKontrak}'],
             ['Kontraktor Pelaksana', ':  ${report.pelaksanaKontraktor}'],
             ['Konsultan Supervisi', ':  ${report.konsultanPengawas}'],
-            ['Status Progres', ':  Rencana: ${formatNum(report.rencanaFisikPersen)}%  |  Realisasi: ${formatNum(report.realisasiKumulatifPersen)}%  |  Deviasi: ${report.deviasiPersen >= 0 ? "+" : ""}${formatNum(report.deviasiPersen)}%'],
+            [
+              'Status Progres',
+              ':  Rencana: ${formatNum(report.rencanaFisikPersen)}%  |  Realisasi: ${formatNum(report.realisasiKumulatifPersen)}%  |  Deviasi: ${report.deviasiPersen >= 0 ? "+" : ""}${formatNum(report.deviasiPersen)}%',
+            ],
           ]),
           pw.SizedBox(height: 10),
 
@@ -577,7 +783,7 @@ class PdfReportService {
             columnWidths: const {
               0: pw.FixedColumnWidth(40), // No
               1: pw.FixedColumnWidth(55), // No Mata Pembayaran
-              2: pw.FlexColumnWidth(4),   // Uraian
+              2: pw.FlexColumnWidth(4), // Uraian
               3: pw.FixedColumnWidth(35), // Satuan
               4: pw.FixedColumnWidth(45), // Bobot Kontrak %
               5: pw.FixedColumnWidth(45), // Realisasi s.d Bln Lalu %
@@ -591,13 +797,29 @@ class PdfReportService {
                 decoration: const pw.BoxDecoration(color: PdfColors.grey200),
                 children: [
                   _cell('NO', isHeader: true, align: pw.TextAlign.center),
-                  _cell('NO MATA\nBAYAR', isHeader: true, align: pw.TextAlign.center),
+                  _cell(
+                    'NO MATA\nBAYAR',
+                    isHeader: true,
+                    align: pw.TextAlign.center,
+                  ),
                   _cell('URAIAN PEKERJAAN', isHeader: true),
                   _cell('SAT', isHeader: true, align: pw.TextAlign.center),
-                  _cell('BOBOT\n(%)', isHeader: true, align: pw.TextAlign.right),
-                  _cell('SD LALU\n(%)', isHeader: true, align: pw.TextAlign.right),
+                  _cell(
+                    'BOBOT\n(%)',
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    'SD LALU\n(%)',
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
                   _cell('INI\n(%)', isHeader: true, align: pw.TextAlign.right),
-                  _cell('SD INI\n(%)', isHeader: true, align: pw.TextAlign.right),
+                  _cell(
+                    'SD INI\n(%)',
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
                   _cell('SISA\n(%)', isHeader: true, align: pw.TextAlign.right),
                   _cell('KET', isHeader: true, align: pw.TextAlign.center),
                 ],
@@ -606,17 +828,43 @@ class PdfReportService {
                 return [
                   // Divisi Header
                   pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey100),
+                    decoration: const pw.BoxDecoration(
+                      color: PdfColors.grey100,
+                    ),
                     children: [
-                      _cell(div.kode, isHeader: true, align: pw.TextAlign.center),
+                      _cell(
+                        div.kode,
+                        isHeader: true,
+                        align: pw.TextAlign.center,
+                      ),
                       _cell(''),
                       _cell(div.nama, isHeader: true),
                       _cell(''),
-                      _cell(formatNum(div.subtotalBobotCCO, decimals: 3), isHeader: true, align: pw.TextAlign.right),
-                      _cell(formatNum(div.subtotalBobotBulanLalu, decimals: 3), isHeader: true, align: pw.TextAlign.right),
-                      _cell(formatNum(div.subtotalBobotBulanIni, decimals: 3), isHeader: true, align: pw.TextAlign.right),
-                      _cell(formatNum(div.subtotalBobotSdBulanIni, decimals: 3), isHeader: true, align: pw.TextAlign.right),
-                      _cell(formatNum(div.subtotalBobotSisa, decimals: 3), isHeader: true, align: pw.TextAlign.right),
+                      _cell(
+                        formatNum(div.subtotalBobotCCO, decimals: 3),
+                        isHeader: true,
+                        align: pw.TextAlign.right,
+                      ),
+                      _cell(
+                        formatNum(div.subtotalBobotBulanLalu, decimals: 3),
+                        isHeader: true,
+                        align: pw.TextAlign.right,
+                      ),
+                      _cell(
+                        formatNum(div.subtotalBobotBulanIni, decimals: 3),
+                        isHeader: true,
+                        align: pw.TextAlign.right,
+                      ),
+                      _cell(
+                        formatNum(div.subtotalBobotSdBulanIni, decimals: 3),
+                        isHeader: true,
+                        align: pw.TextAlign.right,
+                      ),
+                      _cell(
+                        formatNum(div.subtotalBobotSisa, decimals: 3),
+                        isHeader: true,
+                        align: pw.TextAlign.right,
+                      ),
                       _cell(''),
                     ],
                   ),
@@ -627,12 +875,30 @@ class PdfReportService {
                         _cell(it.noMataPembayaran, align: pw.TextAlign.center),
                         _cell(it.uraian),
                         _cell(it.satuan, align: pw.TextAlign.center),
-                        _cell(formatNum(it.bobotCCO, decimals: 3), align: pw.TextAlign.right),
-                        _cell(formatNum(it.bobotBulanLalu, decimals: 3), align: pw.TextAlign.right),
-                        _cell(formatNum(it.bobotBulanIni, decimals: 3), align: pw.TextAlign.right),
-                        _cell(formatNum(it.bobotSdBulanIni, decimals: 3), align: pw.TextAlign.right),
-                        _cell(formatNum(it.sisaBobot, decimals: 3), align: pw.TextAlign.right),
-                        _cell(it.keterangan.isNotEmpty ? it.keterangan : '-', align: pw.TextAlign.center),
+                        _cell(
+                          formatNum(it.bobotCCO, decimals: 3),
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          formatNum(it.bobotBulanLalu, decimals: 3),
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          formatNum(it.bobotBulanIni, decimals: 3),
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          formatNum(it.bobotSdBulanIni, decimals: 3),
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          formatNum(it.sisaBobot, decimals: 3),
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          it.keterangan.isNotEmpty ? it.keterangan : '-',
+                          align: pw.TextAlign.center,
+                        ),
                       ],
                     );
                   }),
@@ -646,12 +912,36 @@ class PdfReportService {
                   _cell('', isHeader: true),
                   _cell('TOTAL REALISASI KUMULATIF BULANAN', isHeader: true),
                   _cell('', isHeader: true),
-                  _cell(formatNum(report.totalBobotCCO, decimals: 3), isHeader: true, align: pw.TextAlign.right),
-                  _cell(formatNum(report.totalBobotBulanLalu, decimals: 3), isHeader: true, align: pw.TextAlign.right),
-                  _cell(formatNum(report.totalBobotBulanIni, decimals: 3), isHeader: true, align: pw.TextAlign.right),
-                  _cell(formatNum(report.totalBobotSdBulanIni, decimals: 3), isHeader: true, align: pw.TextAlign.right),
-                  _cell(formatNum(report.totalBobotSisa, decimals: 3), isHeader: true, align: pw.TextAlign.right),
-                  _cell(report.status, isHeader: true, align: pw.TextAlign.center),
+                  _cell(
+                    formatNum(report.totalBobotCCO, decimals: 3),
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    formatNum(report.totalBobotBulanLalu, decimals: 3),
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    formatNum(report.totalBobotBulanIni, decimals: 3),
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    formatNum(report.totalBobotSdBulanIni, decimals: 3),
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    formatNum(report.totalBobotSisa, decimals: 3),
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    report.status,
+                    isHeader: true,
+                    align: pw.TextAlign.center,
+                  ),
                 ],
               ),
             ],
@@ -661,8 +951,11 @@ class PdfReportService {
           // TANDA TANGAN PENGESAHAN KONSULTAN & DINAS
           _buildDualSignatures(
             leftRole: 'Konsultan Pengawas,\nCV. TATA SAKA CONSULTANT',
-            leftName: contract.siteEngineer.isNotEmpty ? contract.siteEngineer : 'SENDAYU GALIH K., ST\n(Site Engineer)',
-            rightRole: 'Pejabat Pembuat Komitmen (PPK),\nDPU-PR Kab. Purbalingga',
+            leftName: contract.siteEngineer.isNotEmpty
+                ? contract.siteEngineer
+                : 'SENDAYU GALIH K., ST\n(Site Engineer)',
+            rightRole:
+                'Pejabat Pembuat Komitmen (PPK),\nDPU-PR Kab. Purbalingga',
             rightName: 'PPK DINAS PU-PR',
             date: report.periodeFormatted.split(' - ').last,
           ),
@@ -685,7 +978,8 @@ class PdfReportService {
     final pdf = pw.Document();
 
     final noAdd = (addendumData['nomorAddendum'] ?? '01').toString();
-    final addDivList = (addendumData['rkkDivisiList'] as List?)
+    final addDivList =
+        (addendumData['rkkDivisiList'] as List?)
             ?.map((e) => Map<String, dynamic>.from(e))
             .toList() ??
         [];
@@ -715,13 +1009,16 @@ class PdfReportService {
           // Metadata Box
           _buildPdfMetaBox([
             ['Kegiatan / Paket', ':  ${kegiatan.namaKegiatan}'],
-            ['Lokasi Proyek', ':  ${kegiatan.lokasi}  |  Sumber Dana: ${kegiatan.sumberDana}'],
+            [
+              'Lokasi Proyek',
+              ':  ${kegiatan.lokasi}  |  Sumber Dana: ${kegiatan.sumberDana}',
+            ],
             ['Kontraktor Pelaksana', ':  ${kegiatan.kontraktor}'],
             ['Konsultan Supervisi', ':  CV. TATA SAKA CONSULTANT'],
             ['Nilai Kontrak Awal', ':  ${kegiatan.nilaiKontrak}'],
             [
               'Status Pagu CCO',
-              ':  ${(report.totalAddendumHarga - report.totalBaselineHarga).abs() < 1.0 ? "TETAP / SEIMBANG (0.00%)" : "Terdapat Selisih Pagu"}  |  Total Akhir: Rp ${formatNum(report.totalDibulatkan > 0 ? report.totalDibulatkan : report.totalAddendumHarga)}'
+              ':  ${(report.totalAddendumHarga - report.totalBaselineHarga).abs() < 1.0 ? "TETAP / SEIMBANG (0.00%)" : "Terdapat Selisih Pagu"}  |  Total Akhir: Rp ${formatNum(report.totalDibulatkan > 0 ? report.totalDibulatkan : report.totalAddendumHarga)}',
             ],
           ]),
           pw.SizedBox(height: 10),
@@ -755,20 +1052,44 @@ class PdfReportService {
                 decoration: const pw.BoxDecoration(color: PdfColors.grey200),
                 children: [
                   _cell('NO', isHeader: true, align: pw.TextAlign.center),
-                  _cell('NO MATA\nBAYAR', isHeader: true, align: pw.TextAlign.center),
+                  _cell(
+                    'NO MATA\nBAYAR',
+                    isHeader: true,
+                    align: pw.TextAlign.center,
+                  ),
                   _cell('URAIAN PEKERJAAN', isHeader: true),
                   _cell('SAT', isHeader: true, align: pw.TextAlign.center),
-                  _cell('HARGA\nSATUAN (Rp)', isHeader: true, align: pw.TextAlign.right),
-                  _cell('KONTRAK AWAL', isHeader: true, align: pw.TextAlign.center),
+                  _cell(
+                    'HARGA\nSATUAN (Rp)',
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    'KONTRAK AWAL',
+                    isHeader: true,
+                    align: pw.TextAlign.center,
+                  ),
                   _cell(''),
                   _cell(''),
-                  _cell('ADDENDUM $noAdd', isHeader: true, align: pw.TextAlign.center),
+                  _cell(
+                    'ADDENDUM $noAdd',
+                    isHeader: true,
+                    align: pw.TextAlign.center,
+                  ),
                   _cell(''),
                   _cell(''),
-                  _cell('PEKERJAAN TAMBAH', isHeader: true, align: pw.TextAlign.center),
+                  _cell(
+                    'PEKERJAAN TAMBAH',
+                    isHeader: true,
+                    align: pw.TextAlign.center,
+                  ),
                   _cell(''),
                   _cell(''),
-                  _cell('PEKERJAAN KURANG', isHeader: true, align: pw.TextAlign.center),
+                  _cell(
+                    'PEKERJAAN KURANG',
+                    isHeader: true,
+                    align: pw.TextAlign.center,
+                  ),
                   _cell(''),
                   _cell(''),
                   _cell('KET', isHeader: true, align: pw.TextAlign.center),
@@ -784,16 +1105,32 @@ class PdfReportService {
                   _cell(''),
                   _cell(''),
                   _cell('VOL', isHeader: true, align: pw.TextAlign.right),
-                  _cell('TOTAL (Rp)', isHeader: true, align: pw.TextAlign.right),
+                  _cell(
+                    'TOTAL (Rp)',
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
                   _cell('BOBOT', isHeader: true, align: pw.TextAlign.right),
                   _cell('VOL', isHeader: true, align: pw.TextAlign.right),
-                  _cell('TOTAL (Rp)', isHeader: true, align: pw.TextAlign.right),
+                  _cell(
+                    'TOTAL (Rp)',
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
                   _cell('BOBOT', isHeader: true, align: pw.TextAlign.right),
                   _cell('VOL', isHeader: true, align: pw.TextAlign.right),
-                  _cell('TOTAL (Rp)', isHeader: true, align: pw.TextAlign.right),
+                  _cell(
+                    'TOTAL (Rp)',
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
                   _cell('BOBOT', isHeader: true, align: pw.TextAlign.right),
                   _cell('VOL', isHeader: true, align: pw.TextAlign.right),
-                  _cell('TOTAL (Rp)', isHeader: true, align: pw.TextAlign.right),
+                  _cell(
+                    'TOTAL (Rp)',
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
                   _cell('BOBOT', isHeader: true, align: pw.TextAlign.right),
                   _cell(''),
                 ],
@@ -802,25 +1139,63 @@ class PdfReportService {
                 return [
                   // Divisi Baris
                   pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey100),
+                    decoration: const pw.BoxDecoration(
+                      color: PdfColors.grey100,
+                    ),
                     children: [
-                      _cell(div.nomorRomawi, isHeader: true, align: pw.TextAlign.center),
+                      _cell(
+                        div.nomorRomawi,
+                        isHeader: true,
+                        align: pw.TextAlign.center,
+                      ),
                       _cell(''),
                       _cell(div.namaDivisi.toUpperCase(), isHeader: true),
                       _cell(''),
                       _cell(''),
                       _cell(''),
-                      _cell(formatNum(div.subtotalBaselineHarga), isHeader: true, align: pw.TextAlign.right),
-                      _cell(formatNum(div.subtotalBaselineBobot, decimals: 3), isHeader: true, align: pw.TextAlign.right),
+                      _cell(
+                        formatNum(div.subtotalBaselineHarga),
+                        isHeader: true,
+                        align: pw.TextAlign.right,
+                      ),
+                      _cell(
+                        formatNum(div.subtotalBaselineBobot, decimals: 3),
+                        isHeader: true,
+                        align: pw.TextAlign.right,
+                      ),
                       _cell(''),
-                      _cell(formatNum(div.subtotalAddendumHarga), isHeader: true, align: pw.TextAlign.right),
-                      _cell(formatNum(div.subtotalAddendumBobot, decimals: 3), isHeader: true, align: pw.TextAlign.right),
+                      _cell(
+                        formatNum(div.subtotalAddendumHarga),
+                        isHeader: true,
+                        align: pw.TextAlign.right,
+                      ),
+                      _cell(
+                        formatNum(div.subtotalAddendumBobot, decimals: 3),
+                        isHeader: true,
+                        align: pw.TextAlign.right,
+                      ),
                       _cell(''),
-                      _cell(formatNum(div.subtotalTambahHarga), isHeader: true, align: pw.TextAlign.right),
-                      _cell(formatNum(div.subtotalTambahBobot, decimals: 3), isHeader: true, align: pw.TextAlign.right),
+                      _cell(
+                        formatNum(div.subtotalTambahHarga),
+                        isHeader: true,
+                        align: pw.TextAlign.right,
+                      ),
+                      _cell(
+                        formatNum(div.subtotalTambahBobot, decimals: 3),
+                        isHeader: true,
+                        align: pw.TextAlign.right,
+                      ),
                       _cell(''),
-                      _cell(formatNum(div.subtotalKurangHarga), isHeader: true, align: pw.TextAlign.right),
-                      _cell(formatNum(div.subtotalKurangBobot, decimals: 3), isHeader: true, align: pw.TextAlign.right),
+                      _cell(
+                        formatNum(div.subtotalKurangHarga),
+                        isHeader: true,
+                        align: pw.TextAlign.right,
+                      ),
+                      _cell(
+                        formatNum(div.subtotalKurangBobot, decimals: 3),
+                        isHeader: true,
+                        align: pw.TextAlign.right,
+                      ),
                       _cell(''),
                     ],
                   ),
@@ -831,19 +1206,82 @@ class PdfReportService {
                         _cell(it.noMataPembayaran, align: pw.TextAlign.center),
                         _cell(it.uraian),
                         _cell(it.satuan, align: pw.TextAlign.center),
-                        _cell(formatNum(it.hargaSatuan), align: pw.TextAlign.right),
-                        _cell(it.baselineVolume > 0 ? formatNum(it.baselineVolume) : '-', align: pw.TextAlign.right),
-                        _cell(it.baselineTotalHarga > 0 ? formatNum(it.baselineTotalHarga) : '-', align: pw.TextAlign.right),
-                        _cell(it.baselineBobot > 0 ? formatNum(it.baselineBobot, decimals: 3) : '-', align: pw.TextAlign.right),
-                        _cell(it.addendumVolume > 0 ? formatNum(it.addendumVolume) : '-', align: pw.TextAlign.right),
-                        _cell(it.addendumTotalHarga > 0 ? formatNum(it.addendumTotalHarga) : '-', align: pw.TextAlign.right),
-                        _cell(it.addendumBobot > 0 ? formatNum(it.addendumBobot, decimals: 3) : '-', align: pw.TextAlign.right),
-                        _cell(it.tambahVolume > 0 ? formatNum(it.tambahVolume) : '-', align: pw.TextAlign.right),
-                        _cell(it.tambahTotalHarga > 0 ? formatNum(it.tambahTotalHarga) : '-', align: pw.TextAlign.right),
-                        _cell(it.tambahBobot > 0 ? formatNum(it.tambahBobot, decimals: 3) : '-', align: pw.TextAlign.right),
-                        _cell(it.kurangVolume > 0 ? formatNum(it.kurangVolume) : '-', align: pw.TextAlign.right),
-                        _cell(it.kurangTotalHarga > 0 ? formatNum(it.kurangTotalHarga) : '-', align: pw.TextAlign.right),
-                        _cell(it.kurangBobot > 0 ? formatNum(it.kurangBobot, decimals: 3) : '-', align: pw.TextAlign.right),
+                        _cell(
+                          formatNum(it.hargaSatuan),
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          it.baselineVolume > 0
+                              ? formatNum(it.baselineVolume)
+                              : '-',
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          it.baselineTotalHarga > 0
+                              ? formatNum(it.baselineTotalHarga)
+                              : '-',
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          it.baselineBobot > 0
+                              ? formatNum(it.baselineBobot, decimals: 3)
+                              : '-',
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          it.addendumVolume > 0
+                              ? formatNum(it.addendumVolume)
+                              : '-',
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          it.addendumTotalHarga > 0
+                              ? formatNum(it.addendumTotalHarga)
+                              : '-',
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          it.addendumBobot > 0
+                              ? formatNum(it.addendumBobot, decimals: 3)
+                              : '-',
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          it.tambahVolume > 0
+                              ? formatNum(it.tambahVolume)
+                              : '-',
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          it.tambahTotalHarga > 0
+                              ? formatNum(it.tambahTotalHarga)
+                              : '-',
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          it.tambahBobot > 0
+                              ? formatNum(it.tambahBobot, decimals: 3)
+                              : '-',
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          it.kurangVolume > 0
+                              ? formatNum(it.kurangVolume)
+                              : '-',
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          it.kurangTotalHarga > 0
+                              ? formatNum(it.kurangTotalHarga)
+                              : '-',
+                          align: pw.TextAlign.right,
+                        ),
+                        _cell(
+                          it.kurangBobot > 0
+                              ? formatNum(it.kurangBobot, decimals: 3)
+                              : '-',
+                          align: pw.TextAlign.right,
+                        ),
                         _cell(it.keterangan, align: pw.TextAlign.center),
                       ],
                     );
@@ -860,18 +1298,58 @@ class PdfReportService {
                   _cell(''),
                   _cell(''),
                   _cell(''),
-                  _cell(formatNum(report.totalBaselineHarga), isHeader: true, align: pw.TextAlign.right),
-                  _cell(formatNum(report.totalBaselineBobot, decimals: 3), isHeader: true, align: pw.TextAlign.right),
+                  _cell(
+                    formatNum(report.totalBaselineHarga),
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    formatNum(report.totalBaselineBobot, decimals: 3),
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
                   _cell(''),
-                  _cell(formatNum(report.totalAddendumHarga), isHeader: true, align: pw.TextAlign.right),
-                  _cell(formatNum(report.totalAddendumBobot, decimals: 3), isHeader: true, align: pw.TextAlign.right),
+                  _cell(
+                    formatNum(report.totalAddendumHarga),
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    formatNum(report.totalAddendumBobot, decimals: 3),
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
                   _cell(''),
-                  _cell(formatNum(report.totalTambahHarga), isHeader: true, align: pw.TextAlign.right),
-                  _cell(formatNum(report.totalTambahBobot, decimals: 3), isHeader: true, align: pw.TextAlign.right),
+                  _cell(
+                    formatNum(report.totalTambahHarga),
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    formatNum(report.totalTambahBobot, decimals: 3),
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
                   _cell(''),
-                  _cell(formatNum(report.totalKurangHarga), isHeader: true, align: pw.TextAlign.right),
-                  _cell(formatNum(report.totalKurangBobot, decimals: 3), isHeader: true, align: pw.TextAlign.right),
-                  _cell((report.totalAddendumHarga - report.totalBaselineHarga).abs() < 1.0 ? 'SEIMBANG' : 'SELISIH', isHeader: true, align: pw.TextAlign.center),
+                  _cell(
+                    formatNum(report.totalKurangHarga),
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    formatNum(report.totalKurangBobot, decimals: 3),
+                    isHeader: true,
+                    align: pw.TextAlign.right,
+                  ),
+                  _cell(
+                    (report.totalAddendumHarga - report.totalBaselineHarga)
+                                .abs() <
+                            1.0
+                        ? 'SEIMBANG'
+                        : 'SELISIH',
+                    isHeader: true,
+                    align: pw.TextAlign.center,
+                  ),
                 ],
               ),
               if (report.totalDibulatkan > 0)
@@ -884,18 +1362,46 @@ class PdfReportService {
                     _cell(''),
                     _cell(''),
                     _cell(''),
-                    _cell(formatNum(report.totalBaselineHarga), isHeader: true, align: pw.TextAlign.right),
+                    _cell(
+                      formatNum(report.totalBaselineHarga),
+                      isHeader: true,
+                      align: pw.TextAlign.right,
+                    ),
                     _cell('100.000', isHeader: true, align: pw.TextAlign.right),
                     _cell(''),
-                    _cell(formatNum(report.totalDibulatkan), isHeader: true, align: pw.TextAlign.right),
+                    _cell(
+                      formatNum(report.totalDibulatkan),
+                      isHeader: true,
+                      align: pw.TextAlign.right,
+                    ),
                     _cell('100.000', isHeader: true, align: pw.TextAlign.right),
                     _cell(''),
-                    _cell(formatNum(report.totalTambahHarga), isHeader: true, align: pw.TextAlign.right),
-                    _cell(formatNum(report.totalTambahBobot, decimals: 3), isHeader: true, align: pw.TextAlign.right),
+                    _cell(
+                      formatNum(report.totalTambahHarga),
+                      isHeader: true,
+                      align: pw.TextAlign.right,
+                    ),
+                    _cell(
+                      formatNum(report.totalTambahBobot, decimals: 3),
+                      isHeader: true,
+                      align: pw.TextAlign.right,
+                    ),
                     _cell(''),
-                    _cell(formatNum(report.totalKurangHarga), isHeader: true, align: pw.TextAlign.right),
-                    _cell(formatNum(report.totalKurangBobot, decimals: 3), isHeader: true, align: pw.TextAlign.right),
-                    _cell('SEIMBANG', isHeader: true, align: pw.TextAlign.center),
+                    _cell(
+                      formatNum(report.totalKurangHarga),
+                      isHeader: true,
+                      align: pw.TextAlign.right,
+                    ),
+                    _cell(
+                      formatNum(report.totalKurangBobot, decimals: 3),
+                      isHeader: true,
+                      align: pw.TextAlign.right,
+                    ),
+                    _cell(
+                      'SEIMBANG',
+                      isHeader: true,
+                      align: pw.TextAlign.center,
+                    ),
                   ],
                 ),
             ],
@@ -907,10 +1413,15 @@ class PdfReportService {
             leftRole: 'Kontraktor Pelaksana',
             leftName: kegiatan.kontraktor,
             centerRole: 'Konsultan Supervisi\nCV. TATA SAKA CONSULTANT',
-            centerName: contract.siteEngineer.isNotEmpty ? contract.siteEngineer : 'SENDAYU GALIH K., ST\n(Site Engineer)',
-            rightRole: 'Pejabat Pembuat Komitmen (PPK)\nDPU-PR Kab. Purbalingga',
+            centerName: contract.siteEngineer.isNotEmpty
+                ? contract.siteEngineer
+                : 'SENDAYU GALIH K., ST\n(Site Engineer)',
+            rightRole:
+                'Pejabat Pembuat Komitmen (PPK)\nDPU-PR Kab. Purbalingga',
             rightName: 'PPK DINAS PU-PR',
-            date: addendumData['tanggalAddendum']?.toString() ?? '15 Agustus 2026',
+            date:
+                addendumData['tanggalAddendum']?.toString() ??
+                '15 Agustus 2026',
           ),
         ],
       ),
@@ -932,11 +1443,7 @@ class PdfReportService {
     required String fileName,
   }) async {
     try {
-      await savePdfPlatform(
-        context: context,
-        bytes: bytes,
-        fileName: fileName,
-      );
+      await savePdfPlatform(context: context, bytes: bytes, fileName: fileName);
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -959,7 +1466,9 @@ class PdfReportService {
   }) {
     return pw.Container(
       decoration: const pw.BoxDecoration(
-        border: pw.Border(bottom: pw.BorderSide(color: PdfColors.black, width: 1.5)),
+        border: pw.Border(
+          bottom: pw.BorderSide(color: PdfColors.black, width: 1.5),
+        ),
       ),
       padding: const pw.EdgeInsets.only(bottom: 6),
       child: pw.Row(
@@ -971,15 +1480,27 @@ class PdfReportService {
               children: [
                 pw.Text(
                   'PEMERINTAH KABUPATEN PURBALINGGA',
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10.5, letterSpacing: 0.5),
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 10.5,
+                    letterSpacing: 0.5,
+                  ),
                 ),
                 pw.Text(
                   'DINAS PEKERJAAN UMUM DAN PENATAAN RUANG',
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12, letterSpacing: 0.5),
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 12,
+                    letterSpacing: 0.5,
+                  ),
                 ),
                 pw.Text(
                   'KONSULTAN PENGAWAS: CV. TATA SAKA CONSULTANT',
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5, color: PdfColors.blue900),
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 9.5,
+                    color: PdfColors.blue900,
+                  ),
                 ),
                 pw.SizedBox(height: 4),
                 pw.Text(
@@ -993,7 +1514,11 @@ class PdfReportService {
                 ),
                 pw.Text(
                   subtitle,
-                  style: pw.TextStyle(fontSize: 8.5, fontStyle: pw.FontStyle.italic, color: PdfColors.grey800),
+                  style: pw.TextStyle(
+                    fontSize: 8.5,
+                    fontStyle: pw.FontStyle.italic,
+                    color: PdfColors.grey800,
+                  ),
                 ),
               ],
             ),
@@ -1011,7 +1536,9 @@ class PdfReportService {
       margin: const pw.EdgeInsets.only(top: 8),
       padding: const pw.EdgeInsets.only(top: 4),
       decoration: const pw.BoxDecoration(
-        border: pw.Border(top: pw.BorderSide(color: PdfColors.black, width: 0.6)),
+        border: pw.Border(
+          top: pw.BorderSide(color: PdfColors.black, width: 0.6),
+        ),
       ),
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -1022,7 +1549,11 @@ class PdfReportService {
           ),
           pw.Text(
             'Halaman ${context.pageNumber} dari ${context.pagesCount}',
-            style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: PdfColors.grey800),
+            style: pw.TextStyle(
+              fontSize: 7.5,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.grey800,
+            ),
           ),
         ],
       ),
@@ -1047,14 +1578,14 @@ class PdfReportService {
                   width: 140,
                   child: pw.Text(
                     p[0],
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8),
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 8,
+                    ),
                   ),
                 ),
                 pw.Expanded(
-                  child: pw.Text(
-                    p[1],
-                    style: const pw.TextStyle(fontSize: 8),
-                  ),
+                  child: pw.Text(p[1], style: const pw.TextStyle(fontSize: 8)),
                 ),
               ],
             ),
@@ -1078,7 +1609,10 @@ class PdfReportService {
     );
   }
 
-  static pw.Widget _buildPekerjaanTable(List<Map<String, dynamic>> list, {required String defaultLokasi}) {
+  static pw.Widget _buildPekerjaanTable(
+    List<Map<String, dynamic>> list, {
+    required String defaultLokasi,
+  }) {
     if (list.isEmpty) {
       return pw.Table(
         border: pw.TableBorder.all(color: PdfColors.black, width: 0.6),
@@ -1088,7 +1622,12 @@ class PdfReportService {
             children: [
               _cell('NO', isHeader: true, flex: 1, align: pw.TextAlign.center),
               _cell('JENIS PEKERJAAN', isHeader: true, flex: 5),
-              _cell('VOLUME', isHeader: true, flex: 2, align: pw.TextAlign.right),
+              _cell(
+                'VOLUME',
+                isHeader: true,
+                flex: 2,
+                align: pw.TextAlign.right,
+              ),
               _cell('LOKASI / STA', isHeader: true, flex: 3),
             ],
           ),
@@ -1119,7 +1658,9 @@ class PdfReportService {
         ...list.asMap().entries.map((e) {
           final idx = e.key + 1;
           final item = e.value;
-          final jenis = (item['jenis'] ?? item['uraian'] ?? item['jenisPekerjaan'] ?? '-').toString();
+          final jenis =
+              (item['jenis'] ?? item['uraian'] ?? item['jenisPekerjaan'] ?? '-')
+                  .toString();
           final vol = (item['volume'] ?? '-').toString();
           final lok = (item['lokasi'] ?? defaultLokasi).toString();
 
@@ -1136,7 +1677,9 @@ class PdfReportService {
     );
   }
 
-  static pw.Widget _buildMaterialSummaryTable(List<Map<String, dynamic>> pekList) {
+  static pw.Widget _buildMaterialSummaryTable(
+    List<Map<String, dynamic>> pekList,
+  ) {
     final List<List<String>> rows = [];
     int counter = 1;
 
@@ -1168,25 +1711,34 @@ class PdfReportService {
           children: [
             _cell('NO', isHeader: true, flex: 1, align: pw.TextAlign.center),
             _cell('JENIS BAHAN / MATERIAL', isHeader: true, flex: 4),
-            _cell('CACAH VOL', isHeader: true, flex: 2, align: pw.TextAlign.right),
+            _cell(
+              'CACAH VOL',
+              isHeader: true,
+              flex: 2,
+              align: pw.TextAlign.right,
+            ),
             _cell('ASAL / PENGAMBILAN', isHeader: true, flex: 2),
             _cell('LOKASI DIGUNAKAN', isHeader: true, flex: 2),
           ],
         ),
-        ...rows.map((r) => pw.TableRow(
-              children: [
-                _cell(r[0], align: pw.TextAlign.center),
-                _cell(r[1]),
-                _cell(r[2], align: pw.TextAlign.right),
-                _cell(r[3]),
-                _cell(r[4]),
-              ],
-            )),
+        ...rows.map(
+          (r) => pw.TableRow(
+            children: [
+              _cell(r[0], align: pw.TextAlign.center),
+              _cell(r[1]),
+              _cell(r[2], align: pw.TextAlign.right),
+              _cell(r[3]),
+              _cell(r[4]),
+            ],
+          ),
+        ),
       ],
     );
   }
 
-  static pw.Widget _buildPeralatanSummaryTable(List<Map<String, dynamic>> pekList) {
+  static pw.Widget _buildPeralatanSummaryTable(
+    List<Map<String, dynamic>> pekList,
+  ) {
     final List<List<String>> rows = [];
     int counter = 1;
 
@@ -1207,7 +1759,13 @@ class PdfReportService {
     }
 
     if (rows.isEmpty) {
-      rows.add(['1', 'Pekerjaan manual tanpa alat mekanis berat', '-', '-', '-']);
+      rows.add([
+        '1',
+        'Pekerjaan manual tanpa alat mekanis berat',
+        '-',
+        '-',
+        '-',
+      ]);
     }
 
     return pw.Table(
@@ -1218,25 +1776,40 @@ class PdfReportService {
           children: [
             _cell('NO', isHeader: true, flex: 1, align: pw.TextAlign.center),
             _cell('JENIS PERALATAN', isHeader: true, flex: 5),
-            _cell('JUMLAH AKTIF', isHeader: true, flex: 2, align: pw.TextAlign.right),
-            _cell('TOTAL ALAT', isHeader: true, flex: 2, align: pw.TextAlign.right),
+            _cell(
+              'JUMLAH AKTIF',
+              isHeader: true,
+              flex: 2,
+              align: pw.TextAlign.right,
+            ),
+            _cell(
+              'TOTAL ALAT',
+              isHeader: true,
+              flex: 2,
+              align: pw.TextAlign.right,
+            ),
             _cell('KONDISI / RUSAK', isHeader: true, flex: 2),
           ],
         ),
-        ...rows.map((r) => pw.TableRow(
-              children: [
-                _cell(r[0], align: pw.TextAlign.center),
-                _cell(r[1]),
-                _cell(r[2], align: pw.TextAlign.right),
-                _cell(r[3], align: pw.TextAlign.right),
-                _cell(r[4]),
-              ],
-            )),
+        ...rows.map(
+          (r) => pw.TableRow(
+            children: [
+              _cell(r[0], align: pw.TextAlign.center),
+              _cell(r[1]),
+              _cell(r[2], align: pw.TextAlign.right),
+              _cell(r[3], align: pw.TextAlign.right),
+              _cell(r[4]),
+            ],
+          ),
+        ),
       ],
     );
   }
 
-  static pw.Widget _buildPersonilSummaryTable(List<Map<String, dynamic>> pekList, {required String defaultLokasi}) {
+  static pw.Widget _buildPersonilSummaryTable(
+    List<Map<String, dynamic>> pekList, {
+    required String defaultLokasi,
+  }) {
     final List<List<String>> rows = [];
     int counter = 1;
 
@@ -1266,19 +1839,25 @@ class PdfReportService {
           decoration: const pw.BoxDecoration(color: PdfColors.grey200),
           children: [
             _cell('NO', isHeader: true, flex: 1, align: pw.TextAlign.center),
-            _cell('KLASIFIKASI PERSONIL / TENAGA KERJA', isHeader: true, flex: 5),
+            _cell(
+              'KLASIFIKASI PERSONIL / TENAGA KERJA',
+              isHeader: true,
+              flex: 5,
+            ),
             _cell('JUMLAH', isHeader: true, flex: 2, align: pw.TextAlign.right),
             _cell('PENEMPATAN LOKASI', isHeader: true, flex: 3),
           ],
         ),
-        ...rows.map((r) => pw.TableRow(
-              children: [
-                _cell(r[0], align: pw.TextAlign.center),
-                _cell(r[1]),
-                _cell(r[2], align: pw.TextAlign.right),
-                _cell(r[3]),
-              ],
-            )),
+        ...rows.map(
+          (r) => pw.TableRow(
+            children: [
+              _cell(r[0], align: pw.TextAlign.center),
+              _cell(r[1]),
+              _cell(r[2], align: pw.TextAlign.right),
+              _cell(r[3]),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -1356,20 +1935,47 @@ class PdfReportService {
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              pw.Text(leftRole, textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(
+                leftRole,
+                textAlign: pw.TextAlign.center,
+                style: const pw.TextStyle(fontSize: 8),
+              ),
               pw.SizedBox(height: 38),
-              pw.Text('_______________________', style: const pw.TextStyle(fontSize: 8)),
-              pw.Text(leftName, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
+              pw.Text(
+                '_______________________',
+                style: const pw.TextStyle(fontSize: 8),
+              ),
+              pw.Text(
+                leftName,
+                style: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: 8.5,
+                ),
+              ),
             ],
           ),
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
               pw.Text(date, style: const pw.TextStyle(fontSize: 8)),
-              pw.Text(rightRole, textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(
+                rightRole,
+                textAlign: pw.TextAlign.center,
+                style: const pw.TextStyle(fontSize: 8),
+              ),
               pw.SizedBox(height: 38),
-              pw.Text('_______________________', style: const pw.TextStyle(fontSize: 8)),
-              pw.Text(rightName, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
+              pw.Text(
+                '_______________________',
+                style: const pw.TextStyle(fontSize: 8),
+              ),
+              pw.Text(
+                rightName,
+                textAlign: pw.TextAlign.center,
+                style: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: 8.5,
+                ),
+              ),
             ],
           ),
         ],
@@ -1395,29 +2001,71 @@ class PdfReportService {
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              pw.Text(leftRole, textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
+              pw.Text(
+                leftRole,
+                textAlign: pw.TextAlign.center,
+                style: const pw.TextStyle(fontSize: 7.5),
+              ),
               pw.SizedBox(height: 36),
-              pw.Text('_______________________', style: const pw.TextStyle(fontSize: 7.5)),
-              pw.Text(leftName, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+              pw.Text(
+                '_______________________',
+                style: const pw.TextStyle(fontSize: 7.5),
+              ),
+              pw.Text(
+                leftName,
+                textAlign: pw.TextAlign.center,
+                style: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: 8,
+                ),
+              ),
             ],
           ),
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              pw.Text(centerRole, textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
+              pw.Text(
+                centerRole,
+                textAlign: pw.TextAlign.center,
+                style: const pw.TextStyle(fontSize: 7.5),
+              ),
               pw.SizedBox(height: 36),
-              pw.Text('_______________________', style: const pw.TextStyle(fontSize: 7.5)),
-              pw.Text(centerName, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+              pw.Text(
+                '_______________________',
+                style: const pw.TextStyle(fontSize: 7.5),
+              ),
+              pw.Text(
+                centerName,
+                textAlign: pw.TextAlign.center,
+                style: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: 8,
+                ),
+              ),
             ],
           ),
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
               pw.Text(date, style: const pw.TextStyle(fontSize: 7.5)),
-              pw.Text(rightRole, textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
+              pw.Text(
+                rightRole,
+                textAlign: pw.TextAlign.center,
+                style: const pw.TextStyle(fontSize: 7.5),
+              ),
               pw.SizedBox(height: 36),
-              pw.Text('_______________________', style: const pw.TextStyle(fontSize: 7.5)),
-              pw.Text(rightName, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+              pw.Text(
+                '_______________________',
+                style: const pw.TextStyle(fontSize: 7.5),
+              ),
+              pw.Text(
+                rightName,
+                textAlign: pw.TextAlign.center,
+                style: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: 8,
+                ),
+              ),
             ],
           ),
         ],

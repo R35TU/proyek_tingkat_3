@@ -1,4 +1,6 @@
 import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
@@ -19,6 +21,24 @@ class PdfViewerScreen extends StatelessWidget {
     this.pageFormat = PdfPageFormat.a4,
   });
 
+  Future<void> _handleDownload(BuildContext context, Uint8List bytes) async {
+    final safeFileName = fileName.endsWith('.pdf') ? fileName : '$fileName.pdf';
+
+    if (kIsWeb) {
+      // Di Web, gunakan Printing.sharePdf agar otomatis terunduh melalui browser
+      await Printing.sharePdf(bytes: bytes, filename: safeFileName);
+    } else {
+      // Di Mobile (Android/iOS), gunakan service penyimpanan lokal
+      if (context.mounted) {
+        await PdfReportService.downloadAndOpenPdf(
+          context: context,
+          bytes: bytes,
+          fileName: safeFileName,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -38,11 +58,7 @@ class PdfViewerScreen extends StatelessWidget {
               try {
                 final bytes = await buildPdf();
                 if (context.mounted) {
-                  await PdfReportService.downloadAndOpenPdf(
-                    context: context,
-                    bytes: bytes,
-                    fileName: fileName,
-                  );
+                  await _handleDownload(context, bytes);
                 }
               } catch (e) {
                 if (context.mounted) {
@@ -103,11 +119,7 @@ class PdfViewerScreen extends StatelessWidget {
               try {
                 final bytes = await buildPdfCallback(previewPageFormat);
                 if (context.mounted) {
-                  await PdfReportService.downloadAndOpenPdf(
-                    context: context,
-                    bytes: bytes,
-                    fileName: fileName,
-                  );
+                  await _handleDownload(context, bytes);
                 }
               } catch (e) {
                 if (context.mounted) {
