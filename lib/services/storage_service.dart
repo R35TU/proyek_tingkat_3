@@ -50,6 +50,14 @@ class StorageService {
     return '$publicBaseUrl/$cleanPath';
   }
 
+  /// Bersihkan kunci objek R2: hanya [a-zA-Z0-9._/-] yang diizinkan.
+  /// Spasi, kurung, dan karakter lain merusak URL & tanda tangan SigV4.
+  /// (Nama asli tetap utuh di field `name` metadata untuk tampilan.)
+  static String _safeObjectKey(String key) {
+    final clean = key.startsWith('/') ? key.substring(1) : key;
+    return clean.replaceAll(RegExp(r'[^a-zA-Z0-9._\-/]'), '_');
+  }
+
   /// Mengunggah data bytes (Uint8List) langsung ke Cloudflare R2 menggunakan S3 Signature V4.
   /// Mengembalikan URL publik file yang berhasil diunggah.
   static Future<String> uploadBytes({
@@ -60,7 +68,7 @@ class StorageService {
     if (!hasCredentials) {
       throw StateError(_missingCredentialsMessage);
     }
-    final cleanKey = remotePath.startsWith('/') ? remotePath.substring(1) : remotePath;
+    final cleanKey = _safeObjectKey(remotePath);
     final now = DateTime.now().toUtc();
     final amzDate = _formatAmzDate(now);
     final dateStamp = amzDate.substring(0, 8);
@@ -151,7 +159,7 @@ class StorageService {
       debugPrint(_missingCredentialsMessage);
       return false;
     }
-    final cleanKey = remotePath.startsWith('/') ? remotePath.substring(1) : remotePath;
+    final cleanKey = _safeObjectKey(remotePath);
     final now = DateTime.now().toUtc();
     final amzDate = _formatAmzDate(now);
     final dateStamp = amzDate.substring(0, 8);
