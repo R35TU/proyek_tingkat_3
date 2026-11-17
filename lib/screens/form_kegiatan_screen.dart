@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/kegiatan_model.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
@@ -64,6 +65,11 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
   // 6. STRUKTUR ORGANISASI PENYEDIA JASA
   late TextEditingController _pelaksanaLapanganCtrl;
   late TextEditingController _petugasK3Ctrl;
+
+  // Kontraktor user selection from Firestore
+  String? _selectedKontraktorUid;
+  List<Map<String, dynamic>> _kontraktorUsers = [];
+  bool _loadingKontraktorUsers = true;
 
   bool get isEditing => widget.initialKegiatan != null;
 
@@ -224,10 +230,56 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
     _tglSuratPesananCtrl.addListener(_onFieldChanged);
     _noSpmkKontraktorCtrl.addListener(_onFieldChanged);
     _tglSpmkKontraktorCtrl.addListener(_onFieldChanged);
+
+    // Load kontraktor users from Firestore and pre-select if editing
+    _selectedKontraktorUid = init?['kontraktorUid'] as String?;
+    if (_selectedKontraktorUid != null && _selectedKontraktorUid!.isEmpty) {
+      _selectedKontraktorUid = null;
+    }
+    _loadKontraktorUsers();
   }
 
   void _onFieldChanged() {
     setState(() {});
+  }
+
+  Future<void> _loadKontraktorUsers() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'Kontraktor')
+          .where('isActive', isEqualTo: true)
+          .get();
+      if (mounted) {
+        setState(() {
+          _kontraktorUsers = snapshot.docs.map((doc) {
+            final data = doc.data();
+            return {
+              'uid': doc.id,
+              'namaLengkap': data['namaLengkap'] ?? '',
+              'companyOrAgency': data['companyOrAgency'] ?? '',
+            };
+          }).toList();
+
+          // Auto-match if editing and UID was not previously saved but company name matches
+          if (_selectedKontraktorUid == null && _kontraktorCtrl.text.isNotEmpty) {
+            final matched = _kontraktorUsers.cast<Map<String, dynamic>?>().firstWhere(
+              (u) => (u?['companyOrAgency'] ?? '').toString().toLowerCase() == _kontraktorCtrl.text.trim().toLowerCase(),
+              orElse: () => null,
+            );
+            if (matched != null) {
+              _selectedKontraktorUid = matched['uid'] as String?;
+            }
+          }
+          _loadingKontraktorUsers = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading kontraktor users: $e');
+      if (mounted) {
+        setState(() => _loadingKontraktorUsers = false);
+      }
+    }
   }
 
   @override
@@ -333,6 +385,7 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
       'masaPelaksanaan': _masaPelaksanaanCtrl.text.trim(),
       'waktuBerjalan': _waktuBerjalanCtrl.text.trim(),
       'kontraktor': _kontraktorCtrl.text.trim(),
+      'kontraktorUid': _selectedKontraktorUid ?? '',
       'noSuratPesanan': _noSuratPesananCtrl.text.trim(),
       'tglSuratPesanan': _tglSuratPesananCtrl.text.trim(),
       'noSpmkKontraktor': _noSpmkKontraktorCtrl.text.trim(),
@@ -566,6 +619,120 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
     return _buildCard(
       title: 'Penyedia Jasa / Kontraktor Pelaksana',
       children: [
+        // Dropdown to select kontraktor user from Firestore
+        const Text(
+          'Tautkan Akun Kontraktor Terdaftar (Admin)',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF374151),
+            letterSpacing: 0.3,
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (_loadingKontraktorUsers)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF9FAFB),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: const Row(
+              children: [
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF3B82F6)),
+                ),
+                SizedBox(width: 10),
+                Text(
+                  'Memuat daftar akun kontraktor...',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                ),
+              ],
+            ),
+          )
+        else if (_kontraktorUsers.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFFDE68A)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: Color(0xFFD97706)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Belum ada akun kontraktor aktif di menu Admin. Silakan ketik nama kontraktor manual.',
+                    style: TextStyle(fontSize: 11.5, color: Color(0xFF92400E)),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          DropdownButtonFormField<String>(
+            value: _kontraktorUsers.any((u) => u['uid'] == _selectedKontraktorUid)
+                ? _selectedKontraktorUid
+                : null,
+            isExpanded: true,
+            decoration: InputDecoration(
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF374151), width: 1.5),
+              ),
+              fillColor: Colors.white,
+              filled: true,
+              hintText: 'Pilih akun kontraktor agar terhubung ke dashboard-nya',
+              hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+            ),
+            items: [
+              const DropdownMenuItem<String>(
+                value: null,
+                child: Text(
+                  '— Tanpa Tautan Akun (Input Manual) —',
+                  style: TextStyle(fontSize: 12.5, color: Color(0xFF6B7280), fontStyle: FontStyle.italic),
+                ),
+              ),
+              ..._kontraktorUsers.map((user) {
+                final label = '${user['namaLengkap']} (${user['companyOrAgency']})';
+                return DropdownMenuItem<String>(
+                  value: user['uid'] as String,
+                  child: Text(
+                    label,
+                    style: const TextStyle(fontSize: 12.5),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+              }),
+            ],
+            onChanged: (uid) {
+              setState(() {
+                _selectedKontraktorUid = uid;
+                if (uid != null) {
+                  final user = _kontraktorUsers.firstWhere(
+                    (u) => u['uid'] == uid,
+                    orElse: () => <String, dynamic>{},
+                  );
+                  if (user.isNotEmpty) {
+                    _kontraktorCtrl.text = user['companyOrAgency'] ?? '';
+                  }
+                }
+              });
+            },
+          ),
+        const SizedBox(height: 14),
         _buildField(
           controller: _kontraktorCtrl,
           label: 'Kontraktor Pelaksana *',
@@ -599,6 +766,12 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
               onPressed: () {
                 setState(() {
                   _kontraktorCtrl.text = company;
+                  // Try to match a registered kontraktor user by company name
+                  final matchedUser = _kontraktorUsers.cast<Map<String, dynamic>?>().firstWhere(
+                    (u) => (u?['companyOrAgency'] ?? '').toString().toLowerCase() == company.toLowerCase(),
+                    orElse: () => null,
+                  );
+                  _selectedKontraktorUid = matchedUser?['uid'] as String?;
                 });
               },
             );
