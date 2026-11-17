@@ -233,10 +233,38 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
       titleSpacing: 16,
       title: Row(
         children: [
-          // 1. Back button: hanya muncul pada halaman yang membutuhkan navigasi kembali
+          // 1. Tombol Minimize / Expand Sidebar di Header (sebelah kiri)
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+            ),
+            child: IconButton(
+              icon: Icon(
+                isSidebarOpen ? Icons.menu_open : Icons.menu,
+                color: const Color(0xFF475569),
+                size: 20,
+              ),
+              tooltip: isSidebarOpen ? 'Ciutkan Sidebar' : 'Buka Sidebar',
+              splashRadius: 20,
+              constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+              padding: EdgeInsets.zero,
+              onPressed: () {
+                WebDashboardLayout.isSidebarOpen.value =
+                    !WebDashboardLayout.isSidebarOpen.value;
+              },
+            ),
+          ),
+
+          // 2. Tombol Back: tepat di sebelah kanan tombol toggle sidebar
           if (widget.showBackButton) ...[
             Container(
-              margin: const EdgeInsets.only(right: 12),
+              margin: const EdgeInsets.only(left: 8),
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(8),
@@ -244,13 +272,13 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
               ),
               child: IconButton(
                 icon: const Icon(
-                  Icons.arrow_back_rounded,
+                  Icons.arrow_back,
                   color: Color(0xFF0F172A),
                   size: 20,
                 ),
                 tooltip: 'Kembali',
                 splashRadius: 20,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
                 padding: EdgeInsets.zero,
                 onPressed: widget.onBack ??
                     () {
@@ -267,24 +295,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
               ),
             ),
           ],
-
-          // 2. Tombol Minimize / Expand Sidebar di Header
-          IconButton(
-            icon: Icon(
-              isSidebarOpen ? Icons.view_sidebar_outlined : Icons.view_sidebar,
-              color: const Color(0xFF475569),
-              size: 21,
-            ),
-            tooltip: isSidebarOpen ? 'Ciutkan Sidebar' : 'Buka Sidebar',
-            splashRadius: 20,
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-            padding: EdgeInsets.zero,
-            onPressed: () {
-              WebDashboardLayout.isSidebarOpen.value =
-                  !WebDashboardLayout.isSidebarOpen.value;
-            },
-          ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
 
           // 3. Judul Halaman
           Expanded(
@@ -520,7 +531,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                     isDrawer: isDrawer,
                     menuKey: 'dashboard',
                     label: userProf.tr('nav_dashboard'),
-                    icon: Icons.dashboard_outlined,
+                    icon: Icons.dashboard,
                     isActive: widget.activeMenu == 'dashboard',
                     isCollapsed: isCollapsed,
                     onTap: () {
@@ -576,7 +587,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                       isDrawer: isDrawer,
                       menuKey: 'data_laporan',
                       label: 'Data Laporan',
-                      icon: Icons.folder_copy_outlined,
+                      icon: Icons.folder_open,
                       isActive: widget.activeMenu == 'data_laporan',
                       isCollapsed: isCollapsed,
                       onTap: () {
@@ -633,7 +644,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                     isDrawer: isDrawer,
                     menuKey: 'timeline',
                     label: 'Timeline & Histori',
-                    icon: Icons.timeline_outlined,
+                    icon: Icons.timeline,
                     isActive: widget.activeMenu == 'timeline',
                     isCollapsed: isCollapsed,
                     onTap: () {
@@ -695,7 +706,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                     isDrawer: isDrawer,
                     menuKey: 'panduan_faq',
                     label: 'Panduan & FAQ',
-                    icon: Icons.help_outline_rounded,
+                    icon: Icons.help_outline,
                     isActive: widget.activeMenu == 'panduan_faq',
                     isCollapsed: isCollapsed,
                     onTap: () {

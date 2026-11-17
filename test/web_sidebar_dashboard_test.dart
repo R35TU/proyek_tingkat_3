@@ -9,6 +9,7 @@ import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/screens/dashboard_screen.dart';
 import 'package:tata_saka_app/utils/sample_contract_data.dart';
+import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -250,6 +251,83 @@ void main() {
 
         expect(expectedDates, isNotEmpty);
         expect(dates, containsAll(expectedDates));
+      },
+    );
+
+    testWidgets(
+      '5. Header buttons order and standard icons: [Tombol Collapse Sidebar] on left, [Tombol Back] on right',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        final konsultanProfile = UserProfileProvider();
+        konsultanProfile.loginAs(const RegisteredUser(
+          username: 'konsultan',
+          password: 'password123',
+          role: 'Konsultan',
+          namaLengkap: 'CV. Tata Saka Consultant',
+          companyOrAgency: 'CV. Tata Saka Consultant',
+        ));
+
+        tester.view.physicalSize = const Size(1280, 800);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        WebDashboardLayout.isSidebarOpen.value = true;
+
+        await tester.pumpWidget(
+          MultiProvider(
+            providers: [
+              ChangeNotifierProvider<UserProfileProvider>.value(
+                value: konsultanProfile,
+              ),
+            ],
+            child: MaterialApp(
+              home: WebDashboardLayout(
+                title: 'Detail Kontrak Pengujian',
+                showBackButton: true,
+                child: const Center(child: Text('Konten')),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // 1. Temukan kedua tombol di Header
+        final collapseBtnFinder = find.byTooltip('Ciutkan Sidebar');
+        final backBtnFinder = find.byTooltip('Kembali');
+
+        expect(collapseBtnFinder, findsOneWidget);
+        expect(backBtnFinder, findsOneWidget);
+
+        // 2. Verifikasi posisi: [Tombol Collapse Sidebar] berada di sebelah kiri [Tombol Back]
+        final collapseTopLeft = tester.getTopLeft(collapseBtnFinder);
+        final backTopLeft = tester.getTopLeft(backBtnFinder);
+        expect(
+          collapseTopLeft.dx < backTopLeft.dx,
+          isTrue,
+          reason: 'Tombol Collapse Sidebar harus berada di sebelah kiri Tombol Back',
+        );
+
+        // 3. Verifikasi ukuran kedua tombol konsisten
+        final collapseSize = tester.getSize(collapseBtnFinder);
+        final backSize = tester.getSize(backBtnFinder);
+        expect(collapseSize.width, equals(backSize.width));
+        expect(collapseSize.height, equals(backSize.height));
+
+        // 4. Verifikasi ikon Header menggunakan standard Material Icons
+        expect(find.byIcon(Icons.menu_open), findsOneWidget);
+        expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+
+        // 5. Verifikasi ikon Menu Sidebar menggunakan standard Material Icons
+        expect(find.byIcon(Icons.dashboard), findsOneWidget);
+        expect(find.byIcon(Icons.folder_open), findsOneWidget);
+        expect(find.byIcon(Icons.timeline), findsOneWidget);
+        await tester.scrollUntilVisible(
+          find.byIcon(Icons.help_outline),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(find.byIcon(Icons.help_outline), findsOneWidget);
       },
     );
   });

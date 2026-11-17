@@ -130,7 +130,13 @@ void main() {
     });
 
     test('1. Konsultan has full visibility across all project events', () {
-      userProfileProv.login('konsultan', 'password123');
+      userProfileProv.loginAs(const RegisteredUser(
+        username: 'konsultan',
+        password: 'password123',
+        role: 'Konsultan',
+        namaLengkap: 'CV. Tata Saka Consultant',
+        companyOrAgency: 'CV. Tata Saka Consultant',
+      ));
       expect(userProfileProv.isKonsultan, true);
 
       final konsultanEvents = timelineProv.getFilteredEvents(userProfile: userProfileProv);
@@ -144,7 +150,13 @@ void main() {
 
     test('2. Kontraktor ONLY sees events related to their assigned activity, isolating other contractors', () {
       // Login as Kontraktor 1 (CV. Divan Insan Cemerlang - Ruas Jalan A)
-      userProfileProv.login('kontraktor1', 'password123');
+      userProfileProv.loginAs(const RegisteredUser(
+        username: 'kontraktor1',
+        password: 'password123',
+        role: 'Kontraktor',
+        namaLengkap: 'Restu (CV. Divan)',
+        companyOrAgency: 'CV. Divan Insan Cemerlang',
+      ));
       expect(userProfileProv.isKontraktor, true);
       expect(userProfileProv.companyOrAgency, 'CV. Divan Insan Cemerlang');
 
@@ -169,7 +181,13 @@ void main() {
     });
 
     test('3. Dinas sees events under its agency authority', () {
-      userProfileProv.login('dinas', 'password123');
+      userProfileProv.loginAs(const RegisteredUser(
+        username: 'dinas',
+        password: 'password123',
+        role: 'Dinas',
+        namaLengkap: 'Dinas PU Kab. Purbalingga',
+        companyOrAgency: 'DPU-PR Kab. Purbalingga',
+      ));
       expect(userProfileProv.isDinas, true);
 
       final dinasEvents = timelineProv.getFilteredEvents(userProfile: userProfileProv);
@@ -178,7 +196,13 @@ void main() {
     });
 
     test('4. Fast Category Filter isolates specific activity categories', () {
-      userProfileProv.login('konsultan', 'password123');
+      userProfileProv.loginAs(const RegisteredUser(
+        username: 'konsultan',
+        password: 'password123',
+        role: 'Konsultan',
+        namaLengkap: 'CV. Tata Saka Consultant',
+        companyOrAgency: 'CV. Tata Saka Consultant',
+      ));
 
       // Filter by 'Addendum (CCO)'
       final ccoEvents = timelineProv.getFilteredEvents(
@@ -206,7 +230,13 @@ void main() {
     });
 
     test('5. Search Query filters by title, description, or Opsi A parameter changes', () {
-      userProfileProv.login('konsultan', 'password123');
+      userProfileProv.loginAs(const RegisteredUser(
+        username: 'konsultan',
+        password: 'password123',
+        role: 'Konsultan',
+        namaLengkap: 'CV. Tata Saka Consultant',
+        companyOrAgency: 'CV. Tata Saka Consultant',
+      ));
 
       // Search by parameter in Opsi A changes: 'AC-WC'
       final searchResult = timelineProv.getFilteredEvents(
@@ -225,7 +255,13 @@ void main() {
     });
 
     test('6. logEvent adds a new event and updates persistence', () async {
-      userProfileProv.login('konsultan', 'password123');
+      userProfileProv.loginAs(const RegisteredUser(
+        username: 'konsultan',
+        password: 'password123',
+        role: 'Konsultan',
+        namaLengkap: 'CV. Tata Saka Consultant',
+        companyOrAgency: 'CV. Tata Saka Consultant',
+      ));
       final beforeCount = timelineProv.allEvents.length;
 
       await timelineProv.logEvent(

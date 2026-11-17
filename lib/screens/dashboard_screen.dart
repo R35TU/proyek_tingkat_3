@@ -23,7 +23,10 @@ import 'package:tata_saka_app/screens/keamanan_screen.dart';
 import 'package:tata_saka_app/screens/edit_profil_screen.dart';
 import 'package:tata_saka_app/screens/panduan_faq_screen.dart';
 import 'package:tata_saka_app/screens/kelola_addendum_screen.dart';
+import 'package:intl/intl.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
+import 'package:tata_saka_app/models/timeline_event_model.dart';
+import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
@@ -217,6 +220,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _startTimer();
     WebDashboardLayout.activeWebMenu.addListener(_onWebDashboardMenuChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        try {
+          final contracts = context.read<ContractProvider>().contracts;
+          context.read<TimelineProvider>().syncWithContracts(contracts);
+        } catch (_) {}
+      }
+    });
   }
 
   void _onWebDashboardMenuChanged() {
@@ -274,10 +285,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final safeUserProf = userProf ?? UserProfileProvider();
     final provider = Provider.of<ContractProvider>(context);
     final allContracts = provider.contracts;
+    TimelineProvider? timelineProv;
+    try {
+      timelineProv = Provider.of<TimelineProvider>(context);
+    } catch (_) {
+      timelineProv = null;
+    }
 
     // ─── ROLE KONTRAKTOR: TAMPILAN KHUSUS KEGIATAN TANPA DATA KONTRAK LAIN ───
     if (safeUserProf.isKontraktor) {
-      return _buildContractorDashboard(context, safeUserProf, allContracts);
+      return _buildContractorDashboard(
+        context,
+        safeUserProf,
+        allContracts,
+        timelineProv,
+      );
     }
 
     // Filter Kontrak untuk Dinas: hanya kontrak terkait dinas tersebut
@@ -491,73 +513,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
 
           const SizedBox(height: 32),
-          // Aktivitas Terkini
-          const Text(
-            'Aktivitas Terkini',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: AppColors.textDark,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Builder(
-            builder: (context) {
-              final activities = _extractRecentActivities(contracts);
-              if (activities.isNotEmpty) {
-                return Column(
-                  children: activities
-                      .take(5)
-                      .map(
-                        (act) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _buildActivityItem(
-                            act['title']!,
-                            act['desc']!,
-                            act['time']!,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                );
-              }
-              return Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 24,
-                  horizontal: 16,
-                ),
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border, width: 0.8),
-                ),
-                child: const Column(
-                  children: [
-                    Icon(
-                      Icons.history_toggle_off,
-                      size: 40,
-                      color: AppColors.slate,
-                    ),
-                    SizedBox(height: 10),
-                    Text(
-                      'Belum Ada Aktivitas Terkini',
-                      style: TextStyle(
-                        color: AppColors.navySlate,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13.5,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Aktivitas pembuatan laporan dan dokumen akan tercatat di sini secara otomatis.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.slate, fontSize: 11.5),
-                    ),
-                  ],
-                ),
-              );
-            },
+          _buildRecentActivitiesSection(
+            context,
+            safeUserProf,
+            timelineProv,
+            contracts,
           ),
         ],
       ),
@@ -701,7 +661,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Urutkan: terbaru di atas (konsisten dengan Timeline & Histori).
     list.sort((a, b) =>
         ((b['sortTs'] as num?) ?? 0).compareTo((a['sortTs'] as num?) ?? 0));
-    return list.map((e) => Map<String, String>.from(e)).toList();
+    return list
+        .map((e) => {
+              'title': e['title']?.toString() ?? '',
+              'desc': e['desc']?.toString() ?? '',
+              'time': e['time']?.toString() ?? '',
+            })
+        .toList();
   }
 
   Widget _buildCarouselCard(ContractModel contract) {
@@ -931,6 +897,255 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  String _formatTimelineEventTime(TimelineEventModel event) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final eventDay =
+        DateTime(event.timestamp.year, event.timestamp.month, event.timestamp.day);
+    final timeStr = DateFormat('HH:mm').format(event.timestamp);
+
+    if (eventDay == today) {
+      return 'Hari ini • $timeStr WIB';
+    } else if (eventDay == today.subtract(const Duration(days: 1))) {
+      return 'Kemarin • $timeStr WIB';
+    } else {
+      return '${event.formattedDate} • $timeStr WIB';
+    }
+  }
+
+  Widget _buildActivityCardFromEvent(
+    BuildContext context,
+    TimelineEventModel event,
+  ) {
+    final timeLabel = _formatTimelineEventTime(event);
+    final actorLabel = event.actorName.isNotEmpty
+        ? (event.actorRole.isNotEmpty
+            ? 'Oleh: ${event.actorName} (${event.actorRole})'
+            : 'Oleh: ${event.actorName}')
+        : 'Oleh: CV. Tata Saka (Konsultan)';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border, width: 0.8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: event.actionColor.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              event.icon,
+              color: event.actionColor,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        event.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textDark,
+                          fontSize: 13.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      timeLabel,
+                      style: const TextStyle(
+                        color: AppColors.textLight,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  event.description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textLight,
+                    fontSize: 12.5,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  actorLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textLight,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecentActivitiesSection(
+    BuildContext context,
+    UserProfileProvider userProf,
+    TimelineProvider? timelineProv,
+    List<ContractModel> contracts,
+  ) {
+    final timelineEvents = timelineProv != null
+        ? timelineProv.getFilteredEvents(userProfile: userProf)
+        : <TimelineEventModel>[];
+
+    final hasTimelineEvents = timelineEvents.isNotEmpty;
+    final fallbackActivities = !hasTimelineEvents
+        ? _extractRecentActivities(contracts)
+        : <Map<String, String>>[];
+
+    final hasActivities = hasTimelineEvents || fallbackActivities.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Expanded(
+              child: Text(
+                'Aktivitas Terkini',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: AppColors.textDark,
+                ),
+              ),
+            ),
+            if (hasActivities)
+              InkWell(
+                onTap: () {
+                  final isWeb = ResponsiveBreakpoints.isDesktop(context);
+                  WebDashboardLayout.activeWebMenu.value = 'timeline';
+                  if (isWeb) {
+                    setState(() => _activeWebMenu = 'timeline');
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const TimelineScreen(),
+                      ),
+                    );
+                  }
+                },
+                child: const Text(
+                  'Lihat Semua',
+                  style: TextStyle(
+                    color: Color(0xFF2563EB),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (hasTimelineEvents)
+          Column(
+            children: timelineEvents
+                .take(5)
+                .map(
+                  (ev) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _buildActivityCardFromEvent(context, ev),
+                  ),
+                )
+                .toList(),
+          )
+        else if (fallbackActivities.isNotEmpty)
+          Column(
+            children: fallbackActivities
+                .take(5)
+                .map(
+                  (act) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _buildActivityItem(
+                      act['title']!,
+                      act['desc']!,
+                      act['time']!,
+                    ),
+                  ),
+                )
+                .toList(),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.symmetric(
+              vertical: 24,
+              horizontal: 16,
+            ),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border, width: 0.8),
+            ),
+            child: const Column(
+              children: [
+                Icon(
+                  Icons.history_toggle_off,
+                  size: 40,
+                  color: AppColors.slate,
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'Belum Ada Aktivitas Terkini',
+                  style: TextStyle(
+                    color: AppColors.navySlate,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13.5,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Aktivitas pembuatan laporan dan dokumen akan tercatat di sini secara otomatis.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.slate, fontSize: 11.5),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildActivityItem(String title, String desc, String time) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1017,8 +1232,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildContractorDashboard(
     BuildContext context,
     UserProfileProvider userProf,
-    List<ContractModel> contracts,
-  ) {
+    List<ContractModel> contracts, [
+    TimelineProvider? timelineProv,
+  ]) {
     final contractorName = userProf.namaLengkap.toLowerCase();
     final currentUserUid = AuthService.currentUser?.uid ?? '';
     final List<Map<String, dynamic>> myKegiatans = [];
@@ -1402,6 +1618,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 );
               }),
             ),
+          const SizedBox(height: 24),
+          _buildRecentActivitiesSection(
+            context,
+            userProf,
+            timelineProv,
+            contracts,
+          ),
           const SizedBox(height: 20),
         ],
       ),

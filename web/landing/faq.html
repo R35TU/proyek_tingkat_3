@@ -212,6 +212,7 @@
                     <div
                         class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-slate-200/90 transition-transform duration-300 group-hover:scale-105">
                         <img src="../icons/logoRev.png" alt="Logo Tata Saka Consultant"
+                            onerror="if(!this.dataset.retry){this.dataset.retry=1;this.src='logoRev.png';}else if(this.dataset.retry==1){this.dataset.retry=2;this.src='/icons/logoRev.png';}"
                             class="h-full w-full object-contain mix-blend-multiply" />
                     </div>
                     <div class="flex flex-col">
