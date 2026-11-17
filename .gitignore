@@ -66,3 +66,6 @@ app.*.map.json
 .agent/
 .gemini/
 .claude/
+
+# Firebase CLI cache
+.firebase/

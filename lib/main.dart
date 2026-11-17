@@ -1,7 +1,10 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:tata_saka_app/firebase_options.dart';
+import 'package:tata_saka_app/services/auth_service.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/screens/splash_screen.dart';
 import 'package:tata_saka_app/screens/login_screen.dart';
@@ -14,6 +17,14 @@ import 'package:tata_saka_app/widgets/responsive_layout.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Pastikan akun demo (admin/konsultan/kontraktor/dinas) ada di Firebase
+  // Auth + Firestore. Aman offline: dilewati bila Auth belum aktif.
+  await AuthService.ensureSeededAccounts();
 
   await initializeDateFormatting('id_ID', null);
 

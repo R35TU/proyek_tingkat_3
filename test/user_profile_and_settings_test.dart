@@ -15,7 +15,7 @@ void main() {
   });
 
   group('UserProfileProvider Unit Tests', () {
-    test('Initial profile and default credentials are correct', () {
+    test('Initial profile and default credentials are correct', () async {
       final provider = UserProfileProvider();
       expect(provider.namaLengkap, 'CV. Tata Saka Consultant');
       expect(provider.username, 'konsultan');
@@ -24,7 +24,7 @@ void main() {
       expect(provider.verifyCurrentPassword('password123'), isTrue);
     });
 
-    test('Updating namaLengkap works and preserves username & role', () {
+    test('Updating namaLengkap works and preserves username & role', () async {
       final provider = UserProfileProvider();
       provider.updateNamaLengkap('CV. Tata Saka Konsultan Utama');
       expect(provider.namaLengkap, 'CV. Tata Saka Konsultan Utama');
@@ -32,7 +32,7 @@ void main() {
       expect(provider.role, 'Konsultan');
     });
 
-    test('Updating theme and language updates preferences', () {
+    test('Updating theme and language updates preferences', () async {
       final provider = UserProfileProvider();
       provider.updateTheme('Gelap');
       expect(provider.themeMode, 'Gelap');
@@ -45,7 +45,7 @@ void main() {
       expect(provider.language, 'English');
     });
 
-    test('Notification toggles update correctly', () {
+    test('Notification toggles update correctly', () async {
       final provider = UserProfileProvider();
       provider.setNotifikasiPush(false);
       provider.setEmailNotifikasi(false);
@@ -58,25 +58,25 @@ void main() {
       expect(provider.notifikasiLaporan, isFalse);
     });
 
-    test('Changing password validates old password and stores new password', () {
+    test('Changing password validates old password and stores new password', () async {
       final provider = UserProfileProvider();
-      final failed = provider.changePassword('wrongpass', 'NewPass123!');
+      final failed = await provider.changePassword('wrongpass', 'NewPass123!');
       expect(failed, isFalse);
       expect(provider.verifyCurrentPassword('password123'), isTrue);
 
-      final success = provider.changePassword('password123', 'Secret2026#');
+      final success = await provider.changePassword('password123', 'Secret2026#');
       expect(success, isTrue);
       expect(provider.verifyCurrentPassword('Secret2026#'), isTrue);
     });
 
-    test('Clearing cache resets cache size to 0 KB', () {
+    test('Clearing cache resets cache size to 0 KB', () async {
       final provider = UserProfileProvider();
       expect(provider.cacheSize, '12.4 MB');
       provider.clearCache();
       expect(provider.cacheSize, '0 KB');
     });
 
-    test('Logout from all other devices removes non-current sessions', () {
+    test('Logout from all other devices removes non-current sessions', () async {
       final provider = UserProfileProvider();
       expect(provider.loginActivities.length, greaterThan(1));
       provider.logoutFromAllOtherDevices();
