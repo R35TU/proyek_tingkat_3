@@ -6,6 +6,7 @@ import 'package:tata_saka_app/screens/kontrak_screen.dart';
 import 'package:tata_saka_app/screens/laporan_screen.dart';
 import 'package:tata_saka_app/screens/setting_screen.dart';
 import 'package:tata_saka_app/screens/timeline_screen.dart';
+import 'package:tata_saka_app/services/auth_service.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 
@@ -18,6 +19,19 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final userProf = context.read<UserProfileProvider>();
+      final isAuth = AuthService.currentUser != null || userProf.username.isNotEmpty;
+      if (!isAuth) {
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

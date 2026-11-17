@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
+import 'package:tata_saka_app/services/auth_service.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 
@@ -31,6 +32,10 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     _emailController = TextEditingController();
     _passwordController = TextEditingController();
+    // Bersihkan sesi lama saat berada di layar login
+    try {
+      AuthService.signOut();
+    } catch (_) {}
   }
 
   @override
@@ -70,11 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (success) {
       // Admin (role Admin) masuk ke dashboard manajemen akun.
       if (userProf.role.toLowerCase() == 'admin') {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const AdminPage()),
-          (route) => false,
-        );
+        Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);
         return;
       }
       Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);

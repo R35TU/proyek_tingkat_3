@@ -78,11 +78,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white,
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(dialogCtx);
-              Navigator.pushAndRemoveUntil(
+              try {
+                final userProf = context.read<UserProfileProvider>();
+                await userProf.logout();
+              } catch (_) {}
+              if (!context.mounted) return;
+              Navigator.pushNamedAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                '/login',
                 (route) => false,
               );
             },

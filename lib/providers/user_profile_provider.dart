@@ -360,12 +360,17 @@ class UserProfileProvider with ChangeNotifier {
     try {
       await AuthService.signOut();
     } catch (_) {}
-    _username = 'konsultan';
-    _role = 'Konsultan';
-    _namaLengkap = 'CV. Tata Saka Consultant';
-    _companyOrAgency = 'CV. Tata Saka Consultant';
+    _username = '';
+    _role = '';
+    _namaLengkap = '';
+    _companyOrAgency = '';
     _profileImagePath = null;
+    _currentPassword = '';
     notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_prefProfileKey);
+    } catch (_) {}
   }
 
   void logoutFromAllOtherDevices() {

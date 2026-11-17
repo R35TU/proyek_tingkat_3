@@ -7,6 +7,7 @@ import 'package:tata_saka_app/firebase_options.dart';
 import 'package:tata_saka_app/services/auth_service.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/screens/splash_screen.dart';
+import 'package:tata_saka_app/screens/admin_page.dart';
 import 'package:tata_saka_app/screens/login_screen.dart';
 import 'package:tata_saka_app/screens/main_layout.dart';
 import 'package:provider/provider.dart';
@@ -139,6 +140,7 @@ class TataSakaApp extends StatelessWidget {
             '/': (context) => const SplashScreen(),
             '/login': (context) => const LoginScreen(),
             '/main': (context) => const MainLayout(),
+            '/admin': (context) => const AdminPage(),
           },
         );
       },
