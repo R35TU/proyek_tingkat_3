@@ -82,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Email atau password salah. Silakan coba kembali.'),
+          content: Text('Username/Email atau password salah. Silakan coba kembali.'),
           backgroundColor: AppColors.primaryRed,
         ),
       );
@@ -179,9 +179,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
         const SizedBox(height: 20),
 
-        // Email Field
+        // Username atau Email Field
         const Text(
-          'Email Akun',
+          'Username atau Email',
           style: TextStyle(
             fontSize: 12.5,
             fontWeight: FontWeight.bold,
@@ -192,7 +192,12 @@ class _LoginScreenState extends State<LoginScreen> {
         TextFormField(
           controller: _emailController,
           decoration: InputDecoration(
-            hintText: 'Masukkan email',
+            hintText: 'Masukkan username atau email',
+            prefixIcon: const Icon(
+              Icons.person_outline,
+              size: 20,
+              color: Color(0xFF64748B),
+            ),
             filled: true,
             fillColor: AppColors.inputBackground,
             contentPadding: const EdgeInsets.symmetric(
