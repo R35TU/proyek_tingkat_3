@@ -10,6 +10,8 @@ import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/utils/rupiah_input_formatter.dart';
 import 'package:tata_saka_app/widgets/lembar_laporan_mingguan_widget.dart';
 import 'package:tata_saka_app/widgets/lembar_boq_mingguan_widget.dart';
+import 'package:tata_saka_app/widgets/responsive_layout.dart';
+import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 
 /// Normalisasi status dokumen: nilai lama ('Normal', 'Rencana', dll)
 /// dipetakan ke 'Kontrak' agar sesuai pilihan dropdown ('Kontrak'/'Adendum').
@@ -52,12 +54,14 @@ class BuatLaporanMingguanScreen extends StatefulWidget {
   final ContractModel? initialContract;
   final int? initialKegiatanIndex;
   final WeeklyReportModel? editReport;
+  final bool isEmbedded;
 
   const BuatLaporanMingguanScreen({
     super.key,
     this.initialContract,
     this.initialKegiatanIndex,
     this.editReport,
+    this.isEmbedded = false,
   });
 
   @override
@@ -886,11 +890,77 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
   Widget build(BuildContext context) {
     final provider = Provider.of<ContractProvider>(context);
     final contracts = provider.contracts;
+    final isDesktop = ResponsiveBreakpoints.isDesktop(context);
+    final pageTitle = widget.editReport != null ? 'Edit Ringkasan Laporan Mingguan' : 'Ringkasan Laporan Mingguan';
 
     if (_selectedContract == null && contracts.isNotEmpty && widget.editReport == null) {
       _selectedContract = contracts.first;
       _selectedKegiatanIndex = _selectedContract!.kegiatans.isNotEmpty ? 0 : null;
       _initFromSelectedKegiatanData();
+    }
+
+    final saveButton = Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: TextButton(
+        onPressed: _simpanLaporanMingguan,
+        style: TextButton.styleFrom(
+          backgroundColor: isDesktop ? AppColors.primaryBlue : const Color(0xFF1F2937),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child: const Text(
+          'Simpan',
+          style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white, fontSize: 13),
+        ),
+      ),
+    );
+
+    final tabBarWidget = Container(
+      color: Colors.white,
+      child: TabBar(
+        controller: _tabController,
+        labelColor: const Color(0xFF111827),
+        unselectedLabelColor: const Color(0xFF6B7280),
+        indicatorColor: const Color(0xFF1F2937),
+        indicatorWeight: 2.5,
+        labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        tabs: const [
+          Tab(icon: Icon(Icons.edit_note, size: 20), text: 'Form Input'),
+          Tab(icon: Icon(Icons.description_outlined, size: 20), text: 'Pratinjau Dokumen Fisik'),
+        ],
+      ),
+    );
+
+    final mainBody = Column(
+      children: [
+        if (isDesktop || widget.isEmbedded) ...[
+          tabBarWidget,
+          const Divider(height: 1, thickness: 1, color: AppColors.border),
+        ],
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildFormInputTab(contracts),
+              _buildPreviewTab(),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    if (widget.isEmbedded) {
+      return mainBody;
+    }
+
+    if (isDesktop) {
+      return WebDashboardLayout(
+        title: pageTitle,
+        activeMenu: 'laporan',
+        showBackButton: true,
+        actions: [saveButton],
+        child: mainBody,
+      );
     }
 
     return Scaffold(
@@ -910,30 +980,14 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
           },
         ),
         title: Text(
-          widget.editReport != null ? 'Edit Ringkasan Laporan Mingguan' : 'Ringkasan Laporan Mingguan',
+          pageTitle,
           style: const TextStyle(
             color: Color(0xFF111827),
             fontSize: 16,
             fontWeight: FontWeight.w700,
           ),
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: TextButton(
-              onPressed: _simpanLaporanMingguan,
-              style: TextButton.styleFrom(
-                backgroundColor: const Color(0xFF1F2937),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Text(
-                'Simpan',
-                style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white, fontSize: 13),
-              ),
-            ),
-          ),
-        ],
+        actions: [saveButton],
         bottom: TabBar(
           controller: _tabController,
           labelColor: const Color(0xFF111827),

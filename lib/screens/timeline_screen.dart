@@ -8,7 +8,8 @@ import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 
 class TimelineScreen extends StatefulWidget {
-  const TimelineScreen({super.key});
+  final bool isEmbedded;
+  const TimelineScreen({super.key, this.isEmbedded = false});
 
   @override
   State<TimelineScreen> createState() => _TimelineScreenState();
@@ -94,8 +95,10 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
     return Scaffold(
       backgroundColor: bgColor,
-      appBar: AppBar(
-        backgroundColor: cardColor,
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              backgroundColor: cardColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         bottom: PreferredSize(

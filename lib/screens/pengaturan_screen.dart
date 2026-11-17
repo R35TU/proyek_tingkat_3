@@ -4,7 +4,8 @@ import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 
 class PengaturanScreen extends StatefulWidget {
-  const PengaturanScreen({super.key});
+  final bool isEmbedded;
+  const PengaturanScreen({super.key, this.isEmbedded = false});
 
   @override
   State<PengaturanScreen> createState() => _PengaturanScreenState();
@@ -391,8 +392,10 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.getBackground(context),
-      appBar: AppBar(
-        backgroundColor: cardBg,
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              backgroundColor: cardBg,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(

@@ -1,19 +1,21 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:tata_saka_app/services/pdf_saver_native.dart'
-    if (dart.library.js_interop) 'package:tata_saka_app/services/pdf_saver_web.dart'
-    if (dart.library.html) 'package:tata_saka_app/services/pdf_saver_web.dart';
 import 'package:tata_saka_app/models/addendum_model.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/kegiatan_model.dart';
 import 'package:tata_saka_app/models/monthly_report_model.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
-import 'package:tata_saka_app/services/storage_service.dart';
+import 'package:tata_saka_app/services/pdf_saver_native.dart'
+    if (dart.library.js_interop) 'package:tata_saka_app/services/pdf_saver_web.dart'
+    if (dart.library.html) 'package:tata_saka_app/services/pdf_saver_web.dart';
+import 'package:tata_saka_app/utils/plat_nomor_util.dart';
 import 'package:tata_saka_app/utils/rupiah_input_formatter.dart';
 
 class PdfReportService {
@@ -42,6 +44,77 @@ class PdfReportService {
     return _numberFormat.format(value).trim();
   }
 
+  static String _fmtNum(num n, {int dec = 2}) {
+    if (n == 0) return '-';
+    return n.toStringAsFixed(dec);
+  }
+
+  static String _fmtVol(double vol) {
+    if (vol == vol.toInt()) {
+      return vol.toInt().toString();
+    }
+    return vol.toStringAsFixed(3).replaceFirst(RegExp(r'\.?0+$'), '');
+  }
+
+  static String _fmtRupiahNoPrefix(double val, {bool forceDecimals = false}) {
+    if (val == 0) return '-';
+    final parts = val.toStringAsFixed(2).split('.');
+    final intPart = num.tryParse(parts[0]) ?? 0;
+    final formattedInt = RupiahUtil.formatNumber(intPart);
+    final decPart = parts.length > 1 ? parts[1] : '00';
+    if (forceDecimals || decPart != '00') {
+      return '$formattedInt,$decPart';
+    }
+    return formattedInt;
+  }
+
+  static String _toRoman(int n) {
+    const roman = [
+      'I',
+      'II',
+      'III',
+      'IV',
+      'V',
+      'VI',
+      'VII',
+      'VIII',
+      'IX',
+      'X',
+      'XI',
+      'XII',
+      'XIII',
+      'XIV',
+      'XV',
+    ];
+    if (n >= 1 && n <= roman.length) {
+      return roman[n - 1];
+    }
+    return '$n';
+  }
+
+  /// Asynchronously resolves image bytes from base64 string or HTTP URL
+  static Future<Uint8List?> _resolveImageBytes(String? src) async {
+    if (src == null || src.trim().isEmpty) return null;
+    final str = src.trim();
+    try {
+      if (str.startsWith('http://') || str.startsWith('https://')) {
+        final res = await http.get(Uri.parse(str)).timeout(const Duration(seconds: 6));
+        if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+          return res.bodyBytes;
+        }
+        return null;
+      }
+      String clean = str;
+      if (clean.contains(',')) {
+        clean = clean.split(',').last;
+      }
+      clean = clean.replaceAll(RegExp(r'\s+'), '');
+      return base64Decode(clean);
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // ─── 1. GENERATE PDF: BUKU HARIAN STANDAR (LAPORAN HARIAN) ───────────────
   // ═══════════════════════════════════════════════════════════════════════════
@@ -52,201 +125,1187 @@ class PdfReportService {
     required String dana,
     required String kontraktor,
     required String konsultan,
-    List<Map<String, dynamic>>? normalizedPekerjaanList,
-    List<Map<String, dynamic>>? cuacaKejadianList,
+    List<dynamic>? normalizedPekerjaanList,
+    List<dynamic>? cuacaKejadianList,
   }) async {
     final pdf = pw.Document();
 
-    final tglFormatted =
-        (report['tanggalFormatted'] ?? report['tanggal'] ?? '-').toString();
-    final pekList =
-        normalizedPekerjaanList ??
-        ((report['pekerjaanList'] as List?)
-                ?.map((e) => Map<String, dynamic>.from(e is Map ? e : {}))
-                .toList() ??
-            []);
-    final cuacaList =
-        cuacaKejadianList ??
-        ((report['cuacaKejadianList'] as List?)
-                ?.map((e) => Map<String, dynamic>.from(e is Map ? e : {}))
-                .toList() ??
-            []);
+    final tglFormatted = (report['tanggalFormatted'] ?? report['tanggal'] ?? '-').toString();
+    final pekList = normalizedPekerjaanList ??
+        ((report['pekerjaanList'] as List?)?.map((e) => Map<String, dynamic>.from(e is Map ? e : {})).toList() ?? []);
+    final cuacaList = cuacaKejadianList ??
+        ((report['cuacaKejadianList'] as List?)?.map((e) => Map<String, dynamic>.from(e is Map ? e : {})).toList() ?? []);
 
-    final instruksi = (report['instruksi'] ?? report['instruksiSaran'] ?? '-')
-        .toString();
+    final instruksiKonsultan = report['instruksiKonsultan']?.toString() ??
+        report['instruksi']?.toString() ??
+        (report['instruksiSaran'] is Map ? report['instruksiSaran']['konsultanUraian']?.toString() : '') ??
+        '';
 
-    // ── LEMBAR 1: BUKU HARIAN STANDAR (CATATAN HARIAN) ──
+    // Signers from report
+    final ttdPengawasListRaw = report['ttdPengawasList'] as List<dynamic>?;
+    final List<Map<String, String?>> signersRaw = [];
+    if (ttdPengawasListRaw != null && ttdPengawasListRaw.isNotEmpty) {
+      for (var t in ttdPengawasListRaw) {
+        if (t is Map) {
+          final n = t['nama']?.toString().trim() ?? '';
+          final j = t['jabatan']?.toString().trim() ?? '';
+          final s = t['signature']?.toString();
+          if (n.isNotEmpty || j.isNotEmpty || (s != null && s.isNotEmpty)) {
+            signersRaw.add({'nama': n, 'jabatan': j, 'signature': s});
+          }
+        }
+      }
+    }
+    if (signersRaw.isEmpty) {
+      final rawNama = report['ttdNama']?.toString().trim() ?? '';
+      final rawJabatan = report['ttdJabatan']?.toString().trim() ?? '';
+      final ttdNama = rawNama.isNotEmpty ? rawNama : 'MISWANTO';
+      final ttdJabatan = rawJabatan.isNotEmpty ? rawJabatan : 'Inspector';
+      final ttdSig = report['ttdSignature']?.toString();
+      signersRaw.add({'nama': ttdNama, 'jabatan': ttdJabatan, 'signature': ttdSig});
+    }
+
+    // Resolve signatures asynchronously
+    final List<Map<String, dynamic>> resolvedSigners = [];
+    for (final s in signersRaw) {
+      final sigStr = s['signature'];
+      Uint8List? sigBytes;
+      if (sigStr != null && sigStr.isNotEmpty) {
+        sigBytes = await _resolveImageBytes(sigStr);
+      }
+      resolvedSigners.add({
+        'nama': s['nama'] ?? '',
+        'jabatan': s['jabatan'] ?? '',
+        'bytes': sigBytes,
+      });
+    }
+
+    // Resolve photos asynchronously
+    final rawFotoList = (report['fotoList'] as List<dynamic>?) ?? [];
+    final List<Uint8List> resolvedPhotos = [];
+    for (final f in rawFotoList) {
+      final bytes = await _resolveImageBytes(f?.toString());
+      if (bytes != null) {
+        resolvedPhotos.add(bytes);
+      }
+    }
+
+    // Check attachment sheets
+    final hasRekapSuhuLapangan = report['hasRekapSuhuLapangan'] == true &&
+        (report['rekapSuhuLapanganList'] as List?)?.isNotEmpty == true;
+    final rekapSuhuLapanganList = (report['rekapSuhuLapanganList'] as List<dynamic>?) ?? [];
+
+    final hasRekapSuhuAmp = report['hasRekapSuhuAmp'] == true &&
+        (report['rekapSuhuAmpList'] as List?)?.isNotEmpty == true;
+    final rekapSuhuAmpList = (report['rekapSuhuAmpList'] as List<dynamic>?) ?? [];
+
+    final hasRekapTonaseAspal = report['hasRekapTonaseAspal'] == true &&
+        (report['rekapTonaseAspalList'] as List?)?.isNotEmpty == true;
+    final rekapTonaseAspalList = (report['rekapTonaseAspalList'] as List<dynamic>?) ?? [];
+
+    final hasRekapBeton = (report['hasRekapBeton'] == true || report['hasRekapitulasiBeton'] == true) &&
+        (report['rekapPengecoranBetonList'] as List?)?.isNotEmpty == true;
+    final rekapPengecoranBetonList = (report['rekapPengecoranBetonList'] as List<dynamic>?) ?? [];
+
+    final bool hasDataPerjalananDt = (report['hasRekapPerjalananDt'] == true ||
+            report['hasRekapitulasiAspal'] == true) ||
+        (hasRekapSuhuLapangan && hasRekapSuhuAmp);
+
+    int totalPages = 2;
+    if (hasRekapSuhuLapangan) totalPages++;
+    if (hasRekapSuhuAmp) totalPages++;
+    if (hasRekapTonaseAspal) totalPages++;
+    if (hasDataPerjalananDt) totalPages++;
+    if (hasRekapBeton) totalPages++;
+
+    int pageCounter = 2;
+    final int suhuLapPage = hasRekapSuhuLapangan ? ++pageCounter : 0;
+    final int suhuAmpPage = hasRekapSuhuAmp ? ++pageCounter : 0;
+    final int tonasePage = hasRekapTonaseAspal ? ++pageCounter : 0;
+    final int perjalananDtPage = hasDataPerjalananDt ? ++pageCounter : 0;
+    final int betonPage = hasRekapBeton ? ++pageCounter : 0;
+
+    // Build Table Rows for Lembar 1
+    // 1. A. PEKERJAAN
+    final List<List<String>> allJobRows = pekList.asMap().entries.map((entry) {
+      final p = entry.value is Map ? (entry.value as Map) : <String, dynamic>{};
+      final pJenis = p['jenis']?.toString() ?? '-';
+      final pVol = p['volume']?.toString() ?? '-';
+      final pLok = p['lokasi']?.toString() ?? lokasi;
+      return [
+        '${entry.key + 1}',
+        pJenis.isNotEmpty ? pJenis : '-',
+        pVol.isNotEmpty ? pVol : '-',
+        pLok.isNotEmpty ? pLok : lokasi,
+      ];
+    }).toList();
+    if (allJobRows.isEmpty) {
+      allJobRows.add(['1', 'Tidak ada data pekerjaan', '-', lokasi]);
+    }
+
+    // 2. B. MATERIAL
+    final List<List<String>> allMatRows = [];
+    int mCount = 1;
+    for (final p in pekList) {
+      final mats = (p is Map ? p['materials'] : null) as List<dynamic>? ?? [];
+      for (final m in mats) {
+        if (m is Map) {
+          allMatRows.add([
+            '$mCount',
+            m['jenis']?.toString() ?? '-',
+            m['volume']?.toString() ?? '-',
+            m['lokasiAwal']?.toString() ?? '-',
+            m['lokasiTujuan']?.toString() ?? '-',
+          ]);
+          mCount++;
+        }
+      }
+    }
+    if (allMatRows.isEmpty) {
+      allMatRows.add(['1', 'Nihil / Tanpa material', '-', '-', '-']);
+    }
+
+    // 3. C. JENIS PERALATAN YANG DIGUNAKAN (8 Columns)
+    final List<List<String>> allAlatRows = [];
+    int aCount = 1;
+    for (final p in pekList) {
+      final alats = (p is Map ? p['peralatans'] : null) as List<dynamic>? ?? [];
+      for (final a in alats) {
+        if (a is Map) {
+          allAlatRows.add([
+            '$aCount',
+            a['jenis']?.toString() ?? '-',
+            a['cacahAktif']?.toString() ?? a['jumlah']?.toString() ?? '-',
+            a['jumlah']?.toString() ?? '-',
+            a['noRusak']?.toString().isNotEmpty == true
+                ? a['noRusak'].toString()
+                : (a['jenisRusak']?.toString().isNotEmpty == true ? '$aCount' : '-'),
+            a['jenisRusak']?.toString().isNotEmpty == true ? a['jenisRusak'].toString() : '-',
+            a['kode']?.toString().isNotEmpty == true ? a['kode'].toString() : '-',
+            a['rusak']?.toString().isNotEmpty == true ? a['rusak'].toString() : '-',
+          ]);
+          aCount++;
+        }
+      }
+    }
+    if (allAlatRows.isEmpty) {
+      allAlatRows.add(['1', 'Pekerjaan manual / Nihil', '-', '-', '-', '-', '-', '-']);
+    }
+
+    // 4. D. PERSONAL PROYEK PENGAWAS DAN KONTRAKTOR
+    final List<List<String>> allPersRows = [];
+    final Map<String, int> roleMap = {};
+    final Map<String, String> roleLokMap = {};
+    for (final p in pekList) {
+      final pers = (p is Map ? p['personils'] : null) as List<dynamic>? ?? [];
+      final pLok = (p is Map ? p['lokasi'] : null)?.toString() ?? lokasi;
+      for (final pr in pers) {
+        if (pr is Map) {
+          final role = (pr['role'] ?? '-').toString().trim();
+          final cnt = int.tryParse(pr['cacah']?.toString() ?? pr['count']?.toString() ?? '') ?? 1;
+          roleMap[role] = (roleMap[role] ?? 0) + cnt;
+          roleLokMap[role] = (pr['lokasi'] ?? pLok).toString();
+        }
+      }
+    }
+    if (roleMap.isNotEmpty) {
+      int pCount = 1;
+      roleMap.forEach((role, count) {
+        allPersRows.add([
+          '$pCount',
+          role,
+          '$count',
+          roleLokMap[role] ?? lokasi,
+        ]);
+        pCount++;
+      });
+    } else {
+      final defaultRoles = [
+        'Pengawas DPU',
+        'Konsultan Pengawas',
+        'Pelaksana',
+        'Logistik',
+        'Kepala Tukang',
+        'Tukang',
+        'Pekerja',
+      ];
+      for (int i = 0; i < defaultRoles.length; i++) {
+        allPersRows.add(['${i + 1}', defaultRoles[i], '-', lokasi]);
+      }
+    }
+
+    // 5. E. CUACA/BENCANA/KEJADIAN PENGHAMBAT PEKERJAAN
+    final List<List<String>> allCuacaRows = cuacaList.isNotEmpty
+        ? cuacaList.asMap().entries.map((e) {
+            final item = e.value is Map ? (e.value as Map) : <String, dynamic>{};
+            final cuacaVal = item['cuaca']?.toString() ?? '-';
+            final jk = item['jenisKejadian']?.toString() ?? item['jenis']?.toString() ?? '-';
+            return [
+              '${e.key + 1}',
+              cuacaVal.isNotEmpty ? cuacaVal : '-',
+              jk.isNotEmpty ? jk : '-',
+              item['jam']?.toString() ?? '-',
+              item['lokasi']?.toString() ?? '-',
+              item['tanggungJawab']?.toString() ?? 'Tidak',
+              item['akibat']?.toString() ?? '-',
+            ];
+          }).toList()
+        : [
+            ['1', 'Cerah', 'Nihil', '08:00 - 17:00', lokasi, 'Tidak', '-'],
+          ];
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ── LEMBAR 1: BUKU HARIAN STANDAR (CATATAN HARIAN) ──────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        build: (context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              // KOP DOKUMEN RESMI
+              pw.Center(
+                child: pw.Column(
+                  children: [
+                    pw.Text(
+                      'BUKU HARIAN STANDAR',
+                      style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold,
+                        fontSize: 13.5,
+                        decoration: pw.TextDecoration.underline,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    pw.SizedBox(height: 2),
+                    pw.Text(
+                      'Catatan Harian',
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                        fontStyle: pw.FontStyle.italic,
+                        color: PdfColors.grey800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 10),
+
+              // INFORMASI IDENTITAS PROYEK
+              _buildDocMetaRow('Hari / Tanggal', ':  $tglFormatted', fontSize: 8),
+              _buildDocMetaRow('Nama Kegiatan', ':  $namaKegiatan', fontSize: 8),
+              _buildDocMetaRow('Lokasi', ':  $lokasi', fontSize: 8),
+              _buildDocMetaRow('Dana', ':  $dana', fontSize: 8),
+              pw.SizedBox(height: 8),
+
+              // 2-KOLOM LAYOUT (KIRI: A & D, KANAN: B, C, E)
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  // KOLOM KIRI (flex: 48)
+                  pw.Expanded(
+                    flex: 48,
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                      children: [
+                        _buildPdfDocSectionLabel('A.   PEKERJAAN'),
+                        pw.SizedBox(height: 3),
+                        _buildPdfDocTable(
+                          colWidths: const {
+                            0: pw.FixedColumnWidth(18),
+                            1: pw.FlexColumnWidth(3.8),
+                            2: pw.FlexColumnWidth(1.8),
+                            3: pw.FlexColumnWidth(2.0),
+                          },
+                          headers: ['No', 'JENIS PEKERJAAN', 'VOLUME', 'LOKASI'],
+                          rows: allJobRows,
+                        ),
+                        pw.SizedBox(height: 8),
+                        _buildPdfDocSectionLabel('D.   PERSONAL PROYEK PENGAWAS DAN KONTRAKTOR'),
+                        pw.SizedBox(height: 3),
+                        _buildPdfDocTable(
+                          colWidths: const {
+                            0: pw.FixedColumnWidth(18),
+                            1: pw.FlexColumnWidth(3.8),
+                            2: pw.FlexColumnWidth(1.6),
+                            3: pw.FlexColumnWidth(2.0),
+                          },
+                          headers: ['No', 'Personil proyek', 'Cacah', 'Lokasi'],
+                          rows: allPersRows,
+                        ),
+                      ],
+                    ),
+                  ),
+                  pw.SizedBox(width: 8),
+
+                  // KOLOM KANAN (flex: 52)
+                  pw.Expanded(
+                    flex: 52,
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                      children: [
+                        _buildPdfDocSectionLabel('B.   MATERIAL'),
+                        pw.SizedBox(height: 3),
+                        _buildPdfDocTable(
+                          colWidths: const {
+                            0: pw.FixedColumnWidth(16),
+                            1: pw.FlexColumnWidth(2.2),
+                            2: pw.FlexColumnWidth(1.6),
+                            3: pw.FlexColumnWidth(1.5),
+                            4: pw.FlexColumnWidth(1.5),
+                          },
+                          headers: ['No', 'Jenis', 'Cacah Volume', 'Lokasi Awal', 'Lokasi Tujuan'],
+                          rows: allMatRows,
+                        ),
+                        pw.SizedBox(height: 8),
+                        _buildPdfDocSectionLabel('C.   JENIS PERALATAN YANG DIGUNAKAN'),
+                        pw.SizedBox(height: 3),
+                        _buildPdfDocTable(
+                          colWidths: const {
+                            0: pw.FixedColumnWidth(14),
+                            1: pw.FlexColumnWidth(2.2),
+                            2: pw.FlexColumnWidth(1.2),
+                            3: pw.FlexColumnWidth(1.0),
+                            4: pw.FixedColumnWidth(14),
+                            5: pw.FlexColumnWidth(1.4),
+                            6: pw.FlexColumnWidth(1.0),
+                            7: pw.FlexColumnWidth(1.0),
+                          },
+                          headers: ['No', 'Jenis Peralatan', 'Cacah aktif', 'Jumlah', 'No', 'Jenis', 'Kode', 'Rusak'],
+                          rows: allAlatRows,
+                        ),
+                        pw.SizedBox(height: 8),
+                        _buildPdfDocSectionLabel('E.   CUACA/BENCANA/KEJADIAN PENGHAMBAT'),
+                        pw.SizedBox(height: 3),
+                        _buildPdfDocTable(
+                          colWidths: const {
+                            0: pw.FixedColumnWidth(16),
+                            1: pw.FlexColumnWidth(1.8),
+                            2: pw.FlexColumnWidth(2.0),
+                            3: pw.FlexColumnWidth(1.4),
+                            4: pw.FlexColumnWidth(1.4),
+                            5: pw.FlexColumnWidth(1.8),
+                            6: pw.FlexColumnWidth(1.8),
+                          },
+                          headers: ['No', 'Cuaca', 'Jenis Kejadian', 'Jam', 'Lokasi', 'Tanggung Jwb\nKontraktor', 'Akibat'],
+                          rows: allCuacaRows,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 10),
+
+              // F. INSTRUKSI DAN SARAN-SARAN (LEMBAR 1 DENGAN TTD RESMI KONSULTAN)
+              _buildPdfDocSectionLabel('F.   INSTRUKSI DAN SARAN-SARAN'),
+              pw.SizedBox(height: 3),
+              _buildPdfDocTableSectionF(
+                konsultan: konsultan,
+                instruksi: instruksiKonsultan,
+                resolvedSigners: resolvedSigners,
+              ),
+
+              pw.Spacer(),
+
+              // Footer Lembar 1
+              pw.Divider(thickness: 0.6, color: PdfColors.black),
+              pw.SizedBox(height: 2),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('BUKU HARIAN STANDAR - CATATAN HARIAN', style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700)),
+                  pw.Text('Halaman 1 dari $totalPages', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ── LEMBAR 2: RINCIAN OPERASIONAL PER ITEM PEKERJAAN ─────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    final customFields = (report['customFields'] as List<dynamic>?) ?? [];
+
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-        header: (context) => _buildOfficialDocHeader(
-          title: 'BUKU HARIAN STANDAR',
-          subtitle: 'Catatan Harian Pengawasan Konstruksi',
-        ),
-        footer: (context) => _buildPageFooter(
-          title: 'BUKU HARIAN STANDAR | CATATAN HARIAN',
-          context: context,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        footer: (context) => pw.Container(
+          margin: const pw.EdgeInsets.only(top: 6),
+          child: pw.Column(
+            children: [
+              pw.Divider(thickness: 0.6, color: PdfColors.black),
+              pw.SizedBox(height: 2),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('BUKU HARIAN STANDAR - RINCIAN OPERASIONAL', style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700)),
+                  pw.Text('Halaman 2 dari $totalPages', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
+                ],
+              ),
+            ],
+          ),
         ),
         build: (context) => [
-          pw.SizedBox(height: 10),
-          // Metadata Box
-          _buildPdfMetaBox([
-            ['Hari / Tanggal', ':  $tglFormatted'],
-            ['Nama Kegiatan', ':  $namaKegiatan'],
-            ['Lokasi Proyek', ':  $lokasi'],
-            ['Sumber Dana', ':  $dana'],
-            ['Kontraktor Pelaksana', ':  $kontraktor'],
-            ['Konsultan Supervisi', ':  $konsultan'],
-          ]),
-          pw.SizedBox(height: 14),
-
-          // A. PEKERJAAN
-          _buildPdfSectionTitle('A. PEKERJAAN YANG DILAKSANAKAN'),
-          _buildPekerjaanTable(pekList, defaultLokasi: lokasi),
-          pw.SizedBox(height: 12),
-
-          // B. MATERIAL
-          _buildPdfSectionTitle('B. MATERIAL / BAHAN YANG DIGUNAKAN'),
-          _buildMaterialSummaryTable(pekList),
-          pw.SizedBox(height: 12),
-
-          // C. PERALATAN
-          _buildPdfSectionTitle('C. JENIS PERALATAN YANG DIGUNAKAN'),
-          _buildPeralatanSummaryTable(pekList),
-          pw.SizedBox(height: 12),
-
-          // D. PERSONIL
-          _buildPdfSectionTitle('D. PERSONAL PROYEK PENGAWAS DAN KONTRAKTOR'),
-          _buildPersonilSummaryTable(pekList, defaultLokasi: lokasi),
-          pw.SizedBox(height: 12),
-
-          // E. CUACA / BENCANA
-          _buildPdfSectionTitle('E. CUACA / BENCANA / KEJADIAN PENGHAMBAT'),
-          _buildCuacaTable(cuacaList),
-          pw.SizedBox(height: 12),
-
-          // F. INSTRUKSI & SARAN-SARAN
-          _buildPdfSectionTitle(
-            'F. INSTRUKSI DAN SARAN-SARAN KONSULTAN SUPERVISI',
+          // KOP DOKUMEN LEMBAR 2
+          pw.Center(
+            child: pw.Column(
+              children: [
+                pw.Text(
+                  'BUKU HARIAN STANDAR',
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 13.5,
+                    decoration: pw.TextDecoration.underline,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                pw.SizedBox(height: 2),
+                pw.Text(
+                  'Rincian Operasional Item Pekerjaan',
+                  style: pw.TextStyle(
+                    fontSize: 10,
+                    fontStyle: pw.FontStyle.italic,
+                    color: PdfColors.grey800,
+                  ),
+                ),
+              ],
+            ),
           ),
+          pw.SizedBox(height: 10),
+
+          // INFORMASI IDENTITAS PROYEK
+          _buildDocMetaRow('Hari / Tanggal', ':  $tglFormatted', fontSize: 8),
+          _buildDocMetaRow('Nama Kegiatan', ':  $namaKegiatan', fontSize: 8),
+          _buildDocMetaRow('Lokasi', ':  $lokasi', fontSize: 8),
+          _buildDocMetaRow('Dana', ':  $dana', fontSize: 8),
+          pw.SizedBox(height: 8),
+
+          // SUB-BANNER RINCIAN OPERASIONAL
           pw.Container(
-            width: double.infinity,
-            padding: const pw.EdgeInsets.all(8),
+            padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: PdfColors.black, width: 0.8),
+              color: const PdfColor.fromInt(0xFFF1F5F9),
+              border: pw.Border.all(color: PdfColors.black, width: 0.6),
             ),
             child: pw.Text(
-              instruksi.trim().isNotEmpty && instruksi != '-' ? instruksi : 'Pekerjaan dilaksanakan sesuai dengan gambar kerja, spesifikasi teknis Bina Marga, dan instruksi pengawas lapangan. Utamakan ketepatan elevasi, pemadatan lapis agregat, dan keselamatan K3.',
-              style: const pw.TextStyle(fontSize: 8.5),
+              'RINCIAN OPERASIONAL PER ITEM PEKERJAAN',
+              style: pw.TextStyle(
+                fontSize: 8.5,
+                fontWeight: pw.FontWeight.bold,
+                letterSpacing: 0.4,
+              ),
             ),
           ),
-          pw.SizedBox(height: 16),
+          pw.SizedBox(height: 8),
 
-          // TANDA TANGAN 2 PIHAK
-          _buildDualSignatures(
-            leftRole: 'Diperiksa Oleh,\nKontraktor Pelaksana',
-            leftName: kontraktor,
-            rightRole: 'Disetujui Oleh,\nKonsultan Supervisi',
-            rightName: konsultan,
-            date: tglFormatted,
+          // RINCIAN SETIAP ITEM PEKERJAAN
+          ...pekList.asMap().entries.map((entry) {
+            final index = entry.key;
+            final p = entry.value is Map ? entry.value : {};
+            final pIdx = index + 1;
+            final pJenis = (p['jenis'] ?? p['uraian'] ?? 'Pekerjaan #$pIdx').toString();
+            final pVolume = (p['volume'] ?? '-').toString();
+            final pLokasi = (p['lokasi'] ?? lokasi).toString();
+
+            final mats = (p['materials'] as List<dynamic>?) ?? [];
+            final alats = (p['peralatans'] as List<dynamic>?) ?? [];
+            final pers = (p['personils'] as List<dynamic>?) ?? [];
+
+            final jobRows = [
+              ['1', pJenis.isNotEmpty ? pJenis : '-', pVolume.isNotEmpty ? pVolume : '-', pLokasi.isNotEmpty ? pLokasi : lokasi],
+            ];
+
+            final matRows = mats.isNotEmpty
+                ? mats.asMap().entries.map((mEntry) {
+                    final m = mEntry.value is Map ? (mEntry.value as Map) : <String, dynamic>{};
+                    return [
+                      '${mEntry.key + 1}',
+                      m['jenis']?.toString() ?? '-',
+                      m['volume']?.toString() ?? '-',
+                      m['lokasiAwal']?.toString() ?? '-',
+                      m['lokasiTujuan']?.toString() ?? '-',
+                    ];
+                  }).toList()
+                : [
+                    ['1', 'Tidak ada penggunaan material pada pekerjaan ini', '-', '-', '-']
+                  ];
+
+            final alatRows = alats.isNotEmpty
+                ? alats.asMap().entries.map((aEntry) {
+                    final a = aEntry.value is Map ? (aEntry.value as Map) : <String, dynamic>{};
+                    return [
+                      '${aEntry.key + 1}',
+                      a['jenis']?.toString() ?? '-',
+                      a['cacahAktif']?.toString() ?? a['jumlah']?.toString() ?? '-',
+                      a['jumlah']?.toString() ?? '-',
+                      a['noRusak']?.toString().isNotEmpty == true
+                          ? a['noRusak'].toString()
+                          : (a['jenisRusak']?.toString().isNotEmpty == true ? '${aEntry.key + 1}' : '-'),
+                      a['jenisRusak']?.toString().isNotEmpty == true ? a['jenisRusak'].toString() : '-',
+                      a['kode']?.toString().isNotEmpty == true ? a['kode'].toString() : '-',
+                      a['rusak']?.toString().isNotEmpty == true ? a['rusak'].toString() : '-',
+                    ];
+                  }).toList()
+                : [
+                    ['1', 'Pekerjaan manual / tanpa peralatan mekanis', '-', '-', '-', '-', '-', '-']
+                  ];
+
+            final persRows = pers.isNotEmpty
+                ? pers.asMap().entries.map((prEntry) {
+                    final pr = prEntry.value is Map ? (prEntry.value as Map) : <String, dynamic>{};
+                    return [
+                      '${prEntry.key + 1}',
+                      pr['role']?.toString() ?? '-',
+                      '${pr['cacah'] ?? pr['count'] ?? '-'}',
+                      pr['lokasi']?.toString() ?? pLokasi,
+                    ];
+                  }).toList()
+                : [
+                    ['1', 'Personil proyek umum / terpadu', '-', pLokasi]
+                  ];
+
+            return pw.Container(
+              margin: const pw.EdgeInsets.only(bottom: 10),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                children: [
+                  // Partition Header
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFE2E8F0)),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text(
+                          'ITEM #$pIdx: $pJenis',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8),
+                        ),
+                        pw.Text(
+                          'Vol: $pVolume  |  Lokasi: $pLokasi',
+                          style: const pw.TextStyle(fontSize: 7.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                  pw.SizedBox(height: 4),
+
+                  // A. PEKERJAAN
+                  _buildPdfDocSectionLabel('A.   PEKERJAAN'),
+                  pw.SizedBox(height: 2),
+                  _buildPdfDocTable(
+                    colWidths: const {
+                      0: pw.FixedColumnWidth(20),
+                      1: pw.FlexColumnWidth(4),
+                      2: pw.FlexColumnWidth(2),
+                      3: pw.FlexColumnWidth(2.5),
+                    },
+                    headers: ['No', 'JENIS PEKERJAAN', 'VOLUME', 'LOKASI'],
+                    rows: jobRows,
+                  ),
+                  pw.SizedBox(height: 6),
+
+                  // B. MATERIAL DIGUNAKAN
+                  _buildPdfDocSectionLabel('B.   MATERIAL DIGUNAKAN'),
+                  pw.SizedBox(height: 2),
+                  _buildPdfDocTable(
+                    colWidths: const {
+                      0: pw.FixedColumnWidth(20),
+                      1: pw.FlexColumnWidth(3),
+                      2: pw.FlexColumnWidth(2),
+                      3: pw.FlexColumnWidth(2),
+                      4: pw.FlexColumnWidth(2),
+                    },
+                    headers: ['No', 'Jenis', 'Cacah Volume', 'Lokasi Awal', 'Lokasi Tujuan'],
+                    rows: matRows,
+                  ),
+                  pw.SizedBox(height: 6),
+
+                  // C. JENIS PERALATAN
+                  _buildPdfDocSectionLabel('C.   JENIS PERALATAN YANG DIGUNAKAN'),
+                  pw.SizedBox(height: 2),
+                  _buildPdfDocTable(
+                    colWidths: const {
+                      0: pw.FixedColumnWidth(16),
+                      1: pw.FlexColumnWidth(2.6),
+                      2: pw.FlexColumnWidth(1.4),
+                      3: pw.FlexColumnWidth(1.2),
+                      4: pw.FixedColumnWidth(16),
+                      5: pw.FlexColumnWidth(1.8),
+                      6: pw.FlexColumnWidth(1.2),
+                      7: pw.FlexColumnWidth(1.4),
+                    },
+                    headers: ['No', 'Jenis Peralatan', 'Cacah aktif', 'Jumlah', 'No', 'Jenis', 'Kode', 'Rusak'],
+                    rows: alatRows,
+                  ),
+                  pw.SizedBox(height: 6),
+
+                  // D. PERSONAL PROYEK
+                  _buildPdfDocSectionLabel('D.   PERSONAL PROYEK PENGAWAS DAN KONTRAKTOR'),
+                  pw.SizedBox(height: 2),
+                  _buildPdfDocTable(
+                    colWidths: const {
+                      0: pw.FixedColumnWidth(20),
+                      1: pw.FlexColumnWidth(4),
+                      2: pw.FlexColumnWidth(2),
+                      3: pw.FlexColumnWidth(2.5),
+                    },
+                    headers: ['No', 'Personil proyek', 'Cacah', 'Lokasi'],
+                    rows: persRows,
+                  ),
+                ],
+              ),
+            );
+          }),
+
+          // E. CUACA/BENCANA/KEJADIAN PENGHAMBAT PEKERJAAN
+          pw.SizedBox(height: 4),
+          _buildPdfDocSectionLabel('E.   CUACA/BENCANA/KEJADIAN PENGHAMBAT PEKERJAAN'),
+          pw.SizedBox(height: 3),
+          _buildPdfDocTable(
+            colWidths: const {
+              0: pw.FixedColumnWidth(20),
+              1: pw.FlexColumnWidth(1.8),
+              2: pw.FlexColumnWidth(2.2),
+              3: pw.FlexColumnWidth(1.6),
+              4: pw.FlexColumnWidth(1.6),
+              5: pw.FlexColumnWidth(2.0),
+              6: pw.FlexColumnWidth(2.2),
+            },
+            headers: ['No', 'Cuaca', 'Jenis Kejadian', 'Jam', 'Lokasi', 'Tanggung Jwb Kontraktor\n(Ya / Tidak)', 'Akibat'],
+            rows: allCuacaRows,
           ),
+          pw.SizedBox(height: 10),
+
+          // F. INSTRUKSI DAN SARAN-SARAN (DENGAN TTD RESMI KONSULTAN SUPERVISI)
+          _buildPdfDocSectionLabel('F.   INSTRUKSI DAN SARAN-SARAN'),
+          pw.SizedBox(height: 3),
+          _buildPdfDocTableSectionF(
+            konsultan: konsultan,
+            instruksi: instruksiKonsultan,
+            resolvedSigners: resolvedSigners,
+          ),
+          pw.SizedBox(height: 10),
+
+          // FIELD TAMBAHAN / CATATAN KHUSUS (Jika Ada)
+          if (customFields.isNotEmpty) ...[
+            _buildPdfDocSectionLabel('G.   FIELD TAMBAHAN / CATATAN KHUSUS'),
+            pw.SizedBox(height: 3),
+            _buildPdfDocTable(
+              colWidths: const {
+                0: pw.FixedColumnWidth(20),
+                1: pw.FlexColumnWidth(3),
+                2: pw.FlexColumnWidth(7),
+              },
+              headers: ['No', 'Nama Field', 'Keterangan / Uraian'],
+              rows: customFields.asMap().entries.map((e) => [
+                '${e.key + 1}',
+                e.value['nama']?.toString() ?? '',
+                e.value['isi']?.toString() ?? '',
+              ]).toList(),
+            ),
+            pw.SizedBox(height: 10),
+          ],
+
+          // DOKUMENTASI FOTO LAPANGAN
+          if (resolvedPhotos.isNotEmpty) ...[
+            _buildPdfDocSectionLabel(customFields.isNotEmpty ? 'H.   DOKUMENTASI FOTO LAPANGAN' : 'G.   DOKUMENTASI FOTO LAPANGAN'),
+            pw.SizedBox(height: 4),
+            pw.Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: resolvedPhotos.asMap().entries.map((e) {
+                return pw.Container(
+                  width: 160,
+                  height: 120,
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.black, width: 0.6),
+                  ),
+                  child: pw.Column(
+                    children: [
+                      pw.Expanded(
+                        child: pw.Image(pw.MemoryImage(e.value), fit: pw.BoxFit.cover),
+                      ),
+                      pw.Container(
+                        color: const PdfColor.fromInt(0xFFE2E8F0),
+                        padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                        width: double.infinity,
+                        child: pw.Text(
+                          'Foto #${e.key + 1}',
+                          textAlign: pw.TextAlign.center,
+                          style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+            pw.SizedBox(height: 10),
+          ],
         ],
       ),
     );
 
-    // ── LEMBAR 2: RINCIAN OPERASIONAL PER ITEM PEKERJAAN (JIKA ADA RINCIAN) ──
-    if (pekList.isNotEmpty) {
+    // ─────────────────────────────────────────────────────────────────────────
+    // ── LEMBAR 3+: LAMPIRAN REKAPITULASI DOKUMEN ─────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // 1. REKAP WAKTU & SUHU LAPANGAN
+    if (hasRekapSuhuLapangan) {
+      final headers = [
+        'No',
+        'NOMOR\nKENDARAAN',
+        'JAM DATANG\nKE LAPANGAN',
+        'SUHU\nDATANG',
+        'SUHU\nHAMPAR',
+        'JAM MULAI TUANG\nKE FINISHER',
+        'JAM SELESEI TUANG\nKE FINISHER',
+        'SUHU PEMADATAN\nAKHIR',
+        'JAM PULANG\nKE LAPANGAN',
+      ];
+      final tableRows = rekapSuhuLapanganList.asMap().entries.map((entry) {
+        final item = entry.value as Map<String, dynamic>;
+        final rawSuhuDatang = item['suhuDatang'];
+        final rawSuhuHampar = item['suhuHampar'] ?? item['suhuLap'] ?? item['suhu'];
+        final rawSuhuAkhir = item['suhuPemadatanAkhir'] ?? item['suhuAkhir'];
+
+        String fmtSuhu(dynamic val) {
+          if (val == null) return '-';
+          final s = val.toString().trim();
+          if (s.isEmpty || s == '-') return '-';
+          return s.endsWith('°C') ? s : '$s°C';
+        }
+
+        return [
+          '${entry.key + 1}',
+          PlatNomorUtil.normalize(item['nomorKendaraan']?.toString() ?? ''),
+          item['jamDatang']?.toString().isNotEmpty == true ? item['jamDatang'].toString() : '-',
+          fmtSuhu(rawSuhuDatang),
+          fmtSuhu(rawSuhuHampar),
+          item['jamMulaiTuang']?.toString().isNotEmpty == true ? item['jamMulaiTuang'].toString() : '-',
+          item['jamSelesaiTuang']?.toString().isNotEmpty == true ? item['jamSelesaiTuang'].toString() : '-',
+          fmtSuhu(rawSuhuAkhir),
+          item['jamPulang']?.toString().isNotEmpty == true ? item['jamPulang'].toString() : '-',
+        ];
+      }).toList();
+
       pdf.addPage(
-        pw.MultiPage(
+        pw.Page(
           pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-          header: (context) => _buildOfficialDocHeader(
-            title: 'BUKU HARIAN STANDAR',
-            subtitle: 'Rincian Operasional Per Item Pekerjaan',
-          ),
-          footer: (context) => _buildPageFooter(
-            title: 'BUKU HARIAN STANDAR | RINCIAN OPERASIONAL',
-            context: context,
-          ),
-          build: (context) => [
-            pw.SizedBox(height: 8),
-            _buildPdfMetaBox([
-              ['Hari / Tanggal', ':  $tglFormatted'],
-              ['Nama Kegiatan', ':  $namaKegiatan'],
-              ['Lokasi Proyek', ':  $lokasi'],
-            ]),
-            pw.SizedBox(height: 12),
-            ...pekList.asMap().entries.map((entry) {
-              final idx = entry.key + 1;
-              final p = entry.value;
-              final pJenis = (p['jenis'] ?? p['uraian'] ?? 'Pekerjaan #$idx')
-                  .toString();
-              final pVol = (p['volume'] ?? '-').toString();
-              final pLok = (p['lokasi'] ?? lokasi).toString();
-
-              final mats = (p['materials'] as List?) ?? [];
-              final alats = (p['peralatans'] as List?) ?? [];
-              final pers = (p['personils'] as List?) ?? [];
-
-              return pw.Container(
-                margin: const pw.EdgeInsets.only(bottom: 12),
-                padding: const pw.EdgeInsets.all(8),
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: PdfColors.black, width: 0.8),
-                ),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Container(
-                      color: PdfColors.grey200,
-                      padding: const pw.EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 4,
-                      ),
-                      child: pw.Row(
-                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                        children: [
-                          pw.Text(
-                            'ITEM #$idx: $pJenis',
-                            style: pw.TextStyle(
-                              fontWeight: pw.FontWeight.bold,
-                              fontSize: 9,
-                            ),
-                          ),
-                          pw.Text(
-                            'Vol: $pVol  |  Lokasi: $pLok',
-                            style: const pw.TextStyle(fontSize: 8.5),
-                          ),
-                        ],
-                      ),
+          margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          build: (context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              children: [
+                pw.Center(
+                  child: pw.Text(
+                    'REKAPITULASI WAKTU TEMPUH DT & SUHU DI LAPANGAN',
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 12,
+                      decoration: pw.TextDecoration.underline,
                     ),
-                    pw.SizedBox(height: 6),
-                    if (mats.isNotEmpty) ...[
-                      pw.Text(
-                        'Material: ${mats.map((m) => "${m['jenis'] ?? '-'}: ${m['volume'] ?? '-'}").join(', ')}',
-                        style: const pw.TextStyle(fontSize: 8),
-                      ),
-                      pw.SizedBox(height: 3),
-                    ],
-                    if (alats.isNotEmpty) ...[
-                      pw.Text(
-                        'Peralatan: ${alats.map((a) => "${a['jenis'] ?? '-'}: ${a['jumlah'] ?? a['cacahAktif'] ?? '-'} unit").join(', ')}',
-                        style: const pw.TextStyle(fontSize: 8),
-                      ),
-                      pw.SizedBox(height: 3),
-                    ],
-                    if (pers.isNotEmpty) ...[
-                      pw.Text(
-                        'Personil: ${pers.map((pr) => "${pr['role'] ?? '-'}: ${pr['cacah'] ?? '-'} org").join(', ')}',
-                        style: const pw.TextStyle(fontSize: 8),
-                      ),
-                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+                _buildDocMetaRow('KEGIATAN', ':  $namaKegiatan'),
+                _buildDocMetaRow('PENYEDIA JASA', ':  $kontraktor'),
+                _buildDocMetaRow('KONSULTAN PENGAWAS', ':  CV. Tata Saka Consultant'),
+                pw.SizedBox(height: 8),
+                _buildPdfDocTable(
+                  colWidths: const {
+                    0: pw.FixedColumnWidth(18),
+                    1: pw.FlexColumnWidth(2.3),
+                    2: pw.FlexColumnWidth(1.8),
+                    3: pw.FlexColumnWidth(1.6),
+                    4: pw.FlexColumnWidth(1.6),
+                    5: pw.FlexColumnWidth(1.9),
+                    6: pw.FlexColumnWidth(1.9),
+                    7: pw.FlexColumnWidth(1.8),
+                    8: pw.FlexColumnWidth(1.8),
+                  },
+                  headers: headers,
+                  rows: tableRows,
+                ),
+                pw.Spacer(),
+                pw.Divider(thickness: 0.6, color: PdfColors.black),
+                pw.SizedBox(height: 2),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('REKAPITULASI WAKTU TEMPUH DT & SUHU DI LAPANGAN', style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700)),
+                    pw.Text('Halaman $suhuLapPage dari $totalPages', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
                   ],
                 ),
-              );
-            }).toList(),
-          ],
+              ],
+            );
+          },
+        ),
+      );
+    }
+
+    // 2. REKAP SUHU DI AMP
+    if (hasRekapSuhuAmp) {
+      final headers = [
+        'No',
+        'NOMOR KENDARAAN',
+        'JAM PERGI / DARI AMP',
+        'SUHU DI AMP',
+        'JAM PULANG KE AMP',
+      ];
+      final tableRows = rekapSuhuAmpList.asMap().entries.map((entry) {
+        final item = entry.value as Map<String, dynamic>;
+        return [
+          '${entry.key + 1}',
+          PlatNomorUtil.normalize(item['nomorKendaraan']?.toString() ?? ''),
+          item['jamPergi']?.toString() ?? '',
+          item['suhuAmp']?.toString() ?? '',
+          item['jamPulang']?.toString() ?? '',
+        ];
+      }).toList();
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          build: (context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              children: [
+                pw.Center(
+                  child: pw.Text(
+                    'REKAPITULASI WAKTU TEMPUH DT & SUHU DI AMP',
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 12,
+                      decoration: pw.TextDecoration.underline,
+                    ),
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+                _buildDocMetaRow('KEGIATAN', ':  $namaKegiatan'),
+                _buildDocMetaRow('PENYEDIA JASA', ':  $kontraktor'),
+                _buildDocMetaRow('KONSULTAN PENGAWAS', ':  CV. Tata Saka Consultant'),
+                pw.SizedBox(height: 8),
+                _buildPdfDocTable(
+                  colWidths: const {
+                    0: pw.FixedColumnWidth(20),
+                    1: pw.FlexColumnWidth(2.8),
+                    2: pw.FlexColumnWidth(2.2),
+                    3: pw.FlexColumnWidth(2.0),
+                    4: pw.FlexColumnWidth(2.2),
+                  },
+                  headers: headers,
+                  rows: tableRows,
+                ),
+                pw.Spacer(),
+                pw.Divider(thickness: 0.6, color: PdfColors.black),
+                pw.SizedBox(height: 2),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('REKAPITULASI WAKTU TEMPUH DT & SUHU DI AMP', style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700)),
+                    pw.Text('Halaman $suhuAmpPage dari $totalPages', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
+
+    // 3. REKAP TONASE ASPAL
+    if (hasRekapTonaseAspal) {
+      final headers = [
+        'No',
+        'NOMOR KENDARAAN',
+        'TONASE TIKET',
+        'JUMLAH KUMULATIF',
+      ];
+      final tableRows = rekapTonaseAspalList.asMap().entries.map((entry) {
+        final item = entry.value as Map<String, dynamic>;
+        return [
+          '${entry.key + 1}',
+          PlatNomorUtil.normalize(item['nomorKendaraan']?.toString() ?? ''),
+          item['tonaseTiket']?.toString() ?? '',
+          item['jumlahKumulatif']?.toString() ?? '',
+        ];
+      }).toList();
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          build: (context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              children: [
+                pw.Center(
+                  child: pw.Text(
+                    'REKAPITULASI TONASE ASPAL',
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 12,
+                      decoration: pw.TextDecoration.underline,
+                    ),
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+                _buildDocMetaRow('KEGIATAN', ':  $namaKegiatan'),
+                _buildDocMetaRow('PENYEDIA JASA', ':  $kontraktor'),
+                _buildDocMetaRow('KONSULTAN PENGAWAS', ':  CV. Tata Saka Consultant'),
+                pw.SizedBox(height: 8),
+                _buildPdfDocTable(
+                  colWidths: const {
+                    0: pw.FixedColumnWidth(24),
+                    1: pw.FlexColumnWidth(3.5),
+                    2: pw.FlexColumnWidth(2.5),
+                    3: pw.FlexColumnWidth(2.5),
+                  },
+                  headers: headers,
+                  rows: tableRows,
+                ),
+                pw.Spacer(),
+                pw.Divider(thickness: 0.6, color: PdfColors.black),
+                pw.SizedBox(height: 2),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('REKAPITULASI TONASE ASPAL', style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700)),
+                    pw.Text('Halaman $tonasePage dari $totalPages', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
+
+    // 4. DATA PERJALANAN DUMP TRUCK (DT)
+    if (hasDataPerjalananDt) {
+      final jarakTempuhVal = report['jarakTempuh']?.toString() ?? '35.5';
+      final double jarakKm = double.tryParse(jarakTempuhVal.replaceAll(',', '.')) ?? 35.5;
+
+      final rawLapList = (report['rekapSuhuLapanganList'] as List<dynamic>?) ?? [];
+      final rawDtList = (report['rekapPengirimanDtList'] as List<dynamic>?) ?? [];
+      final lapanganList = rawLapList.isNotEmpty
+          ? rawLapList.asMap().entries.map((e) {
+              final m = Map<String, dynamic>.from(e.value as Map);
+              if ((m['waktuAntrian'] == null || m['waktuAntrian'].toString().isEmpty) &&
+                  e.key < rawDtList.length &&
+                  rawDtList[e.key] is Map) {
+                m['waktuAntrian'] = (rawDtList[e.key] as Map)['waktuAntrian'];
+              }
+              return m;
+            }).toList()
+          : (rawDtList.isNotEmpty
+              ? rawDtList.map((m) => {
+                  'nomorKendaraan': m['nomorKendaraan'],
+                  'jamDatang': m['jamDatangLap'] ?? m['jamDatang'],
+                  'suhuDatang': m['suhuDatang'],
+                  'suhu': m['suhuLap'] ?? m['suhu'],
+                  'suhuLap': m['suhuLap'] ?? m['suhu'],
+                  'jamMulaiTuang': m['jamMulaiTuang'],
+                  'jamSelesaiTuang': m['jamSelesaiTuang'],
+                  'suhuPemadatanAkhir': m['suhuPemadatanAkhir'],
+                  'jamPulang': m['jamPulangLap'] ?? m['jamPulang'],
+                  'waktuAntrian': m['waktuAntrian'],
+                }).toList()
+              : []);
+
+      final dtRows = PlatNomorUtil.computeDataPerjalananRows(
+        lapanganList: lapanganList,
+        ampList: (report['rekapSuhuAmpList'] as List<dynamic>?) ?? [],
+        tonaseList: (report['rekapTonaseAspalList'] as List<dynamic>?) ?? [],
+        jarakKm: jarakKm,
+      );
+
+      final headers = [
+        'No',
+        'HURUF',
+        'ANGKA',
+        'SERI',
+        'BERANGKAT\nAMP',
+        'SUHU\nAMP',
+        'TIBA\nLAPANGAN',
+        'SUHU\nTIBA',
+        'MULAI\nHAMPAR',
+        'SELESAI\nHAMPAR',
+        'SUHU\nHAMPAR',
+        'SUHU\nAKHIR',
+        'KEMBALI\nAMP',
+        'TIBA\nAMP',
+        'TONASE\n(TON)',
+        'JARAK\n(KM)',
+      ];
+
+      final tableRows = dtRows.asMap().entries.map((e) {
+        final r = e.value;
+        return [
+          '${e.key + 1}',
+          (r['hurufDepan'] ?? '').toString(),
+          (r['angka'] ?? '').toString(),
+          (r['hurufBelakang'] ?? '').toString(),
+          (r['jamBerangkatAmp'] ?? '').toString(),
+          (r['suhuAmp'] ?? '').toString(),
+          (r['jamTibaLap'] ?? '').toString(),
+          (r['suhuTibaLap'] ?? '').toString(),
+          (r['jamMulaiHampar'] ?? '').toString(),
+          (r['jamSelesaiHampar'] ?? '').toString(),
+          (r['suhuHampar'] ?? '').toString(),
+          (r['suhuAkhir'] ?? '').toString(),
+          (r['jamKembaliAmp'] ?? '').toString(),
+          (r['jamTibaAmp'] ?? '').toString(),
+          (r['beratAc'] is num ? (r['beratAc'] as num).toStringAsFixed(2) : '-'),
+          '$jarakKm',
+        ];
+      }).toList();
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4.landscape,
+          margin: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          build: (context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              children: [
+                pw.Center(
+                  child: pw.Text(
+                    'DATA PERJALANAN DUMP TRUCK (DT)',
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 12,
+                      decoration: pw.TextDecoration.underline,
+                    ),
+                  ),
+                ),
+                pw.SizedBox(height: 6),
+                _buildDocMetaRow('KEGIATAN', ':  $namaKegiatan', fontSize: 7.5),
+                _buildDocMetaRow('KONTRAKTOR', ':  $kontraktor', fontSize: 7.5),
+                pw.SizedBox(height: 6),
+                _buildPdfDocTable(
+                  colWidths: const {
+                    0: pw.FixedColumnWidth(16),
+                    1: pw.FixedColumnWidth(24),
+                    2: pw.FixedColumnWidth(30),
+                    3: pw.FixedColumnWidth(24),
+                    4: pw.FlexColumnWidth(1.2),
+                    5: pw.FlexColumnWidth(1.0),
+                    6: pw.FlexColumnWidth(1.2),
+                    7: pw.FlexColumnWidth(1.0),
+                    8: pw.FlexColumnWidth(1.2),
+                    9: pw.FlexColumnWidth(1.2),
+                    10: pw.FlexColumnWidth(1.0),
+                    11: pw.FlexColumnWidth(1.0),
+                    12: pw.FlexColumnWidth(1.2),
+                    13: pw.FlexColumnWidth(1.2),
+                    14: pw.FlexColumnWidth(1.2),
+                    15: pw.FlexColumnWidth(1.0),
+                  },
+                  headers: headers,
+                  rows: tableRows,
+                  headerFontSize: 6.0,
+                  cellFontSize: 6.0,
+                ),
+                pw.Spacer(),
+                pw.Divider(thickness: 0.6, color: PdfColors.black),
+                pw.SizedBox(height: 2),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('DATA PERJALANAN DUMP TRUCK', style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700)),
+                    pw.Text('Halaman $perjalananDtPage dari $totalPages', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
+
+    // 5. REKAPITULASI PENGECORAN BETON READY MIX
+    if (hasRekapBeton) {
+      final headers = [
+        'No',
+        'NOMOR KENDARAAN\n(TRUCK MIXER)',
+        'BATCHING PLANT\nREADY MIX',
+        'JAM\nBERANGKAT',
+        'JAM DATANG\nDI LAPANGAN',
+        'SLUMP TEST\n(CM)',
+        'VOLUME\n(M³)',
+      ];
+
+      final tableRows = rekapPengecoranBetonList.asMap().entries.map((entry) {
+        final item = entry.value as Map<String, dynamic>;
+        final rawVol = item['volume']?.toString() ?? '-';
+        return [
+          '${entry.key + 1}',
+          PlatNomorUtil.normalize(item['nomorKendaraan']?.toString() ?? ''),
+          item['batchingPlant']?.toString().isNotEmpty == true ? item['batchingPlant'].toString() : '-',
+          item['jamBerangkat']?.toString() ?? '',
+          item['jamDatang']?.toString() ?? '',
+          item['slumpTest']?.toString() ?? '',
+          rawVol.endsWith('m³') ? rawVol : '$rawVol m³',
+        ];
+      }).toList();
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          build: (context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              children: [
+                pw.Center(
+                  child: pw.Text(
+                    'REKAPITULASI PENGECORAN BETON READY MIX',
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 12,
+                      decoration: pw.TextDecoration.underline,
+                    ),
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+                _buildDocMetaRow('KEGIATAN', ':  $namaKegiatan'),
+                _buildDocMetaRow('PENYEDIA JASA', ':  $kontraktor'),
+                _buildDocMetaRow('KONSULTAN PENGAWAS', ':  CV. Tata Saka Consultant'),
+                pw.SizedBox(height: 8),
+                _buildPdfDocTable(
+                  colWidths: const {
+                    0: pw.FixedColumnWidth(20),
+                    1: pw.FlexColumnWidth(2.6),
+                    2: pw.FlexColumnWidth(2.8),
+                    3: pw.FlexColumnWidth(2.0),
+                    4: pw.FlexColumnWidth(2.0),
+                    5: pw.FlexColumnWidth(1.8),
+                    6: pw.FlexColumnWidth(1.8),
+                  },
+                  headers: headers,
+                  rows: tableRows,
+                ),
+                pw.Spacer(),
+                pw.Divider(thickness: 0.6, color: PdfColors.black),
+                pw.SizedBox(height: 2),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('REKAPITULASI PENGECORAN BETON READY MIX', style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700)),
+                    pw.Text('Halaman $betonPage dari $totalPages', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: PdfColors.black)),
+                  ],
+                ),
+              ],
+            );
+          },
         ),
       );
     }
@@ -264,239 +1323,180 @@ class PdfReportService {
   }) async {
     final pdf = pw.Document();
 
-    final namaKegiatan = kegiatan['namaKegiatan'] ?? report.pekerjaan;
-    final lokasi = kegiatan['lokasi'] ?? report.lokasiProyek;
-    final sumberDana = kegiatan['sumberDana'] ?? contract.sumberDana;
-    final kontraktor = kegiatan['kontraktor'] ?? report.kontraktor;
+    const Color headerBgColorVal = Color(0xFFDCE6EE);
+    final pdfHeaderBg = PdfColor.fromInt(headerBgColorVal.value);
+    const Color yellowHighlightVal = Color(0xFFFFDE59);
+    final pdfYellowHighlight = PdfColor.fromInt(yellowHighlightVal.value);
 
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-        header: (context) => _buildOfficialDocHeader(
-          title: 'RINGKASAN KEGIATAN MINGGUAN',
-          subtitle: 'Laporan Kemajuan Progres Fisik Mingguan',
-        ),
+        margin: const pw.EdgeInsets.symmetric(horizontal: 26, vertical: 22),
         footer: (context) => _buildPageFooter(
           title: 'RINGKASAN KEGIATAN MINGGUAN | MINGGU KE-${report.mingguKe}',
           context: context,
         ),
         build: (context) => [
-          pw.SizedBox(height: 10),
-          // Informasi Kontrak & Proyek
-          _buildPdfMetaBox([
-            ['Nama Kegiatan', ':  $namaKegiatan'],
-            ['Lokasi Proyek', ':  $lokasi'],
-            [
-              'Nomor Kontrak / SPK',
-              ':  ${report.nomorKontrak.isNotEmpty ? report.nomorKontrak : contract.nomorSpk}',
-            ],
-            [
-              'Tanggal Kontrak / SPMK',
-              ':  ${report.tanggalKontrak.isNotEmpty ? report.tanggalKontrak : contract.tglMulaiSpk}',
-            ],
-            [
-              'Nilai Kontrak',
-              ':  ${report.nilaiKontrak.isNotEmpty ? report.nilaiKontrak : "Rp ${formatNum(report.nilaiKontrakNumeric)}"}',
-            ],
-            ['Sumber Dana', ':  $sumberDana'],
-            ['Kontraktor Pelaksana', ':  $kontraktor'],
-            ['Konsultan Pengawas', ':  CV. TATA SAKA CONSULTANT'],
-            [
-              'Periode Laporan',
-              ':  Minggu Ke-${report.mingguKe} (${report.periodeAwal} s.d. ${report.periodeAkhir})',
-            ],
-            [
-              'Waktu Pelaksanaan',
-              ':  ${report.jangkaWaktu} Hari Kalender  (Terpakai: ${report.waktuTerpakai} HK, Sisa: ${report.sisaWaktu} HK)',
-            ],
-          ]),
-          pw.SizedBox(height: 14),
-
-          // TABEL EVALUASI PROGRES FISIK MINGGU INI
-          _buildPdfSectionTitle('EVALUASI PROGRES FISIK MINGGUAN'),
-          pw.Table(
-            border: pw.TableBorder.all(color: PdfColors.black, width: 0.8),
-            children: [
-              pw.TableRow(
-                decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-                children: [
-                  _cell('URAIAN BOBOT / PROGRES', isHeader: true, flex: 3),
-                  _cell(
-                    'RENCANA (%)',
-                    isHeader: true,
-                    flex: 2,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    'REALISASI (%)',
-                    isHeader: true,
-                    flex: 2,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    'DEVIASI (+/- %)',
-                    isHeader: true,
-                    flex: 2,
-                    align: pw.TextAlign.right,
-                  ),
-                ],
+          // JUDUL DOKUMEN RESMI
+          pw.Center(
+            child: pw.Text(
+              'RINGKASAN KEGIATAN MINGGUAN',
+              style: pw.TextStyle(
+                fontSize: 13,
+                fontWeight: pw.FontWeight.bold,
+                letterSpacing: 0.8,
               ),
-              pw.TableRow(
-                children: [
-                  _cell('Kemajuan s.d. Minggu Lalu'),
-                  _cell(
-                    formatNum(
-                      report.rencanaPersen -
-                          (report.realisasiPersen - report.rencanaPersen > 0
-                              ? 0.5
-                              : 0),
-                    ),
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    formatNum((report.realisasiPersen - 2.5).clamp(0.0, 100.0)),
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    formatNum(report.deviasiPersen),
-                    align: pw.TextAlign.right,
-                  ),
-                ],
-              ),
-              pw.TableRow(
-                children: [
-                  _cell('Kemajuan Minggu Ini'),
-                  _cell(
-                    formatNum(report.rencanaPersen),
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    formatNum(report.realisasiPersen),
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    formatNum(report.deviasiPersen),
-                    align: pw.TextAlign.right,
-                  ),
-                ],
-              ),
-              pw.TableRow(
-                decoration: const pw.BoxDecoration(color: PdfColors.grey100),
-                children: [
-                  _cell('KUMULATIF s.d. MINGGU INI', isHeader: true),
-                  _cell(
-                    '${formatNum(report.rencanaPersen)} %',
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    '${formatNum(report.realisasiPersen)} %',
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    '${formatNum(report.deviasiPersen)} %',
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
-          pw.SizedBox(height: 14),
+          pw.SizedBox(height: 12),
 
-          // TABEL JADWAL KUMULATIF MINGGUAN (JIKA ADA DATA)
-          if (report.tabelMingguan.isNotEmpty) ...[
-            _buildPdfSectionTitle(
-              'REKAPITULASI JADWAL DAN REALISASI SELURUH MINGGU',
-            ),
-            pw.Table(
-              border: pw.TableBorder.all(color: PdfColors.black, width: 0.8),
-              children: [
-                pw.TableRow(
-                  decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-                  children: [
-                    _cell(
-                      'Minggu Ke',
-                      isHeader: true,
-                      flex: 1,
-                      align: pw.TextAlign.center,
-                    ),
-                    _cell('Periode', isHeader: true, flex: 3),
-                    _cell(
-                      'Rencana (%)',
-                      isHeader: true,
-                      flex: 2,
-                      align: pw.TextAlign.right,
-                    ),
-                    _cell(
-                      'Realisasi (%)',
-                      isHeader: true,
-                      flex: 2,
-                      align: pw.TextAlign.right,
-                    ),
-                    _cell(
-                      'Deviasi (%)',
-                      isHeader: true,
-                      flex: 2,
-                      align: pw.TextAlign.right,
-                    ),
-                  ],
-                ),
-                ...report.tabelMingguan.take(15).map((row) {
-                  return pw.TableRow(
-                    children: [
-                      _cell(
-                        'Minggu ${row.mingguKe}',
-                        align: pw.TextAlign.center,
-                      ),
-                      _cell('${row.tglMulai} s.d ${row.tglSelesai}'),
-                      _cell(
-                        row.rencana != null ? formatNum(row.rencana!) : '-',
-                        align: pw.TextAlign.right,
-                      ),
-                      _cell(
-                        row.realisasi != null ? formatNum(row.realisasi!) : '-',
-                        align: pw.TextAlign.right,
-                      ),
-                      _cell(
-                        row.deviasi != null ? formatNum(row.deviasi!) : '-',
-                        align: pw.TextAlign.right,
-                      ),
-                    ],
-                  );
-                }).toList(),
-              ],
-            ),
-            pw.SizedBox(height: 14),
-          ],
-
-          // CATATAN & KENDALA
-          _buildPdfSectionTitle('CATATAN LAPANGAN & REKOMENDASI PENGAWAS'),
+          // KOTAK INFORMASI KONTRAK & PROYEK (Persis LembarLaporanMingguanWidget)
           pw.Container(
-            width: double.infinity,
-            padding: const pw.EdgeInsets.all(8),
             decoration: pw.BoxDecoration(
               border: pw.Border.all(color: PdfColors.black, width: 0.8),
             ),
-            child: pw.Text(
-              'Realisasi progres fisik pekerjaan sampai dengan Minggu Ke-${report.mingguKe} berjalan dengan deviasi ${report.deviasiPersen >= 0 ? "+" : ""}${formatNum(report.deviasiPersen)}%. Kontraktor diminta untuk menjaga ritme suplai material serta mempercepat pekerjaan pemadatan lapis pondasi.',
-              style: const pw.TextStyle(fontSize: 8.5),
+            child: pw.Column(
+              children: [
+                _buildInfoRowPdf('PEKERJAAN', report.pekerjaan.toUpperCase(), isBold: true),
+                _buildDividerPdf(),
+                _buildInfoRowPdf('LOKASI PROYEK', report.lokasiProyek.toUpperCase()),
+                _buildDividerPdf(),
+                _buildInfoRowPdf('KONTRAKTOR PELAKSANA', report.kontraktor.toUpperCase()),
+                _buildDividerPdf(),
+                _buildInfoRowWithSuffixPdf('JANGKA WAKTU KONTRAK', '${report.jangkaWaktu}', 'Hari Kalender'),
+                _buildDividerPdf(),
+                _buildInfoRowPdf('NOMOR KONTRAK', report.nomorKontrak),
+                _buildDividerPdf(),
+                _buildInfoRowPdf('TANGGAL KONTRAK', report.tanggalKontrak),
+                _buildDividerPdf(),
+                _buildInfoRowPdf(
+                  'NILAI KONTRAK',
+                  report.nilaiKontrak.startsWith('Rp') ? report.nilaiKontrak : 'Rp ${report.nilaiKontrak}',
+                ),
+                _buildDividerPdf(),
+                _buildInfoRowPdf('TANGGAL SPMK', report.tanggalSpmk),
+                _buildDividerPdf(),
+                // SECTION LAPORAN MINGGU KE -
+                pw.Container(
+                  color: pdfHeaderBg,
+                  child: _buildInfoRowTwoColsPdf(
+                    'LAPORAN MINGGU KE -',
+                    '${report.mingguKe}',
+                    '',
+                    '${report.totalMinggu}',
+                    'dari',
+                    isBoldVal: true,
+                  ),
+                ),
+                _buildDividerPdf(),
+                // PERIODE
+                _buildInfoRowTwoColsPdf(
+                  'PERIODE',
+                  report.periodeAwal,
+                  '',
+                  report.periodeAkhir,
+                  's/d',
+                  isBoldVal: false,
+                ),
+                _buildDividerPdf(),
+                // RENCANA FISIK
+                _buildProgressSummaryRowPdf(
+                  'RENCANA FISIK S/D MINGGU INI',
+                  '${WeeklyReportModel.formatPercent(report.rencanaPersen, decimalDigits: 2, appendUnit: false)} %',
+                  WeeklyReportModel.formatRupiah(report.rencanaNominal, withRp: false),
+                  PdfColors.white,
+                ),
+                _buildDividerPdf(),
+                // REALISASI FISIK
+                _buildProgressSummaryRowPdf(
+                  'REALISASI FISIK S/D MINGGU INI',
+                  '${WeeklyReportModel.formatPercent(report.realisasiPersen, decimalDigits: 2, appendUnit: false)} %',
+                  WeeklyReportModel.formatRupiah(report.realisasiNominal, withRp: false),
+                  PdfColors.white,
+                ),
+                _buildDividerPdf(),
+                // DEVIASI (+/-)
+                _buildProgressSummaryRowPdf(
+                  'DEVIASI (+/-)',
+                  '${WeeklyReportModel.formatPercent(report.deviasiPersen, decimalDigits: 2, showSign: false, appendUnit: false)} %',
+                  WeeklyReportModel.formatRupiah(report.deviasiNominal, withRp: false),
+                  pdfYellowHighlight,
+                  isBold: true,
+                ),
+                _buildDividerPdf(),
+                _buildInfoRowWithSuffixPdf('WAKTU TERPAKAI', '${report.waktuTerpakai}', 'Hari Kalender'),
+                _buildDividerPdf(),
+                _buildInfoRowWithSuffixPdf('SISA WAKTU', '${report.sisaWaktu}', 'Hari Kalender'),
+                _buildDividerPdf(),
+                _buildInfoRowPdf('AKHIR MASA KONTRAK', report.akhirMasaKontrak),
+              ],
             ),
           ),
-          pw.SizedBox(height: 18),
+          pw.SizedBox(height: 12),
+
+          // TABEL BOBOT S/D MINGGU INI (TABEL BAWAH)
+          pw.Table(
+            border: pw.TableBorder.all(color: PdfColors.black, width: 0.8),
+            columnWidths: const {
+              0: pw.FixedColumnWidth(68),
+              1: pw.FixedColumnWidth(48),
+              2: pw.FlexColumnWidth(3.0),
+              3: pw.FixedColumnWidth(68),
+              4: pw.FixedColumnWidth(68),
+              5: pw.FixedColumnWidth(68),
+            },
+            children: [
+              pw.TableRow(
+                decoration: pw.BoxDecoration(color: pdfHeaderBg),
+                children: [
+                  _headerCellPdf('STATUS\nKONTRAK/\nADDENDUM'),
+                  _headerCellPdf('MINGGU\nKE -'),
+                  _headerCellPdf('PERIODE'),
+                  _headerCellPdf('BOBOT S/D MINGGU INI\nRENCANA\n(%)'),
+                  _headerCellPdf('BOBOT S/D MINGGU INI\nREALISASI\n(%)'),
+                  _headerCellPdf('BOBOT S/D MINGGU INI\nDEVIASI\n(%)'),
+                ],
+              ),
+              ...report.tabelMingguan.map((row) {
+                final bool isCurrentWeek = row.mingguKe == report.mingguKe;
+                final pdfColor = isCurrentWeek ? pdfYellowHighlight : PdfColors.white;
+                final weight = isCurrentWeek ? pw.FontWeight.bold : pw.FontWeight.normal;
+
+                final rencanaText = row.rencana != null
+                    ? WeeklyReportModel.formatPercent(row.rencana, decimalDigits: 3, appendUnit: false)
+                    : '';
+                final realisasiText = row.realisasi != null
+                    ? WeeklyReportModel.formatPercent(row.realisasi, decimalDigits: 3, appendUnit: false)
+                    : '';
+                final deviasiText = row.deviasi != null
+                    ? WeeklyReportModel.formatPercent(row.deviasi, decimalDigits: 3, showSign: false, appendUnit: false)
+                    : '';
+
+                return pw.TableRow(
+                  decoration: pw.BoxDecoration(color: pdfColor),
+                  children: [
+                    _dataCellPdf(row.status, align: pw.TextAlign.left, weight: weight),
+                    _dataCellPdf('${row.mingguKe}', align: pw.TextAlign.center, weight: weight),
+                    _dataCellPdf('${row.tglMulai}    -    ${row.tglSelesai}', align: pw.TextAlign.center, weight: weight),
+                    _dataCellPdf(rencanaText, align: pw.TextAlign.right, weight: weight),
+                    _dataCellPdf(realisasiText, align: pw.TextAlign.right, weight: weight),
+                    _dataCellPdf(deviasiText, align: pw.TextAlign.right, weight: weight),
+                  ],
+                );
+              }),
+            ],
+          ),
+          pw.SizedBox(height: 16),
 
           // TANDA TANGAN 3 PIHAK
           _buildTripleSignatures(
             leftRole: 'Kontraktor Pelaksana',
-            leftName: kontraktor,
+            leftName: report.kontraktor,
             centerRole: 'Konsultan Supervisi\nCV. TATA SAKA CONSULTANT',
             centerName: contract.siteEngineer.isNotEmpty
                 ? contract.siteEngineer
                 : 'SENDAYU GALIH K., ST\n(Site Engineer)',
-            rightRole:
-                'Pejabat Pembuat Komitmen (PPK)\nDPU-PR Kab. Purbalingga',
+            rightRole: 'Pejabat Pembuat Komitmen (PPK)\nDPU-PR Kab. Purbalingga',
             rightName: 'PPK DINAS PU-PR',
             date: report.periodeAkhir,
           ),
@@ -508,7 +1508,7 @@ class PdfReportService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ─── 3. GENERATE PDF: LEMBAR BoQ 8-KOLOM (KEMAJUAN FISIK MINGGUAN) ────────
+  // ─── 3. GENERATE PDF: LEMBAR BoQ 14-KOLOM (KEMAJUAN FISIK MINGGUAN) ───────
   // ═══════════════════════════════════════════════════════════════════════════
   static Future<Uint8List> generateLembarBoqMingguanPdf({
     required WeeklyReportModel report,
@@ -517,216 +1517,361 @@ class PdfReportService {
   }) async {
     final pdf = pw.Document();
 
-    final namaKegiatan = kegiatan['namaKegiatan'] ?? report.pekerjaan;
-    final lokasi = kegiatan['lokasi'] ?? report.lokasiProyek;
-    final kontraktor = kegiatan['kontraktor'] ?? report.kontraktor;
+    final metadata = {
+      'pekerjaan': report.pekerjaan.isNotEmpty ? report.pekerjaan : (kegiatan['namaKegiatan'] ?? '-'),
+      'lokasi': report.lokasiProyek.isNotEmpty ? report.lokasiProyek : (kegiatan['lokasi'] ?? 'Kab. Purbalingga'),
+      'sumberDana': (kegiatan['sumberDana'] ?? contract.sumberDana).toString(),
+      'kontraktor': report.kontraktor.isNotEmpty ? report.kontraktor : (kegiatan['kontraktor'] ?? 'CV. DIVAN INSAN CEMERLANG'),
+      'noKontrak': report.nomorKontrak.isNotEmpty ? report.nomorKontrak : (kegiatan['noSuratPesanan'] ?? kegiatan['noSpmkKontraktor'] ?? '-'),
+      'pengawas': (kegiatan['konsultanPengawas'] ?? 'CV. TATA SAKA CONSULTANT').toString(),
+      'noKontrakPengawasan': (kegiatan['noSpkKonsultan'] ?? kegiatan['noSpmkKonsultan'] ?? '-').toString(),
+    };
 
-    // Resolve divisi list
-    final rkkList = (kegiatan['rkkDivisiList'] as List?) ?? [];
+    // Calculate divisi list accurately matching LembarBoqMingguanWidget
+    List<Map<String, dynamic>> divisiList = [];
+    if (report.boqProgressList != null && report.boqProgressList!.isNotEmpty) {
+      divisiList = report.boqProgressList!;
+    } else {
+      List rawRkk = [];
+      final adds = (kegiatan['addendums'] as List?) ?? [];
+      if (adds.isNotEmpty) {
+        final latest = adds.last;
+        final divList = (latest['rkkDivisiList'] as List?);
+        if (divList != null && divList.isNotEmpty) {
+          rawRkk = divList;
+        }
+      }
+      if (rawRkk.isEmpty) {
+        rawRkk = (kegiatan['rkkDivisiList'] as List?) ?? [];
+      }
+
+      final dailyReports = (kegiatan['laporans'] as List?) ?? [];
+      final startDt = WeeklyReportModel.parseIndonesianDate(report.periodeAwal);
+      final endDt = WeeklyReportModel.parseIndonesianDate(report.periodeAkhir);
+
+      for (final rawDiv in rawRkk) {
+        final div = Map<String, dynamic>.from(rawDiv);
+        final rawItems = (div['items'] as List? ?? []);
+        final List<Map<String, dynamic>> computedItems = [];
+
+        for (final rawIt in rawItems) {
+          final it = Map<String, dynamic>.from(rawIt);
+          final noMata = (it['noMataPembayaran'] ?? '').toString();
+          final volKontrak = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
+          final bbtKontrak = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
+
+          double volMingguIni = 0.0;
+          double volMingguLalu = 0.0;
+
+          for (final rep in dailyReports) {
+            if (rep is Map) {
+              DateTime? repDate;
+              final repTglStr = rep['tanggal']?.toString() ?? '';
+              if (repTglStr.isNotEmpty) {
+                repDate = WeeklyReportModel.parseIndonesianDate(repTglStr) ?? DateTime.tryParse(repTglStr);
+              }
+
+              bool isMingguIni = false;
+              bool isMingguLalu = false;
+
+              if (startDt != null && endDt != null && repDate != null) {
+                final repDayOnly = DateTime(repDate.year, repDate.month, repDate.day);
+                final startDayOnly = DateTime(startDt.year, startDt.month, startDt.day);
+                final endDayOnly = DateTime(endDt.year, endDt.month, endDt.day);
+
+                if (repDayOnly.isBefore(startDayOnly)) {
+                  isMingguLalu = true;
+                } else if (!repDayOnly.isAfter(endDayOnly)) {
+                  isMingguIni = true;
+                }
+              } else {
+                isMingguIni = true;
+              }
+
+              final pList = (rep['pekerjaanList'] as List?) ?? [];
+              for (final p in pList) {
+                if (p is Map) {
+                  final matchNoMata = p['noMataPembayaran']?.toString().trim() == noMata.trim() && noMata.isNotEmpty;
+                  final matchUraian = p['jenis']?.toString().trim().toLowerCase() == it['uraian']?.toString().trim().toLowerCase() ||
+                      p['uraian']?.toString().trim().toLowerCase() == it['uraian']?.toString().trim().toLowerCase();
+                  if (matchNoMata || matchUraian) {
+                    final vStr = (p['volume'] ?? '').toString();
+                    final vNum = double.tryParse(vStr.split(' ').first.replaceAll(',', '.')) ?? 0.0;
+                    if (isMingguIni) {
+                      volMingguIni += vNum;
+                    } else if (isMingguLalu) {
+                      volMingguLalu += vNum;
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          final bbtMingguLalu = volKontrak > 0 ? (volMingguLalu / volKontrak) * bbtKontrak : 0.0;
+          final bbtMingguIni = volKontrak > 0 ? (volMingguIni / volKontrak) * bbtKontrak : 0.0;
+          final volSdMingguIni = volMingguLalu + volMingguIni;
+          final bbtSdMingguIni = bbtMingguLalu + bbtMingguIni;
+          final volSisa = (volKontrak - volSdMingguIni).clamp(0.0, volKontrak);
+          final bbtSisa = (bbtKontrak - bbtSdMingguIni).clamp(0.0, bbtKontrak);
+
+          it['mingguLaluVolume'] = volMingguLalu;
+          it['mingguLaluBobot'] = bbtMingguLalu;
+          it['mingguIniVolume'] = volMingguIni;
+          it['mingguIniBobot'] = bbtMingguIni;
+          it['sdMingguIniVolume'] = volSdMingguIni;
+          it['sdMingguIniBobot'] = bbtSdMingguIni;
+          it['sisaVolume'] = volSisa;
+          it['sisaBobot'] = bbtSisa;
+
+          computedItems.add(it);
+        }
+
+        div['items'] = computedItems;
+        divisiList.add(div);
+      }
+    }
+
+    // Totals
+    double totalNilaiBobot = 0.0;
+    double totalMingguLaluBobot = 0.0;
+    double totalMingguIniBobot = 0.0;
+    double totalSdMingguIniBobot = 0.0;
+    double totalSisaBobot = 0.0;
+
+    for (final div in divisiList) {
+      final items = div['items'] as List? ?? [];
+      for (final item in items) {
+        totalNilaiBobot += (item['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
+        totalMingguLaluBobot += (item['mingguLaluBobot'] as num?)?.toDouble() ?? 0.0;
+        totalMingguIniBobot += (item['mingguIniBobot'] as num?)?.toDouble() ?? 0.0;
+        totalSdMingguIniBobot += (item['sdMingguIniBobot'] as num?)?.toDouble() ?? 0.0;
+        totalSisaBobot += (item['sisaBobot'] as num?)?.toDouble() ?? 0.0;
+      }
+    }
+
+    final realisasiTotal = totalSdMingguIniBobot > 0 ? totalSdMingguIniBobot : report.realisasiPersen;
+    final rencanaTotal = report.rencanaPersen;
+    final deviasiTotal = realisasiTotal - rencanaTotal;
 
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4.landscape,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        header: (context) => _buildOfficialDocHeader(
-          title: 'LEMBAR EVALUASI KEMAJUAN FISIK PEKERJAAN (BoQ / RKK)',
-          subtitle:
-              'Periode Minggu Ke-${report.mingguKe} (${report.periodeAwal} s.d. ${report.periodeAkhir})',
-          isLandscape: true,
-        ),
+        margin: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         footer: (context) => _buildPageFooter(
-          title:
-              'LEMBAR KEMAJUAN FISIK PEKERJAAN | MINGGU KE-${report.mingguKe}',
+          title: 'LEMBAR KEMAJUAN FISIK PEKERJAAN (BoQ) | MINGGU KE-${report.mingguKe}',
           context: context,
         ),
         build: (context) => [
-          pw.SizedBox(height: 6),
-          _buildPdfMetaBox([
-            ['Nama Kegiatan', ':  $namaKegiatan'],
-            [
-              'Lokasi / Dana',
-              ':  $lokasi  |  ${kegiatan['sumberDana'] ?? contract.sumberDana}',
-            ],
-            [
-              'Kontraktor / Konsultan',
-              ':  $kontraktor  |  CV. TATA SAKA CONSULTANT',
-            ],
-            [
-              'Nilai Kontrak',
-              ':  ${report.nilaiKontrak.isNotEmpty ? report.nilaiKontrak : "Rp ${formatNum(report.nilaiKontrakNumeric)}"}',
-            ],
-          ]),
+          // JUDUL RESMI
+          pw.Center(
+            child: pw.Column(
+              children: [
+                pw.Text(
+                  'LAPORAN MINGGUAN',
+                  style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, letterSpacing: 0.8),
+                ),
+                pw.Text(
+                  'MINGGU ${_toRoman(report.mingguKe)}',
+                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.Text(
+                  '( PERIODE TANGGAL : ${report.periodeAwal.toUpperCase()} - ${report.periodeAkhir.toUpperCase()} )',
+                  style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
           pw.SizedBox(height: 10),
 
-          // TABEL 8 KOLOM LENGKAP
-          pw.Table(
-            border: pw.TableBorder.all(color: PdfColors.black, width: 0.8),
-            columnWidths: const {
-              0: pw.FixedColumnWidth(45), // No Mata Pembayaran
-              1: pw.FlexColumnWidth(4.5), // Uraian
-              2: pw.FixedColumnWidth(35), // Satuan
-              3: pw.FixedColumnWidth(45), // Vol Kontrak
-              4: pw.FixedColumnWidth(45), // Bobot %
-              5: pw.FixedColumnWidth(45), // Lalu %
-              6: pw.FixedColumnWidth(45), // Ini %
-              7: pw.FixedColumnWidth(45), // s.d Ini %
-              8: pw.FixedColumnWidth(45), // Sisa %
-            },
-            children: [
-              pw.TableRow(
-                decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-                children: [
-                  _cell(
-                    'NO. MATA\nBAYAR',
-                    isHeader: true,
-                    align: pw.TextAlign.center,
-                  ),
-                  _cell('URAIAN PEKERJAAN', isHeader: true),
-                  _cell('SAT', isHeader: true, align: pw.TextAlign.center),
-                  _cell('VOL', isHeader: true, align: pw.TextAlign.right),
-                  _cell(
-                    'BOBOT\n(%)',
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    'SD LALU\n(%)',
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell('INI\n(%)', isHeader: true, align: pw.TextAlign.right),
-                  _cell(
-                    'SD INI\n(%)',
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell('SISA\n(%)', isHeader: true, align: pw.TextAlign.right),
-                ],
-              ),
-              ...rkkList.expand((div) {
-                final dCode = div['kode'] ?? div['nama'] ?? '';
-                final dName = div['nama'] ?? '';
-                final items = (div['items'] as List?) ?? [];
-
-                return [
-                  // Divisi Header Row
-                  pw.TableRow(
-                    decoration: const pw.BoxDecoration(
-                      color: PdfColors.grey100,
-                    ),
+          // KOTAK INFORMASI PROYEK (Persis LembarBoqMingguanWidget)
+          pw.Container(
+            padding: const pw.EdgeInsets.all(6),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.black, width: 0.8),
+            ),
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                  child: pw.Column(
                     children: [
-                      _cell(
-                        dCode.toString(),
-                        isHeader: true,
-                        align: pw.TextAlign.center,
-                      ),
-                      _cell(dName.toString(), isHeader: true),
-                      _cell(''),
-                      _cell(''),
-                      _cell(''),
-                      _cell(''),
-                      _cell(''),
-                      _cell(''),
-                      _cell(''),
+                      _buildMetaRowSimplePdf('Pekerjaan', metadata['pekerjaan'] ?? '-'),
+                      _buildMetaRowSimplePdf('Lokasi', metadata['lokasi'] ?? '-'),
+                      _buildMetaRowSimplePdf('Sumber Dana', metadata['sumberDana'] ?? '-'),
                     ],
                   ),
-                  ...items.map((it) {
-                    final noMata = (it['noMataPembayaran'] ?? it['no'] ?? '')
-                        .toString();
-                    final uraian = (it['uraian'] ?? it['nama'] ?? '-')
-                        .toString();
-                    final sat = (it['satuan'] ?? '-').toString();
-                    final vol =
-                        (it['volumeCCO'] ?? it['volume'] as num?)?.toDouble() ??
-                        0.0;
-                    final bobot = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
-                    final sdIni =
-                        (it['sdMingguIniBobot'] as num?)?.toDouble() ??
-                        (bobot * 0.45);
-                    final ini =
-                        (it['mingguIniBobot'] as num?)?.toDouble() ??
-                        (bobot * 0.12);
-                    final lalu =
-                        (it['mingguLaluBobot'] as num?)?.toDouble() ??
-                        (sdIni - ini);
-                    final sisa = (bobot - sdIni).clamp(0.0, 100.0);
+                ),
+                pw.SizedBox(width: 16),
+                pw.Expanded(
+                  child: pw.Column(
+                    children: [
+                      _buildMetaRowSimplePdf('Kontraktor', metadata['kontraktor'] ?? '-'),
+                      _buildMetaRowSimplePdf('No. Kontrak', metadata['noKontrak'] ?? '-'),
+                      _buildMetaRowSimplePdf('Pengawas', metadata['pengawas'] ?? '-'),
+                      _buildMetaRowSimplePdf('No. Kontrak Pengawasan', metadata['noKontrakPengawasan'] ?? '-'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 8),
+
+          // TABEL 14 KOLOM BoQ
+          pw.Table(
+            border: pw.TableBorder.all(color: PdfColors.black, width: 0.6),
+            columnWidths: const {
+              0: pw.FixedColumnWidth(20),  // NO
+              1: pw.FlexColumnWidth(3.5),  // URAIAN
+              2: pw.FixedColumnWidth(28),  // Satuan
+              3: pw.FixedColumnWidth(40),  // Vol Kontrak
+              4: pw.FixedColumnWidth(38),  // Nilai Bobot
+              5: pw.FixedColumnWidth(36),  // Mgg Lalu Vol
+              6: pw.FixedColumnWidth(34),  // Mgg Lalu Bobot
+              7: pw.FixedColumnWidth(36),  // Mgg Ini Vol
+              8: pw.FixedColumnWidth(34),  // Mgg Ini Bobot
+              9: pw.FixedColumnWidth(38),  // S/D Vol
+              10: pw.FixedColumnWidth(34), // S/D Bobot
+              11: pw.FixedColumnWidth(38), // Sisa Vol
+              12: pw.FixedColumnWidth(34), // Sisa Bobot
+              13: pw.FixedColumnWidth(24), // Ket
+            },
+            children: [
+              // Header
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF3F4F6)),
+                children: [
+                  _cellBoqPdf('NO.', isHeader: true, align: pw.TextAlign.center),
+                  _cellBoqPdf('URAIAN', isHeader: true),
+                  _cellBoqPdf('Satuan', isHeader: true, align: pw.TextAlign.center),
+                  _cellBoqPdf('Volume\nKontrak', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('Nilai\nBobot\n%', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('MINGGU LALU\nVol', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('MINGGU LALU\n%', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('MINGGU INI\nVol', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('MINGGU INI\n%', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('S/D MINGGU INI\nVol', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('S/D MINGGU INI\n%', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('Sisa Pekerjaan\nVol', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('Sisa Pekerjaan\n%', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('Ket.', isHeader: true, align: pw.TextAlign.center),
+                ],
+              ),
+              // Body
+              ...divisiList.expand((div) {
+                final romawi = div['nomorRomawi']?.toString() ?? 'I';
+                final namaDiv = div['namaDivisi']?.toString() ?? 'DIVISI';
+                final items = div['items'] as List? ?? [];
+
+                return [
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF1F5F9)),
+                    children: [
+                      _cellBoqPdf(romawi, isBold: true, align: pw.TextAlign.center),
+                      _cellBoqPdf(namaDiv.toUpperCase(), isBold: true),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(''),
+                    ],
+                  ),
+                  ...items.asMap().entries.map((itEntry) {
+                    final idx = itEntry.key + 1;
+                    final it = itEntry.value;
+
+                    final uraian = (it['uraian'] ?? '').toString();
+                    final satuan = (it['satuan'] ?? '').toString();
+                    final volKontrak = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
+                    final bbtKontrak = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
+
+                    final mlVol = (it['mingguLaluVolume'] as num?)?.toDouble() ?? 0.0;
+                    final mlBbt = (it['mingguLaluBobot'] as num?)?.toDouble() ?? 0.0;
+                    final miVol = (it['mingguIniVolume'] as num?)?.toDouble() ?? 0.0;
+                    final miBbt = (it['mingguIniBobot'] as num?)?.toDouble() ?? 0.0;
+                    final sdVol = (it['sdMingguIniVolume'] as num?)?.toDouble() ?? 0.0;
+                    final sdBbt = (it['sdMingguIniBobot'] as num?)?.toDouble() ?? 0.0;
+                    final ssVol = (it['sisaVolume'] as num?)?.toDouble() ?? 0.0;
+                    final ssBbt = (it['sisaBobot'] as num?)?.toDouble() ?? 0.0;
 
                     return pw.TableRow(
                       children: [
-                        _cell(noMata, align: pw.TextAlign.center),
-                        _cell(uraian),
-                        _cell(sat, align: pw.TextAlign.center),
-                        _cell(formatNum(vol), align: pw.TextAlign.right),
-                        _cell(
-                          formatNum(bobot, decimals: 3),
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          formatNum(lalu, decimals: 3),
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          formatNum(ini, decimals: 3),
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          formatNum(sdIni, decimals: 3),
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          formatNum(sisa, decimals: 3),
-                          align: pw.TextAlign.right,
-                        ),
+                        _cellBoqPdf('$idx', align: pw.TextAlign.center),
+                        _cellBoqPdf(uraian),
+                        _cellBoqPdf(satuan, align: pw.TextAlign.center),
+                        _cellBoqPdf(volKontrak > 0 ? _fmtNum(volKontrak) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf(bbtKontrak > 0 ? _fmtNum(bbtKontrak, dec: 3) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf(mlVol > 0 ? _fmtNum(mlVol) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf(mlBbt > 0 ? _fmtNum(mlBbt, dec: 2) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf(miVol > 0 ? _fmtNum(miVol) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf(miBbt > 0 ? _fmtNum(miBbt, dec: 2) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf(sdVol > 0 ? _fmtNum(sdVol) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf(sdBbt > 0 ? _fmtNum(sdBbt, dec: 2) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf(ssVol > 0 ? _fmtNum(ssVol) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf(ssBbt > 0 ? _fmtNum(ssBbt, dec: 2) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf('-', align: pw.TextAlign.center),
                       ],
                     );
                   }),
                 ];
               }),
-              // Total Row
+              // Summary Total Row
               pw.TableRow(
-                decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF3F4F6)),
                 children: [
-                  _cell('TOTAL', isHeader: true, align: pw.TextAlign.center),
-                  _cell('KEMAJUAN FISIK KESELURUHAN', isHeader: true),
-                  _cell('', isHeader: true),
-                  _cell('', isHeader: true),
-                  _cell('100.000', isHeader: true, align: pw.TextAlign.right),
-                  _cell(
-                    formatNum(report.realisasiPersen - 2.5, decimals: 3),
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    formatNum(2.5, decimals: 3),
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    formatNum(report.realisasiPersen, decimals: 3),
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    formatNum(100.0 - report.realisasiPersen, decimals: 3),
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
+                  _cellBoqPdf(''),
+                  _cellBoqPdf('Jumlah', isBold: true, align: pw.TextAlign.center),
+                  _cellBoqPdf(''),
+                  _cellBoqPdf(''),
+                  _cellBoqPdf(_fmtNum(totalNilaiBobot, dec: 3), isBold: true, align: pw.TextAlign.right),
+                  _cellBoqPdf(''),
+                  _cellBoqPdf(_fmtNum(totalMingguLaluBobot, dec: 2), isBold: true, align: pw.TextAlign.right),
+                  _cellBoqPdf(''),
+                  _cellBoqPdf(_fmtNum(totalMingguIniBobot, dec: 2), isBold: true, align: pw.TextAlign.right),
+                  _cellBoqPdf(''),
+                  _cellBoqPdf(_fmtNum(totalSdMingguIniBobot, dec: 2), isBold: true, align: pw.TextAlign.right),
+                  _cellBoqPdf(''),
+                  _cellBoqPdf(_fmtNum(totalSisaBobot, dec: 2), isBold: true, align: pw.TextAlign.right),
+                  _cellBoqPdf(''),
                 ],
               ),
             ],
           ),
-          pw.SizedBox(height: 16),
+          pw.SizedBox(height: 10),
+
+          // SUMMARY KEMAJUAN (Rencana, Realisasi, Deviasi)
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(left: 30),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                _buildSummaryLinePdf('Rencana Fisik s/d Minggu ini', '${_fmtNum(rencanaTotal)} %'),
+                pw.SizedBox(height: 2),
+                _buildSummaryLinePdf('Realisasi Fisik s/d Minggu ini', '${_fmtNum(realisasiTotal)} %'),
+                pw.SizedBox(height: 2),
+                _buildSummaryLinePdf('Deviasi (+/-)', '${deviasiTotal >= 0 ? "+" : ""}${_fmtNum(deviasiTotal)} %', isBold: true),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 14),
 
           // TANDA TANGAN 3 PIHAK LANDSCAPE
           _buildTripleSignatures(
             leftRole: 'Kontraktor Pelaksana',
-            leftName: kontraktor,
+            leftName: metadata['kontraktor'] ?? '-',
             centerRole: 'Konsultan Supervisi\nCV. TATA SAKA CONSULTANT',
             centerName: contract.siteEngineer.isNotEmpty
                 ? contract.siteEngineer
                 : 'SENDAYU GALIH K., ST\n(Site Engineer)',
-            rightRole:
-                'Pejabat Pembuat Komitmen (PPK)\nDPU-PR Kab. Purbalingga',
+            rightRole: 'Pejabat Pembuat Komitmen (PPK)\nDPU-PR Kab. Purbalingga',
             rightName: 'PPK DINAS PU-PR',
             date: report.periodeAkhir,
           ),
@@ -738,7 +1883,7 @@ class PdfReportService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ─── 4. GENERATE PDF: LAPORAN BULANAN PENGAWASAN LAPANGAN ─────────────────
+  // ─── 4. GENERATE PDF: LAPORAN BULANAN (LEMBAR BoQ 15-KOLOM) ───────────────
   // ═══════════════════════════════════════════════════════════════════════════
   static Future<Uint8List> generateLaporanBulananPdf({
     required MonthlyReportModel report,
@@ -749,216 +1894,205 @@ class PdfReportService {
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4.landscape,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        header: (context) => _buildOfficialDocHeader(
-          title: 'LAPORAN BULANAN PENGAWASAN LAPANGAN',
-          subtitle:
-              'Laporan Progres Fisik Bulanan (Bulan ${report.bulanRomawi} | Periode: ${report.periodeFormatted})',
-          isLandscape: true,
-        ),
+        margin: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         footer: (context) => _buildPageFooter(
-          title:
-              'LAPORAN BULANAN | BULAN ${report.bulanRomawi} (${report.namaBulan})',
+          title: 'LAPORAN BULANAN | BULAN ${report.bulanRomawi} (${report.namaBulan})',
           context: context,
         ),
         build: (context) => [
-          pw.SizedBox(height: 6),
-          // Metadata Box
-          _buildPdfMetaBox([
-            ['Nama Kegiatan', ':  ${report.namaKegiatan}'],
-            ['Lokasi Proyek', ':  ${report.lokasi}'],
-            ['Sumber Dana', ':  ${report.sumberDana}'],
-            ['Nomor Kontrak', ':  ${report.noKontrak}'],
-            ['Kontraktor Pelaksana', ':  ${report.pelaksanaKontraktor}'],
-            ['Konsultan Supervisi', ':  ${report.konsultanPengawas}'],
-            [
-              'Status Progres',
-              ':  Rencana: ${formatNum(report.rencanaFisikPersen)}%  |  Realisasi: ${formatNum(report.realisasiKumulatifPersen)}%  |  Deviasi: ${report.deviasiPersen >= 0 ? "+" : ""}${formatNum(report.deviasiPersen)}%',
-            ],
-          ]),
+          // JUDUL RESMI
+          pw.Center(
+            child: pw.Column(
+              children: [
+                pw.Text(
+                  'LAPORAN BULANAN',
+                  style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, letterSpacing: 0.8),
+                ),
+                pw.Text(
+                  'BULAN ${report.bulanRomawi}',
+                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.Text(
+                  '( PERIODE TANGGAL: ${report.periodeFormatted.toUpperCase()} )',
+                  style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
           pw.SizedBox(height: 10),
 
-          // MASTER TABEL BULANAN
+          // KOTAK INFORMASI PROYEK (Persis LembarLaporanBulananWidget)
+          pw.Container(
+            padding: const pw.EdgeInsets.all(6),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.black, width: 0.8),
+            ),
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                  child: pw.Column(
+                    children: [
+                      _buildMetaRowSimplePdf('Pekerjaan', report.namaKegiatan),
+                      _buildMetaRowSimplePdf('Lokasi', report.lokasi),
+                      _buildMetaRowSimplePdf('Sumber Dana', report.sumberDana),
+                      _buildMetaRowSimplePdf('Pelaksana Kontraktor', report.pelaksanaKontraktor),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(width: 16),
+                pw.Expanded(
+                  child: pw.Column(
+                    children: [
+                      _buildMetaRowSimplePdf('No Kontrak', report.noKontrak),
+                      _buildMetaRowSimplePdf('Pengawas', report.konsultanPengawas),
+                      _buildMetaRowSimplePdf('No Kontrak Pengawas', report.noKontrakPengawas),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 8),
+
+          // TABEL 15 KOLOM BoQ BULANAN
           pw.Table(
-            border: pw.TableBorder.all(color: PdfColors.black, width: 0.8),
+            border: pw.TableBorder.all(color: PdfColors.black, width: 0.6),
             columnWidths: const {
-              0: pw.FixedColumnWidth(40), // No
-              1: pw.FixedColumnWidth(55), // No Mata Pembayaran
-              2: pw.FlexColumnWidth(4), // Uraian
-              3: pw.FixedColumnWidth(35), // Satuan
-              4: pw.FixedColumnWidth(45), // Bobot Kontrak %
-              5: pw.FixedColumnWidth(45), // Realisasi s.d Bln Lalu %
-              6: pw.FixedColumnWidth(45), // Realisasi Bln Ini %
-              7: pw.FixedColumnWidth(45), // Realisasi s.d Bln Ini %
-              8: pw.FixedColumnWidth(45), // Sisa Bobot %
-              9: pw.FixedColumnWidth(50), // Ket
+              0: pw.FixedColumnWidth(18),  // NO
+              1: pw.FixedColumnWidth(44),  // No. Mata Pembayaran
+              2: pw.FlexColumnWidth(3.5),  // Uraian
+              3: pw.FixedColumnWidth(26),  // Satuan
+              4: pw.FixedColumnWidth(38),  // Vol CCO
+              5: pw.FixedColumnWidth(36),  // Nilai Bobot %
+              6: pw.FixedColumnWidth(36),  // Bln Lalu Vol
+              7: pw.FixedColumnWidth(34),  // Bln Lalu Bobot
+              8: pw.FixedColumnWidth(36),  // Bln Ini Vol
+              9: pw.FixedColumnWidth(34),  // Bln Ini Bobot
+              10: pw.FixedColumnWidth(38), // S/D Bln Ini Vol
+              11: pw.FixedColumnWidth(34), // S/D Bln Ini Bobot
+              12: pw.FixedColumnWidth(38), // Sisa Vol
+              13: pw.FixedColumnWidth(34), // Sisa Bobot
+              14: pw.FixedColumnWidth(24), // Ket.
             },
             children: [
               pw.TableRow(
-                decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF1F5F9)),
                 children: [
-                  _cell('NO', isHeader: true, align: pw.TextAlign.center),
-                  _cell(
-                    'NO MATA\nBAYAR',
-                    isHeader: true,
-                    align: pw.TextAlign.center,
-                  ),
-                  _cell('URAIAN PEKERJAAN', isHeader: true),
-                  _cell('SAT', isHeader: true, align: pw.TextAlign.center),
-                  _cell(
-                    'BOBOT\n(%)',
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    'SD LALU\n(%)',
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell('INI\n(%)', isHeader: true, align: pw.TextAlign.right),
-                  _cell(
-                    'SD INI\n(%)',
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell('SISA\n(%)', isHeader: true, align: pw.TextAlign.right),
-                  _cell('KET', isHeader: true, align: pw.TextAlign.center),
+                  _cellBoqPdf('NO.', isHeader: true, align: pw.TextAlign.center),
+                  _cellBoqPdf('No. Mata\nPembayaran', isHeader: true, align: pw.TextAlign.center),
+                  _cellBoqPdf('Uraian', isHeader: true),
+                  _cellBoqPdf('Satuan', isHeader: true, align: pw.TextAlign.center),
+                  _cellBoqPdf('Volume\nCCO', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('Nilai\nBobot %', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('Bulan Lalu\nVol', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('Bulan Lalu\nBobot', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('Bulan Ini\nVol', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('Bulan Ini\nBobot', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('S/D Bln Ini\nVol', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('S/D Bln Ini\nBobot', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('Sisa\nVol', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('Sisa\nBobot', isHeader: true, align: pw.TextAlign.right),
+                  _cellBoqPdf('Ket.', isHeader: true, align: pw.TextAlign.center),
                 ],
               ),
               ...report.divisions.expand((div) {
                 return [
-                  // Divisi Header
                   pw.TableRow(
-                    decoration: const pw.BoxDecoration(
-                      color: PdfColors.grey100,
-                    ),
+                    decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF8FAFC)),
                     children: [
-                      _cell(
-                        div.kode,
-                        isHeader: true,
-                        align: pw.TextAlign.center,
-                      ),
-                      _cell(''),
-                      _cell(div.nama, isHeader: true),
-                      _cell(''),
-                      _cell(
-                        formatNum(div.subtotalBobotCCO, decimals: 3),
-                        isHeader: true,
-                        align: pw.TextAlign.right,
-                      ),
-                      _cell(
-                        formatNum(div.subtotalBobotBulanLalu, decimals: 3),
-                        isHeader: true,
-                        align: pw.TextAlign.right,
-                      ),
-                      _cell(
-                        formatNum(div.subtotalBobotBulanIni, decimals: 3),
-                        isHeader: true,
-                        align: pw.TextAlign.right,
-                      ),
-                      _cell(
-                        formatNum(div.subtotalBobotSdBulanIni, decimals: 3),
-                        isHeader: true,
-                        align: pw.TextAlign.right,
-                      ),
-                      _cell(
-                        formatNum(div.subtotalBobotSisa, decimals: 3),
-                        isHeader: true,
-                        align: pw.TextAlign.right,
-                      ),
-                      _cell(''),
+                      _cellBoqPdf(div.kode, isBold: true, align: pw.TextAlign.center),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(div.nama, isBold: true),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(_fmtNum(div.subtotalBobotCCO, dec: 3), isBold: true, align: pw.TextAlign.right),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(_fmtNum(div.subtotalBobotBulanLalu, dec: 3), isBold: true, align: pw.TextAlign.right),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(_fmtNum(div.subtotalBobotBulanIni, dec: 3), isBold: true, align: pw.TextAlign.right),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(_fmtNum(div.subtotalBobotSdBulanIni, dec: 3), isBold: true, align: pw.TextAlign.right),
+                      _cellBoqPdf(''),
+                      _cellBoqPdf(_fmtNum(div.subtotalBobotCCO - div.subtotalBobotSdBulanIni, dec: 3), isBold: true, align: pw.TextAlign.right),
+                      _cellBoqPdf(''),
                     ],
                   ),
                   ...div.items.map((it) {
                     return pw.TableRow(
                       children: [
-                        _cell(it.no, align: pw.TextAlign.center),
-                        _cell(it.noMataPembayaran, align: pw.TextAlign.center),
-                        _cell(it.uraian),
-                        _cell(it.satuan, align: pw.TextAlign.center),
-                        _cell(
-                          formatNum(it.bobotCCO, decimals: 3),
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          formatNum(it.bobotBulanLalu, decimals: 3),
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          formatNum(it.bobotBulanIni, decimals: 3),
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          formatNum(it.bobotSdBulanIni, decimals: 3),
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          formatNum(it.sisaBobot, decimals: 3),
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          it.keterangan.isNotEmpty ? it.keterangan : '-',
-                          align: pw.TextAlign.center,
-                        ),
+                        _cellBoqPdf(it.no, align: pw.TextAlign.center),
+                        _cellBoqPdf(it.noMataPembayaran, align: pw.TextAlign.center),
+                        _cellBoqPdf(it.uraian),
+                        _cellBoqPdf(it.satuan, align: pw.TextAlign.center),
+                        _cellBoqPdf(_fmtNum(it.volumeCCO), align: pw.TextAlign.right),
+                        _cellBoqPdf(_fmtNum(it.bobotCCO, dec: 3), align: pw.TextAlign.right),
+                        _cellBoqPdf(it.volumeBulanLalu > 0 ? _fmtNum(it.volumeBulanLalu) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf(it.bobotBulanLalu > 0 ? _fmtNum(it.bobotBulanLalu, dec: 3) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf(it.volumeBulanIni > 0 ? _fmtNum(it.volumeBulanIni) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf(it.bobotBulanIni > 0 ? _fmtNum(it.bobotBulanIni, dec: 3) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf(it.volumeSdBulanIni > 0 ? _fmtNum(it.volumeSdBulanIni) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf(it.bobotSdBulanIni > 0 ? _fmtNum(it.bobotSdBulanIni, dec: 3) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf(it.sisaVolume > 0 ? _fmtNum(it.sisaVolume) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf(it.sisaBobot > 0 ? _fmtNum(it.sisaBobot, dec: 3) : '-', align: pw.TextAlign.right),
+                        _cellBoqPdf(it.keterangan.isNotEmpty ? it.keterangan : '-', align: pw.TextAlign.center),
                       ],
                     );
                   }),
                 ];
               }),
-              // Total Kumulatif
+              // Total Row
               pw.TableRow(
-                decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF1F5F9)),
                 children: [
-                  _cell('TOTAL', isHeader: true, align: pw.TextAlign.center),
-                  _cell('', isHeader: true),
-                  _cell('TOTAL REALISASI KUMULATIF BULANAN', isHeader: true),
-                  _cell('', isHeader: true),
-                  _cell(
-                    formatNum(report.totalBobotCCO, decimals: 3),
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    formatNum(report.totalBobotBulanLalu, decimals: 3),
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    formatNum(report.totalBobotBulanIni, decimals: 3),
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    formatNum(report.totalBobotSdBulanIni, decimals: 3),
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    formatNum(report.totalBobotSisa, decimals: 3),
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    report.status,
-                    isHeader: true,
-                    align: pw.TextAlign.center,
-                  ),
+                  _cellBoqPdf(''),
+                  _cellBoqPdf(''),
+                  _cellBoqPdf('Jumlah Total', isBold: true),
+                  _cellBoqPdf(''),
+                  _cellBoqPdf(''),
+                  _cellBoqPdf(_fmtNum(report.totalBobotCCO, dec: 3), isBold: true, align: pw.TextAlign.right),
+                  _cellBoqPdf(''),
+                  _cellBoqPdf(_fmtNum(report.totalBobotBulanLalu, dec: 3), isBold: true, align: pw.TextAlign.right),
+                  _cellBoqPdf(''),
+                  _cellBoqPdf(_fmtNum(report.totalBobotBulanIni, dec: 3), isBold: true, align: pw.TextAlign.right),
+                  _cellBoqPdf(''),
+                  _cellBoqPdf(_fmtNum(report.totalBobotSdBulanIni, dec: 3), isBold: true, align: pw.TextAlign.right),
+                  _cellBoqPdf(''),
+                  _cellBoqPdf(_fmtNum(report.totalBobotSisa, dec: 3), isBold: true, align: pw.TextAlign.right),
+                  _cellBoqPdf(''),
                 ],
               ),
             ],
           ),
-          pw.SizedBox(height: 16),
+          pw.SizedBox(height: 10),
 
-          // TANDA TANGAN PENGESAHAN KONSULTAN & DINAS
-          _buildDualSignatures(
-            leftRole: 'Konsultan Pengawas,\nCV. TATA SAKA CONSULTANT',
-            leftName: contract.siteEngineer.isNotEmpty
+          // SUMMARY (Rencana, Realisasi, Deviasi)
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(left: 30),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                _buildSummaryLinePdf('Rencana Fisik s/d Bulan ini', '${formatNum(report.rencanaFisikPersen)} %'),
+                pw.SizedBox(height: 2),
+                _buildSummaryLinePdf('Realisasi Fisik s/d Bulan ini', '${formatNum(report.realisasiKumulatifPersen)} %'),
+                pw.SizedBox(height: 2),
+                _buildSummaryLinePdf('Deviasi (+/-)', '${report.deviasiPersen >= 0 ? "+" : ""}${formatNum(report.deviasiPersen)} %', isBold: true),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 14),
+
+          // TANDA TANGAN 3 PIHAK LANDSCAPE
+          _buildTripleSignatures(
+            leftRole: 'Kontraktor Pelaksana',
+            leftName: report.pelaksanaKontraktor,
+            centerRole: 'Konsultan Supervisi\nCV. TATA SAKA CONSULTANT',
+            centerName: contract.siteEngineer.isNotEmpty
                 ? contract.siteEngineer
                 : 'SENDAYU GALIH K., ST\n(Site Engineer)',
-            rightRole:
-                'Pejabat Pembuat Komitmen (PPK),\nDPU-PR Kab. Purbalingga',
+            rightRole: 'Pejabat Pembuat Komitmen (PPK)\nDPU-PR Kab. Purbalingga',
             rightName: 'PPK DINAS PU-PR',
-            date: report.periodeFormatted.split(' - ').last,
+            date: report.periodeFormatted.split('-').last.trim(),
           ),
         ],
       ),
@@ -968,7 +2102,7 @@ class PdfReportService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ─── 5. GENERATE PDF: LEMBAR TAMBAH KURANG (ADDENDUM CCO 18 KOLOM) ───────
+  // ─── 5. GENERATE PDF: DAFTAR PERHITUNGAN TAMBAH KURANG (18-KOLOM) ─────────
   // ═══════════════════════════════════════════════════════════════════════════
   static Future<Uint8List> generateLembarTambahKurangPdf({
     required KegiatanModel kegiatan,
@@ -979,8 +2113,7 @@ class PdfReportService {
     final pdf = pw.Document();
 
     final noAdd = (addendumData['nomorAddendum'] ?? '01').toString();
-    final addDivList =
-        (addendumData['rkkDivisiList'] as List?)
+    final addDivList = (addendumData['rkkDivisiList'] as List?)
             ?.map((e) => Map<String, dynamic>.from(e))
             .toList() ??
         [];
@@ -995,34 +2128,60 @@ class PdfReportService {
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4.landscape,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        header: (context) => _buildOfficialDocHeader(
-          title: 'DAFTAR PERHITUNGAN TAMBAH KURANG KE - $noAdd',
-          subtitle: 'Contract Change Order (CCO) Rekayasa Lapangan',
-          isLandscape: true,
-        ),
+        margin: const pw.EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         footer: (context) => _buildPageFooter(
           title: 'DAFTAR PERHITUNGAN TAMBAH KURANG KE - $noAdd',
           context: context,
         ),
         build: (context) => [
-          pw.SizedBox(height: 6),
-          // Metadata Box
-          _buildPdfMetaBox([
-            ['Kegiatan / Paket', ':  ${kegiatan.namaKegiatan}'],
-            [
-              'Lokasi Proyek',
-              ':  ${kegiatan.lokasi}  |  Sumber Dana: ${kegiatan.sumberDana}',
-            ],
-            ['Kontraktor Pelaksana', ':  ${kegiatan.kontraktor}'],
-            ['Konsultan Supervisi', ':  CV. TATA SAKA CONSULTANT'],
-            ['Nilai Kontrak Awal', ':  ${kegiatan.nilaiKontrak}'],
-            [
-              'Status Pagu CCO',
-              ':  ${(report.totalAddendumHarga - report.totalBaselineHarga).abs() < 1.0 ? "TETAP / SEIMBANG (0.00%)" : "Terdapat Selisih Pagu"}  |  Total Akhir: Rp ${formatNum(report.totalDibulatkan > 0 ? report.totalDibulatkan : report.totalAddendumHarga)}',
-            ],
-          ]),
+          // JUDUL DOKUMEN RESMI
+          pw.Center(
+            child: pw.Text(
+              'DAFTAR PERHITUNGAN TAMBAH KURANG KE - $noAdd',
+              style: pw.TextStyle(
+                fontSize: 12.5,
+                fontWeight: pw.FontWeight.bold,
+                decoration: pw.TextDecoration.underline,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
           pw.SizedBox(height: 10),
+
+          // KOTAK METADATA PROYEK (Persis LembarTambahKurangWidget)
+          pw.Container(
+            padding: const pw.EdgeInsets.all(6),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.black, width: 0.8),
+            ),
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                  child: pw.Column(
+                    children: [
+                      _buildMetaRowSimplePdf('Kegiatan', kegiatan.namaKegiatan),
+                      _buildMetaRowSimplePdf('Pekerjaan', kegiatan.namaKegiatan),
+                      _buildMetaRowSimplePdf('Lokasi', kegiatan.lokasi.isNotEmpty ? kegiatan.lokasi : 'Kab. Purbalingga'),
+                      _buildMetaRowSimplePdf('Sumber Dana', kegiatan.sumberDana.isNotEmpty ? kegiatan.sumberDana : 'APBD Kab. Purbalingga'),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(width: 16),
+                pw.Expanded(
+                  child: pw.Column(
+                    children: [
+                      _buildMetaRowSimplePdf('Pelaksana Kontraktor', kegiatan.kontraktor.isNotEmpty ? kegiatan.kontraktor : '-'),
+                      _buildMetaRowSimplePdf('No Kontrak', kegiatan.suratPesananFull.isNotEmpty ? kegiatan.suratPesananFull : '-'),
+                      _buildMetaRowSimplePdf('Pengawas', kegiatan.konsultanPengawas.isNotEmpty ? kegiatan.konsultanPengawas : 'CV. TATA SAKA CONSULTANT'),
+                      _buildMetaRowSimplePdf('No Kontrak Pengawasan', kegiatan.spkKonsultanFull.isNotEmpty ? kegiatan.spkKonsultanFull : '-'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 8),
 
           // TABEL 18 KOLOM TAMBAH KURANG LENGKAP
           pw.Table(
@@ -1050,47 +2209,23 @@ class PdfReportService {
             children: [
               // Header Group 1
               pw.TableRow(
-                decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF3F4F6)),
                 children: [
                   _cell('NO', isHeader: true, align: pw.TextAlign.center),
-                  _cell(
-                    'NO MATA\nBAYAR',
-                    isHeader: true,
-                    align: pw.TextAlign.center,
-                  ),
+                  _cell('NO MATA\nBAYAR', isHeader: true, align: pw.TextAlign.center),
                   _cell('URAIAN PEKERJAAN', isHeader: true),
                   _cell('SAT', isHeader: true, align: pw.TextAlign.center),
-                  _cell(
-                    'HARGA\nSATUAN (Rp)',
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    'KONTRAK AWAL',
-                    isHeader: true,
-                    align: pw.TextAlign.center,
-                  ),
+                  _cell('HARGA\nSATUAN (Rp)', isHeader: true, align: pw.TextAlign.right),
+                  _cell('KONTRAK AWAL', isHeader: true, align: pw.TextAlign.center),
                   _cell(''),
                   _cell(''),
-                  _cell(
-                    'ADDENDUM $noAdd',
-                    isHeader: true,
-                    align: pw.TextAlign.center,
-                  ),
+                  _cell('ADDENDUM $noAdd', isHeader: true, align: pw.TextAlign.center),
                   _cell(''),
                   _cell(''),
-                  _cell(
-                    'PEKERJAAN TAMBAH',
-                    isHeader: true,
-                    align: pw.TextAlign.center,
-                  ),
+                  _cell('PEKERJAAN TAMBAH', isHeader: true, align: pw.TextAlign.center),
                   _cell(''),
                   _cell(''),
-                  _cell(
-                    'PEKERJAAN KURANG',
-                    isHeader: true,
-                    align: pw.TextAlign.center,
-                  ),
+                  _cell('PEKERJAAN KURANG', isHeader: true, align: pw.TextAlign.center),
                   _cell(''),
                   _cell(''),
                   _cell('KET', isHeader: true, align: pw.TextAlign.center),
@@ -1098,7 +2233,7 @@ class PdfReportService {
               ),
               // Header Sub-Columns 2
               pw.TableRow(
-                decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF3F4F6)),
                 children: [
                   _cell(''),
                   _cell(''),
@@ -1106,97 +2241,42 @@ class PdfReportService {
                   _cell(''),
                   _cell(''),
                   _cell('VOL', isHeader: true, align: pw.TextAlign.right),
-                  _cell(
-                    'TOTAL (Rp)',
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
+                  _cell('TOTAL (Rp)', isHeader: true, align: pw.TextAlign.right),
                   _cell('BOBOT', isHeader: true, align: pw.TextAlign.right),
                   _cell('VOL', isHeader: true, align: pw.TextAlign.right),
-                  _cell(
-                    'TOTAL (Rp)',
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
+                  _cell('TOTAL (Rp)', isHeader: true, align: pw.TextAlign.right),
                   _cell('BOBOT', isHeader: true, align: pw.TextAlign.right),
                   _cell('VOL', isHeader: true, align: pw.TextAlign.right),
-                  _cell(
-                    'TOTAL (Rp)',
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
+                  _cell('TOTAL (Rp)', isHeader: true, align: pw.TextAlign.right),
                   _cell('BOBOT', isHeader: true, align: pw.TextAlign.right),
                   _cell('VOL', isHeader: true, align: pw.TextAlign.right),
-                  _cell(
-                    'TOTAL (Rp)',
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
+                  _cell('TOTAL (Rp)', isHeader: true, align: pw.TextAlign.right),
                   _cell('BOBOT', isHeader: true, align: pw.TextAlign.right),
                   _cell(''),
                 ],
               ),
               ...report.divisiResults.expand((div) {
                 return [
-                  // Divisi Baris
                   pw.TableRow(
-                    decoration: const pw.BoxDecoration(
-                      color: PdfColors.grey100,
-                    ),
+                    decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF8FAFC)),
                     children: [
-                      _cell(
-                        div.nomorRomawi,
-                        isHeader: true,
-                        align: pw.TextAlign.center,
-                      ),
+                      _cell(div.nomorRomawi, isHeader: true, align: pw.TextAlign.center),
                       _cell(''),
                       _cell(div.namaDivisi.toUpperCase(), isHeader: true),
                       _cell(''),
                       _cell(''),
                       _cell(''),
-                      _cell(
-                        formatNum(div.subtotalBaselineHarga),
-                        isHeader: true,
-                        align: pw.TextAlign.right,
-                      ),
-                      _cell(
-                        formatNum(div.subtotalBaselineBobot, decimals: 3),
-                        isHeader: true,
-                        align: pw.TextAlign.right,
-                      ),
+                      _cell(_fmtRupiahNoPrefix(div.subtotalBaselineHarga), isHeader: true, align: pw.TextAlign.right),
+                      _cell(formatNum(div.subtotalBaselineBobot, decimals: 3), isHeader: true, align: pw.TextAlign.right),
                       _cell(''),
-                      _cell(
-                        formatNum(div.subtotalAddendumHarga),
-                        isHeader: true,
-                        align: pw.TextAlign.right,
-                      ),
-                      _cell(
-                        formatNum(div.subtotalAddendumBobot, decimals: 3),
-                        isHeader: true,
-                        align: pw.TextAlign.right,
-                      ),
+                      _cell(_fmtRupiahNoPrefix(div.subtotalAddendumHarga), isHeader: true, align: pw.TextAlign.right),
+                      _cell(formatNum(div.subtotalAddendumBobot, decimals: 3), isHeader: true, align: pw.TextAlign.right),
                       _cell(''),
-                      _cell(
-                        formatNum(div.subtotalTambahHarga),
-                        isHeader: true,
-                        align: pw.TextAlign.right,
-                      ),
-                      _cell(
-                        formatNum(div.subtotalTambahBobot, decimals: 3),
-                        isHeader: true,
-                        align: pw.TextAlign.right,
-                      ),
+                      _cell(div.subtotalTambahHarga > 0 ? _fmtRupiahNoPrefix(div.subtotalTambahHarga) : '-', isHeader: true, align: pw.TextAlign.right),
+                      _cell(div.subtotalTambahBobot > 0 ? formatNum(div.subtotalTambahBobot, decimals: 3) : '-', isHeader: true, align: pw.TextAlign.right),
                       _cell(''),
-                      _cell(
-                        formatNum(div.subtotalKurangHarga),
-                        isHeader: true,
-                        align: pw.TextAlign.right,
-                      ),
-                      _cell(
-                        formatNum(div.subtotalKurangBobot, decimals: 3),
-                        isHeader: true,
-                        align: pw.TextAlign.right,
-                      ),
+                      _cell(div.subtotalKurangHarga > 0 ? _fmtRupiahNoPrefix(div.subtotalKurangHarga) : '-', isHeader: true, align: pw.TextAlign.right),
+                      _cell(div.subtotalKurangBobot > 0 ? formatNum(div.subtotalKurangBobot, decimals: 3) : '-', isHeader: true, align: pw.TextAlign.right),
                       _cell(''),
                     ],
                   ),
@@ -1207,147 +2287,48 @@ class PdfReportService {
                         _cell(it.noMataPembayaran, align: pw.TextAlign.center),
                         _cell(it.uraian),
                         _cell(it.satuan, align: pw.TextAlign.center),
-                        _cell(
-                          formatNum(it.hargaSatuan),
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          it.baselineVolume > 0
-                              ? formatNum(it.baselineVolume)
-                              : '-',
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          it.baselineTotalHarga > 0
-                              ? formatNum(it.baselineTotalHarga)
-                              : '-',
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          it.baselineBobot > 0
-                              ? formatNum(it.baselineBobot, decimals: 3)
-                              : '-',
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          it.addendumVolume > 0
-                              ? formatNum(it.addendumVolume)
-                              : '-',
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          it.addendumTotalHarga > 0
-                              ? formatNum(it.addendumTotalHarga)
-                              : '-',
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          it.addendumBobot > 0
-                              ? formatNum(it.addendumBobot, decimals: 3)
-                              : '-',
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          it.tambahVolume > 0
-                              ? formatNum(it.tambahVolume)
-                              : '-',
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          it.tambahTotalHarga > 0
-                              ? formatNum(it.tambahTotalHarga)
-                              : '-',
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          it.tambahBobot > 0
-                              ? formatNum(it.tambahBobot, decimals: 3)
-                              : '-',
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          it.kurangVolume > 0
-                              ? formatNum(it.kurangVolume)
-                              : '-',
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          it.kurangTotalHarga > 0
-                              ? formatNum(it.kurangTotalHarga)
-                              : '-',
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(
-                          it.kurangBobot > 0
-                              ? formatNum(it.kurangBobot, decimals: 3)
-                              : '-',
-                          align: pw.TextAlign.right,
-                        ),
-                        _cell(it.keterangan, align: pw.TextAlign.center),
+                        _cell(_fmtRupiahNoPrefix(it.hargaSatuan), align: pw.TextAlign.right),
+                        _cell(_fmtVol(it.baselineVolume), align: pw.TextAlign.right),
+                        _cell(_fmtRupiahNoPrefix(it.baselineTotalHarga), align: pw.TextAlign.right),
+                        _cell(formatNum(it.baselineBobot, decimals: 3), align: pw.TextAlign.right),
+                        _cell(_fmtVol(it.addendumVolume), align: pw.TextAlign.right),
+                        _cell(_fmtRupiahNoPrefix(it.addendumTotalHarga), align: pw.TextAlign.right),
+                        _cell(formatNum(it.addendumBobot, decimals: 3), align: pw.TextAlign.right),
+                        _cell(it.tambahVolume > 0 ? _fmtVol(it.tambahVolume) : '-', align: pw.TextAlign.right),
+                        _cell(it.tambahTotalHarga > 0 ? _fmtRupiahNoPrefix(it.tambahTotalHarga) : '-', align: pw.TextAlign.right),
+                        _cell(it.tambahBobot > 0 ? formatNum(it.tambahBobot, decimals: 3) : '-', align: pw.TextAlign.right),
+                        _cell(it.kurangVolume > 0 ? _fmtVol(it.kurangVolume) : '-', align: pw.TextAlign.right),
+                        _cell(it.kurangTotalHarga > 0 ? _fmtRupiahNoPrefix(it.kurangTotalHarga) : '-', align: pw.TextAlign.right),
+                        _cell(it.kurangBobot > 0 ? formatNum(it.kurangBobot, decimals: 3) : '-', align: pw.TextAlign.right),
+                        _cell(it.keterangan.isNotEmpty ? it.keterangan : '-', align: pw.TextAlign.center),
                       ],
                     );
                   }),
                 ];
               }),
-              // Total Baris
+              // Total Row
               pw.TableRow(
-                decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF3F4F6)),
                 children: [
-                  _cell('TOT', isHeader: true, align: pw.TextAlign.center),
+                  _cell('', isHeader: true),
                   _cell(''),
-                  _cell('JUMLAH TOTAL HARGA', isHeader: true),
+                  _cell('Jumlah Total Harga Pekerjaan', isHeader: true),
                   _cell(''),
                   _cell(''),
                   _cell(''),
-                  _cell(
-                    formatNum(report.totalBaselineHarga),
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    formatNum(report.totalBaselineBobot, decimals: 3),
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
+                  _cell(_fmtRupiahNoPrefix(report.totalBaselineHarga), isHeader: true, align: pw.TextAlign.right),
+                  _cell('100.000', isHeader: true, align: pw.TextAlign.right),
                   _cell(''),
-                  _cell(
-                    formatNum(report.totalAddendumHarga),
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    formatNum(report.totalAddendumBobot, decimals: 3),
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
+                  _cell(_fmtRupiahNoPrefix(report.totalAddendumHarga), isHeader: true, align: pw.TextAlign.right),
+                  _cell('100.000', isHeader: true, align: pw.TextAlign.right),
                   _cell(''),
-                  _cell(
-                    formatNum(report.totalTambahHarga),
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    formatNum(report.totalTambahBobot, decimals: 3),
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
+                  _cell(_fmtRupiahNoPrefix(report.totalTambahHarga), isHeader: true, align: pw.TextAlign.right),
+                  _cell(formatNum(report.totalTambahBobot, decimals: 3), isHeader: true, align: pw.TextAlign.right),
                   _cell(''),
+                  _cell(_fmtRupiahNoPrefix(report.totalKurangHarga), isHeader: true, align: pw.TextAlign.right),
+                  _cell(formatNum(report.totalKurangBobot, decimals: 3), isHeader: true, align: pw.TextAlign.right),
                   _cell(
-                    formatNum(report.totalKurangHarga),
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    formatNum(report.totalKurangBobot, decimals: 3),
-                    isHeader: true,
-                    align: pw.TextAlign.right,
-                  ),
-                  _cell(
-                    (report.totalAddendumHarga - report.totalBaselineHarga)
-                                .abs() <
-                            1.0
-                        ? 'SEIMBANG'
-                        : 'SELISIH',
+                    (report.totalAddendumHarga - report.totalBaselineHarga).abs() < 1.0 ? 'SEIMBANG' : 'SELISIH',
                     isHeader: true,
                     align: pw.TextAlign.center,
                   ),
@@ -1355,74 +2336,86 @@ class PdfReportService {
               ),
               if (report.totalDibulatkan > 0)
                 pw.TableRow(
-                  decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                  decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF3F4F6)),
                   children: [
                     _cell('', isHeader: true),
                     _cell(''),
-                    _cell('NILAI KONTRAK DIBULATKAN', isHeader: true),
+                    _cell('Jumlah Total Harga Pekerjaan ( Dibulatkan )', isHeader: true),
                     _cell(''),
                     _cell(''),
                     _cell(''),
-                    _cell(
-                      formatNum(report.totalBaselineHarga),
-                      isHeader: true,
-                      align: pw.TextAlign.right,
-                    ),
+                    _cell(_fmtRupiahNoPrefix(report.totalDibulatkan, forceDecimals: true), isHeader: true, align: pw.TextAlign.right),
                     _cell('100.000', isHeader: true, align: pw.TextAlign.right),
                     _cell(''),
-                    _cell(
-                      formatNum(report.totalDibulatkan),
-                      isHeader: true,
-                      align: pw.TextAlign.right,
-                    ),
+                    _cell(_fmtRupiahNoPrefix(report.totalDibulatkan, forceDecimals: true), isHeader: true, align: pw.TextAlign.right),
                     _cell('100.000', isHeader: true, align: pw.TextAlign.right),
                     _cell(''),
-                    _cell(
-                      formatNum(report.totalTambahHarga),
-                      isHeader: true,
-                      align: pw.TextAlign.right,
-                    ),
-                    _cell(
-                      formatNum(report.totalTambahBobot, decimals: 3),
-                      isHeader: true,
-                      align: pw.TextAlign.right,
-                    ),
+                    _cell('', isHeader: true),
+                    _cell('', isHeader: true),
                     _cell(''),
-                    _cell(
-                      formatNum(report.totalKurangHarga),
-                      isHeader: true,
-                      align: pw.TextAlign.right,
-                    ),
-                    _cell(
-                      formatNum(report.totalKurangBobot, decimals: 3),
-                      isHeader: true,
-                      align: pw.TextAlign.right,
-                    ),
-                    _cell(
-                      'SEIMBANG',
-                      isHeader: true,
-                      align: pw.TextAlign.center,
-                    ),
+                    _cell('', isHeader: true),
+                    _cell('', isHeader: true),
+                    _cell('SEIMBANG', isHeader: true, align: pw.TextAlign.center),
                   ],
                 ),
             ],
           ),
-          pw.SizedBox(height: 16),
+          pw.SizedBox(height: 14),
 
-          // TANDA TANGAN RESMI 3 PIHAK
-          _buildTripleSignatures(
-            leftRole: 'Kontraktor Pelaksana',
-            leftName: kegiatan.kontraktor,
-            centerRole: 'Konsultan Supervisi\nCV. TATA SAKA CONSULTANT',
-            centerName: contract.siteEngineer.isNotEmpty
-                ? contract.siteEngineer
-                : 'SENDAYU GALIH K., ST\n(Site Engineer)',
-            rightRole:
-                'Pejabat Pembuat Komitmen (PPK)\nDPU-PR Kab. Purbalingga',
-            rightName: 'PPK DINAS PU-PR',
-            date:
-                addendumData['tanggalAddendum']?.toString() ??
-                '15 Agustus 2026',
+          // TANDA TANGAN RESMI
+          pw.Column(
+            children: [
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Padding(
+                  padding: const pw.EdgeInsets.only(right: 60),
+                  child: pw.Text(
+                    'Purbalingga, ${addendumData['tanggalAddendum']?.toString().isNotEmpty == true ? addendumData['tanggalAddendum'] : 'Agustus 2026'}',
+                    style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                  ),
+                ),
+              ),
+              pw.SizedBox(height: 10),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(left: 40),
+                    child: pw.Column(
+                      children: [
+                        pw.Text('Kepala DPU-PR Kabupaten Purbalingga', style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold)),
+                        pw.Text('Selaku Pejabat Penandatanganan Kontrak', style: const pw.TextStyle(fontSize: 8)),
+                        pw.SizedBox(height: 40),
+                        pw.Text(
+                          kegiatan.penggunaAnggaran.isNotEmpty ? kegiatan.penggunaAnggaran : 'DRAJAT UJI WAKHYONO, S.T., M.T',
+                          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, decoration: pw.TextDecoration.underline),
+                        ),
+                        pw.Text('NIP. 19711111 199803 1 008', style: const pw.TextStyle(fontSize: 7.5)),
+                      ],
+                    ),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(right: 40),
+                    child: pw.Column(
+                      children: [
+                        pw.Text('Kontraktor Pelaksana', style: const pw.TextStyle(fontSize: 8.5)),
+                        pw.Text(
+                          kegiatan.kontraktor.isNotEmpty ? kegiatan.kontraktor : 'CV. DIVAN INSAN CEMERLANG',
+                          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                        ),
+                        pw.SizedBox(height: 40),
+                        pw.Text(
+                          kegiatan.direkturPenyedia.isNotEmpty ? kegiatan.direkturPenyedia : 'NURKHOLIS WIDIANTO',
+                          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, decoration: pw.TextDecoration.underline),
+                        ),
+                        pw.Text('Direktur', style: const pw.TextStyle(fontSize: 7.5)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),
@@ -1435,9 +2428,6 @@ class PdfReportService {
   // ─── FILE MANAGEMENT & DOWNLOAD HELPERS ───────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /// Downloads/saves the PDF.
-  /// On web: triggers a browser download via Blob + AnchorElement.
-  /// On mobile/desktop: saves to Documents directory and opens the file.
   static Future<void> downloadAndOpenPdf({
     required BuildContext context,
     required Uint8List bytes,
@@ -1460,71 +2450,407 @@ class PdfReportService {
   // ─── INTERNAL PDF WIDGET BUILDERS & STYLES ────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
 
-  static pw.Widget _buildOfficialDocHeader({
-    required String title,
-    required String subtitle,
-    bool isLandscape = false,
-  }) {
-    return pw.Container(
-      decoration: const pw.BoxDecoration(
-        border: pw.Border(
-          bottom: pw.BorderSide(color: PdfColors.black, width: 1.5),
-        ),
-      ),
-      padding: const pw.EdgeInsets.only(bottom: 6),
+  static pw.Widget _buildDocMetaRow(String label, String value, {double labelWidth = 110, double fontSize = 7.5}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 0.8),
       child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
+          pw.SizedBox(
+            width: labelWidth,
+            child: pw.Text(
+              label,
+              style: pw.TextStyle(fontSize: fontSize, fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+            ),
+          ),
           pw.Expanded(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
-              children: [
-                pw.Text(
-                  'PEMERINTAH KABUPATEN PURBALINGGA',
-                  style: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
-                    fontSize: 10.5,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                pw.Text(
-                  'DINAS PEKERJAAN UMUM DAN PENATAAN RUANG',
-                  style: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
-                    fontSize: 12,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                pw.Text(
-                  'KONSULTAN PENGAWAS: CV. TATA SAKA CONSULTANT',
-                  style: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
-                    fontSize: 9.5,
-                    color: PdfColors.blue900,
-                  ),
-                ),
-                pw.SizedBox(height: 4),
-                pw.Text(
-                  title,
-                  style: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
-                    fontSize: 13,
-                    decoration: pw.TextDecoration.underline,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-                pw.Text(
-                  subtitle,
-                  style: pw.TextStyle(
-                    fontSize: 8.5,
-                    fontStyle: pw.FontStyle.italic,
-                    color: PdfColors.grey800,
-                  ),
-                ),
-              ],
+            child: pw.Text(
+              value,
+              style: pw.TextStyle(fontSize: fontSize, color: PdfColors.black),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  static pw.Widget _buildMetaRowSimplePdf(String label, String value) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 1.5),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.SizedBox(
+            width: 120,
+            child: pw.Text(
+              label,
+              style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
+            ),
+          ),
+          pw.Text(': ', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold)),
+          pw.Expanded(
+            child: pw.Text(
+              value,
+              style: const pw.TextStyle(fontSize: 7.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _buildSummaryLinePdf(String label, String value, {bool isBold = false}) {
+    return pw.Row(
+      children: [
+        pw.SizedBox(
+          width: 180,
+          child: pw.Text(
+            label,
+            style: pw.TextStyle(fontSize: 8, fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal),
+          ),
+        ),
+        pw.Text(': ', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+        pw.Text(
+          value,
+          style: pw.TextStyle(fontSize: 8, fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal),
+        ),
+      ],
+    );
+  }
+
+  static pw.Widget _buildPdfDocSectionLabel(String title) {
+    return pw.Text(
+      title,
+      style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: PdfColors.black),
+    );
+  }
+
+  static pw.Widget _buildPdfDocTable({
+    required Map<int, pw.TableColumnWidth> colWidths,
+    required List<String> headers,
+    required List<List<String>> rows,
+    double headerFontSize = 6.0,
+    double cellFontSize = 6.0,
+    pw.EdgeInsets cellPadding = const pw.EdgeInsets.symmetric(horizontal: 2.5, vertical: 2),
+  }) {
+    return pw.Table(
+      columnWidths: colWidths,
+      border: pw.TableBorder.all(color: PdfColors.black, width: 0.6),
+      defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
+      children: [
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFE2E8F0)),
+          children: headers.asMap().entries.map((e) {
+            return pw.Padding(
+              padding: cellPadding,
+              child: pw.Text(
+                e.value,
+                textAlign: pw.TextAlign.center,
+                style: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: headerFontSize,
+                  color: PdfColors.black,
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        ...rows.map((row) {
+          return pw.TableRow(
+            children: row.asMap().entries.map((e) {
+              final align = (e.key == 0) ? pw.TextAlign.center : pw.TextAlign.left;
+              return pw.Padding(
+                padding: cellPadding,
+                child: pw.Text(
+                  e.value,
+                  textAlign: align,
+                  style: pw.TextStyle(
+                    fontSize: cellFontSize,
+                    color: PdfColors.black,
+                  ),
+                ),
+              );
+            }).toList(),
+          );
+        }),
+      ],
+    );
+  }
+
+  static pw.Widget _buildPdfDocTableSectionF({
+    required String konsultan,
+    required String instruksi,
+    required List<Map<String, dynamic>> resolvedSigners,
+  }) {
+    return pw.Table(
+      columnWidths: const {
+        0: pw.FlexColumnWidth(3.8),
+        1: pw.FlexColumnWidth(5.8),
+        2: pw.FlexColumnWidth(3.4),
+      },
+      border: pw.TableBorder.all(color: PdfColors.black, width: 0.8),
+      defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
+      children: [
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFE2E8F0)),
+          children: [
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(3),
+              child: pw.Text('', textAlign: pw.TextAlign.center),
+            ),
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(3),
+              child: pw.Text(
+                'Uraian dan Saran - Saran',
+                textAlign: pw.TextAlign.center,
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5),
+              ),
+            ),
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(3),
+              child: pw.Text(
+                'ttd',
+                textAlign: pw.TextAlign.center,
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5),
+              ),
+            ),
+          ],
+        ),
+        pw.TableRow(
+          children: [
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(5),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('Konsultan Supervisi', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
+                  pw.SizedBox(height: 2),
+                  pw.Text(konsultan, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7)),
+                ],
+              ),
+            ),
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(5),
+              child: pw.Text(
+                instruksi.trim().isNotEmpty ? instruksi : '-',
+                style: const pw.TextStyle(fontSize: 7.5),
+              ),
+            ),
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(3),
+              child: pw.Column(
+                children: resolvedSigners.asMap().entries.map((entry) {
+                  final idx = entry.key;
+                  final s = entry.value;
+                  final nama = (s['nama'] ?? '').toString();
+                  final jabatan = (s['jabatan'] ?? '').toString();
+                  final bytes = s['bytes'] as Uint8List?;
+
+                  return pw.Column(
+                    children: [
+                      if (idx > 0) ...[
+                        pw.SizedBox(height: 3),
+                        pw.Divider(thickness: 0.5, color: PdfColors.grey500),
+                        pw.SizedBox(height: 2),
+                      ],
+                      if (bytes != null)
+                        pw.Container(
+                          height: 28,
+                          child: pw.Image(pw.MemoryImage(bytes), fit: pw.BoxFit.contain),
+                        )
+                      else
+                        pw.SizedBox(height: 20),
+                      if (nama.isNotEmpty)
+                        pw.Text(
+                          nama,
+                          textAlign: pw.TextAlign.center,
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            fontSize: 7,
+                            decoration: pw.TextDecoration.underline,
+                          ),
+                        ),
+                      if (jabatan.isNotEmpty)
+                        pw.Text(
+                          jabatan,
+                          textAlign: pw.TextAlign.center,
+                          style: const pw.TextStyle(fontSize: 6.5),
+                        ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  static pw.Widget _buildInfoRowPdf(String label, String value, {bool isBold = false}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.SizedBox(
+            width: 140,
+            child: pw.Text(
+              label,
+              style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+            ),
+          ),
+          pw.Text(': ', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+          pw.Expanded(
+            child: pw.Text(
+              value,
+              style: pw.TextStyle(fontSize: 8, fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _buildInfoRowWithSuffixPdf(String label, String value, String suffix) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+      child: pw.Row(
+        children: [
+          pw.SizedBox(
+            width: 140,
+            child: pw.Text(
+              label,
+              style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+            ),
+          ),
+          pw.Text(': ', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(
+            width: 50,
+            child: pw.Text(
+              value,
+              textAlign: pw.TextAlign.center,
+              style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+            ),
+          ),
+          pw.SizedBox(width: 20),
+          pw.Text(suffix, style: const pw.TextStyle(fontSize: 8)),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _buildInfoRowTwoColsPdf(
+    String label,
+    String col1,
+    String col1Prefix,
+    String col2,
+    String col2Prefix, {
+    bool isBoldVal = false,
+  }) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+      child: pw.Row(
+        children: [
+          pw.SizedBox(
+            width: 140,
+            child: pw.Text(
+              label,
+              style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+            ),
+          ),
+          pw.Text(': ', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+          if (col1Prefix.isNotEmpty) pw.Text('$col1Prefix ', style: const pw.TextStyle(fontSize: 7.5)),
+          pw.SizedBox(
+            width: 80,
+            child: pw.Text(
+              col1,
+              style: pw.TextStyle(fontSize: 8, fontWeight: isBoldVal ? pw.FontWeight.bold : pw.FontWeight.normal),
+            ),
+          ),
+          if (col2Prefix.isNotEmpty) pw.Text('$col2Prefix ', style: const pw.TextStyle(fontSize: 7.5)),
+          pw.Expanded(
+            child: pw.Text(
+              col2,
+              style: pw.TextStyle(fontSize: 8, fontWeight: isBoldVal ? pw.FontWeight.bold : pw.FontWeight.normal),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _buildProgressSummaryRowPdf(String label, String percentStr, String nominalStr, PdfColor bgColor, {bool isBold = false}) {
+    return pw.Container(
+      color: bgColor,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+      child: pw.Row(
+        children: [
+          pw.SizedBox(
+            width: 140,
+            child: pw.Text(
+              label,
+              style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+            ),
+          ),
+          pw.Text(': ', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(
+            width: 80,
+            child: pw.Text(
+              percentStr,
+              textAlign: pw.TextAlign.right,
+              style: pw.TextStyle(fontSize: 8, fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal),
+            ),
+          ),
+          pw.SizedBox(width: 30),
+          pw.Expanded(
+            child: pw.Text(
+              nominalStr,
+              textAlign: pw.TextAlign.right,
+              style: pw.TextStyle(fontSize: 8, fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _buildDividerPdf() {
+    return pw.Divider(thickness: 0.6, color: PdfColors.black, height: 1);
+  }
+
+  static pw.Widget _headerCellPdf(String text) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+      child: pw.Text(
+        text,
+        textAlign: pw.TextAlign.center,
+        style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold),
+      ),
+    );
+  }
+
+  static pw.Widget _dataCellPdf(String text, {pw.TextAlign align = pw.TextAlign.center, pw.FontWeight weight = pw.FontWeight.normal}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2.5),
+      child: pw.Text(
+        text,
+        textAlign: align,
+        style: pw.TextStyle(fontSize: 7.5, fontWeight: weight),
+      ),
+    );
+  }
+
+  static pw.Widget _cellBoqPdf(String text, {bool isHeader = false, bool isBold = false, pw.TextAlign align = pw.TextAlign.left}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+      child: pw.Text(
+        text,
+        textAlign: align,
+        style: pw.TextStyle(
+          fontSize: 6.0,
+          fontWeight: (isHeader || isBold) ? pw.FontWeight.bold : pw.FontWeight.normal,
+        ),
       ),
     );
   }
@@ -1534,450 +2860,18 @@ class PdfReportService {
     required pw.Context context,
   }) {
     return pw.Container(
-      margin: const pw.EdgeInsets.only(top: 8),
-      padding: const pw.EdgeInsets.only(top: 4),
+      margin: const pw.EdgeInsets.only(top: 6),
+      padding: const pw.EdgeInsets.only(top: 2),
       decoration: const pw.BoxDecoration(
-        border: pw.Border(
-          top: pw.BorderSide(color: PdfColors.black, width: 0.6),
-        ),
+        border: pw.Border(top: pw.BorderSide(color: PdfColors.black, width: 0.6)),
       ),
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text(
-            title,
-            style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700),
-          ),
+          pw.Text(title, style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700)),
           pw.Text(
             'Halaman ${context.pageNumber} dari ${context.pagesCount}',
-            style: pw.TextStyle(
-              fontSize: 7.5,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.grey800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static pw.Widget _buildPdfMetaBox(List<List<String>> pairs) {
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(6),
-      decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: PdfColors.black, width: 0.8),
-        color: PdfColors.grey100,
-      ),
-      child: pw.Column(
-        children: pairs.map((p) {
-          return pw.Padding(
-            padding: const pw.EdgeInsets.symmetric(vertical: 1.5),
-            child: pw.Row(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.SizedBox(
-                  width: 140,
-                  child: pw.Text(
-                    p[0],
-                    style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: 8,
-                    ),
-                  ),
-                ),
-                pw.Expanded(
-                  child: pw.Text(p[1], style: const pw.TextStyle(fontSize: 8)),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  static pw.Widget _buildPdfSectionTitle(String title) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 3),
-      child: pw.Text(
-        title,
-        style: pw.TextStyle(
-          fontWeight: pw.FontWeight.bold,
-          fontSize: 8.5,
-          letterSpacing: 0.3,
-        ),
-      ),
-    );
-  }
-
-  static pw.Widget _buildPekerjaanTable(
-    List<Map<String, dynamic>> list, {
-    required String defaultLokasi,
-  }) {
-    if (list.isEmpty) {
-      return pw.Table(
-        border: pw.TableBorder.all(color: PdfColors.black, width: 0.6),
-        children: [
-          pw.TableRow(
-            decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-            children: [
-              _cell('NO', isHeader: true, flex: 1, align: pw.TextAlign.center),
-              _cell('JENIS PEKERJAAN', isHeader: true, flex: 5),
-              _cell(
-                'VOLUME',
-                isHeader: true,
-                flex: 2,
-                align: pw.TextAlign.right,
-              ),
-              _cell('LOKASI / STA', isHeader: true, flex: 3),
-            ],
-          ),
-          pw.TableRow(
-            children: [
-              _cell('1', align: pw.TextAlign.center),
-              _cell('Tidak ada aktivitas pekerjaan lapangan yang tercatat'),
-              _cell('-', align: pw.TextAlign.right),
-              _cell(defaultLokasi),
-            ],
-          ),
-        ],
-      );
-    }
-
-    return pw.Table(
-      border: pw.TableBorder.all(color: PdfColors.black, width: 0.6),
-      children: [
-        pw.TableRow(
-          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-          children: [
-            _cell('NO', isHeader: true, flex: 1, align: pw.TextAlign.center),
-            _cell('JENIS PEKERJAAN', isHeader: true, flex: 5),
-            _cell('VOLUME', isHeader: true, flex: 2, align: pw.TextAlign.right),
-            _cell('LOKASI / STA', isHeader: true, flex: 3),
-          ],
-        ),
-        ...list.asMap().entries.map((e) {
-          final idx = e.key + 1;
-          final item = e.value;
-          final jenis =
-              (item['jenis'] ?? item['uraian'] ?? item['jenisPekerjaan'] ?? '-')
-                  .toString();
-          final vol = (item['volume'] ?? '-').toString();
-          final lok = (item['lokasi'] ?? defaultLokasi).toString();
-
-          return pw.TableRow(
-            children: [
-              _cell('$idx', align: pw.TextAlign.center),
-              _cell(jenis),
-              _cell(vol, align: pw.TextAlign.right),
-              _cell(lok),
-            ],
-          );
-        }).toList(),
-      ],
-    );
-  }
-
-  static pw.Widget _buildMaterialSummaryTable(
-    List<Map<String, dynamic>> pekList,
-  ) {
-    final List<List<String>> rows = [];
-    int counter = 1;
-
-    for (final p in pekList) {
-      final mats = (p['materials'] as List?) ?? [];
-      for (final m in mats) {
-        if (m is Map) {
-          rows.add([
-            '$counter',
-            (m['jenis'] ?? '-').toString(),
-            (m['volume'] ?? '-').toString(),
-            (m['lokasiAwal'] ?? '-').toString(),
-            (m['lokasiTujuan'] ?? '-').toString(),
-          ]);
-          counter++;
-        }
-      }
-    }
-
-    if (rows.isEmpty) {
-      rows.add(['1', 'Tidak ada material khusus digunakan', '-', '-', '-']);
-    }
-
-    return pw.Table(
-      border: pw.TableBorder.all(color: PdfColors.black, width: 0.6),
-      children: [
-        pw.TableRow(
-          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-          children: [
-            _cell('NO', isHeader: true, flex: 1, align: pw.TextAlign.center),
-            _cell('JENIS BAHAN / MATERIAL', isHeader: true, flex: 4),
-            _cell(
-              'CACAH VOL',
-              isHeader: true,
-              flex: 2,
-              align: pw.TextAlign.right,
-            ),
-            _cell('ASAL / PENGAMBILAN', isHeader: true, flex: 2),
-            _cell('LOKASI DIGUNAKAN', isHeader: true, flex: 2),
-          ],
-        ),
-        ...rows.map(
-          (r) => pw.TableRow(
-            children: [
-              _cell(r[0], align: pw.TextAlign.center),
-              _cell(r[1]),
-              _cell(r[2], align: pw.TextAlign.right),
-              _cell(r[3]),
-              _cell(r[4]),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  static pw.Widget _buildPeralatanSummaryTable(
-    List<Map<String, dynamic>> pekList,
-  ) {
-    final List<List<String>> rows = [];
-    int counter = 1;
-
-    for (final p in pekList) {
-      final alats = (p['peralatans'] as List?) ?? [];
-      for (final a in alats) {
-        if (a is Map) {
-          rows.add([
-            '$counter',
-            (a['jenis'] ?? '-').toString(),
-            (a['cacahAktif'] ?? a['jumlah'] ?? '1').toString(),
-            (a['jumlah'] ?? '1').toString(),
-            (a['rusak'] ?? a['jenisRusak'] ?? '-').toString(),
-          ]);
-          counter++;
-        }
-      }
-    }
-
-    if (rows.isEmpty) {
-      rows.add([
-        '1',
-        'Pekerjaan manual tanpa alat mekanis berat',
-        '-',
-        '-',
-        '-',
-      ]);
-    }
-
-    return pw.Table(
-      border: pw.TableBorder.all(color: PdfColors.black, width: 0.6),
-      children: [
-        pw.TableRow(
-          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-          children: [
-            _cell('NO', isHeader: true, flex: 1, align: pw.TextAlign.center),
-            _cell('JENIS PERALATAN', isHeader: true, flex: 5),
-            _cell(
-              'JUMLAH AKTIF',
-              isHeader: true,
-              flex: 2,
-              align: pw.TextAlign.right,
-            ),
-            _cell(
-              'TOTAL ALAT',
-              isHeader: true,
-              flex: 2,
-              align: pw.TextAlign.right,
-            ),
-            _cell('KONDISI / RUSAK', isHeader: true, flex: 2),
-          ],
-        ),
-        ...rows.map(
-          (r) => pw.TableRow(
-            children: [
-              _cell(r[0], align: pw.TextAlign.center),
-              _cell(r[1]),
-              _cell(r[2], align: pw.TextAlign.right),
-              _cell(r[3], align: pw.TextAlign.right),
-              _cell(r[4]),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  static pw.Widget _buildPersonilSummaryTable(
-    List<Map<String, dynamic>> pekList, {
-    required String defaultLokasi,
-  }) {
-    final List<List<String>> rows = [];
-    int counter = 1;
-
-    for (final p in pekList) {
-      final pers = (p['personils'] as List?) ?? [];
-      for (final pr in pers) {
-        if (pr is Map) {
-          rows.add([
-            '$counter',
-            (pr['role'] ?? pr['posisi'] ?? '-').toString(),
-            '${pr['cacah'] ?? pr['count'] ?? '1'} orang',
-            (pr['lokasi'] ?? defaultLokasi).toString(),
-          ]);
-          counter++;
-        }
-      }
-    }
-
-    if (rows.isEmpty) {
-      rows.add(['1', 'Tim Pelaksana Proyek Terpadu', '4 orang', defaultLokasi]);
-    }
-
-    return pw.Table(
-      border: pw.TableBorder.all(color: PdfColors.black, width: 0.6),
-      children: [
-        pw.TableRow(
-          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-          children: [
-            _cell('NO', isHeader: true, flex: 1, align: pw.TextAlign.center),
-            _cell(
-              'KLASIFIKASI PERSONIL / TENAGA KERJA',
-              isHeader: true,
-              flex: 5,
-            ),
-            _cell('JUMLAH', isHeader: true, flex: 2, align: pw.TextAlign.right),
-            _cell('PENEMPATAN LOKASI', isHeader: true, flex: 3),
-          ],
-        ),
-        ...rows.map(
-          (r) => pw.TableRow(
-            children: [
-              _cell(r[0], align: pw.TextAlign.center),
-              _cell(r[1]),
-              _cell(r[2], align: pw.TextAlign.right),
-              _cell(r[3]),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  static pw.Widget _buildCuacaTable(List<Map<String, dynamic>> cuacaList) {
-    if (cuacaList.isEmpty) {
-      return pw.Table(
-        border: pw.TableBorder.all(color: PdfColors.black, width: 0.6),
-        children: [
-          pw.TableRow(
-            decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-            children: [
-              _cell('NO', isHeader: true, flex: 1, align: pw.TextAlign.center),
-              _cell('KONDISI CUACA', isHeader: true, flex: 2),
-              _cell('JENIS KEJADIAN', isHeader: true, flex: 3),
-              _cell('JAM', isHeader: true, flex: 2),
-              _cell('AKIBAT / KENDALA', isHeader: true, flex: 3),
-            ],
-          ),
-          pw.TableRow(
-            children: [
-              _cell('1', align: pw.TextAlign.center),
-              _cell('Cerah / Berawan'),
-              _cell('-'),
-              _cell('08:00 - 17:00'),
-              _cell('Pekerjaan berjalan lancar tanpa kendala'),
-            ],
-          ),
-        ],
-      );
-    }
-
-    return pw.Table(
-      border: pw.TableBorder.all(color: PdfColors.black, width: 0.6),
-      children: [
-        pw.TableRow(
-          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-          children: [
-            _cell('NO', isHeader: true, flex: 1, align: pw.TextAlign.center),
-            _cell('KONDISI CUACA', isHeader: true, flex: 2),
-            _cell('JENIS KEJADIAN', isHeader: true, flex: 3),
-            _cell('JAM', isHeader: true, flex: 2),
-            _cell('AKIBAT / KENDALA', isHeader: true, flex: 3),
-          ],
-        ),
-        ...cuacaList.asMap().entries.map((e) {
-          final idx = e.key + 1;
-          final c = e.value;
-          return pw.TableRow(
-            children: [
-              _cell('$idx', align: pw.TextAlign.center),
-              _cell((c['cuaca'] ?? 'Cerah').toString()),
-              _cell((c['jenisKejadian'] ?? c['jenis'] ?? '-').toString()),
-              _cell((c['jam'] ?? '-').toString()),
-              _cell((c['akibat'] ?? '-').toString()),
-            ],
-          );
-        }).toList(),
-      ],
-    );
-  }
-
-  static pw.Widget _buildDualSignatures({
-    required String leftRole,
-    required String leftName,
-    required String rightRole,
-    required String rightName,
-    required String date,
-  }) {
-    return pw.Container(
-      margin: const pw.EdgeInsets.only(top: 8),
-      child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        children: [
-          pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.center,
-            children: [
-              pw.Text(
-                leftRole,
-                textAlign: pw.TextAlign.center,
-                style: const pw.TextStyle(fontSize: 8),
-              ),
-              pw.SizedBox(height: 38),
-              pw.Text(
-                '_______________________',
-                style: const pw.TextStyle(fontSize: 8),
-              ),
-              pw.Text(
-                leftName,
-                style: pw.TextStyle(
-                  fontWeight: pw.FontWeight.bold,
-                  fontSize: 8.5,
-                ),
-              ),
-            ],
-          ),
-          pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.center,
-            children: [
-              pw.Text(date, style: const pw.TextStyle(fontSize: 8)),
-              pw.Text(
-                rightRole,
-                textAlign: pw.TextAlign.center,
-                style: const pw.TextStyle(fontSize: 8),
-              ),
-              pw.SizedBox(height: 38),
-              pw.Text(
-                '_______________________',
-                style: const pw.TextStyle(fontSize: 8),
-              ),
-              pw.Text(
-                rightName,
-                textAlign: pw.TextAlign.center,
-                style: pw.TextStyle(
-                  fontWeight: pw.FontWeight.bold,
-                  fontSize: 8.5,
-                ),
-              ),
-            ],
+            style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: PdfColors.grey800),
           ),
         ],
       ),
@@ -1994,79 +2888,37 @@ class PdfReportService {
     required String date,
   }) {
     return pw.Container(
-      margin: const pw.EdgeInsets.only(top: 8),
+      margin: const pw.EdgeInsets.only(top: 10),
       child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              pw.Text(
-                leftRole,
-                textAlign: pw.TextAlign.center,
-                style: const pw.TextStyle(fontSize: 7.5),
-              ),
-              pw.SizedBox(height: 36),
-              pw.Text(
-                '_______________________',
-                style: const pw.TextStyle(fontSize: 7.5),
-              ),
-              pw.Text(
-                leftName,
-                textAlign: pw.TextAlign.center,
-                style: pw.TextStyle(
-                  fontWeight: pw.FontWeight.bold,
-                  fontSize: 8,
-                ),
-              ),
+              pw.Text(leftRole, textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
+              pw.SizedBox(height: 32),
+              pw.Text('_______________________', style: const pw.TextStyle(fontSize: 7.5)),
+              pw.Text(leftName, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
             ],
           ),
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              pw.Text(
-                centerRole,
-                textAlign: pw.TextAlign.center,
-                style: const pw.TextStyle(fontSize: 7.5),
-              ),
-              pw.SizedBox(height: 36),
-              pw.Text(
-                '_______________________',
-                style: const pw.TextStyle(fontSize: 7.5),
-              ),
-              pw.Text(
-                centerName,
-                textAlign: pw.TextAlign.center,
-                style: pw.TextStyle(
-                  fontWeight: pw.FontWeight.bold,
-                  fontSize: 8,
-                ),
-              ),
+              pw.Text(centerRole, textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
+              pw.SizedBox(height: 32),
+              pw.Text('_______________________', style: const pw.TextStyle(fontSize: 7.5)),
+              pw.Text(centerName, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
             ],
           ),
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
               pw.Text(date, style: const pw.TextStyle(fontSize: 7.5)),
-              pw.Text(
-                rightRole,
-                textAlign: pw.TextAlign.center,
-                style: const pw.TextStyle(fontSize: 7.5),
-              ),
-              pw.SizedBox(height: 36),
-              pw.Text(
-                '_______________________',
-                style: const pw.TextStyle(fontSize: 7.5),
-              ),
-              pw.Text(
-                rightName,
-                textAlign: pw.TextAlign.center,
-                style: pw.TextStyle(
-                  fontWeight: pw.FontWeight.bold,
-                  fontSize: 8,
-                ),
-              ),
+              pw.Text(rightRole, textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7.5)),
+              pw.SizedBox(height: 32),
+              pw.Text('_______________________', style: const pw.TextStyle(fontSize: 7.5)),
+              pw.Text(rightName, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
             ],
           ),
         ],
@@ -2077,16 +2929,15 @@ class PdfReportService {
   static pw.Widget _cell(
     String text, {
     bool isHeader = false,
-    int flex = 1,
     pw.TextAlign align = pw.TextAlign.left,
   }) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 2.5, vertical: 2),
       child: pw.Text(
         text,
         textAlign: align,
         style: pw.TextStyle(
-          fontSize: isHeader ? 7.5 : 7,
+          fontSize: isHeader ? 6.5 : 6.0,
           fontWeight: isHeader ? pw.FontWeight.bold : pw.FontWeight.normal,
         ),
       ),

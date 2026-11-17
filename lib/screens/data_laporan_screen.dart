@@ -6,9 +6,12 @@ import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/screens/detail_data_laporan_screen.dart';
+import 'package:tata_saka_app/widgets/responsive_layout.dart';
+import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 
 class DataLaporanScreen extends StatefulWidget {
-  const DataLaporanScreen({super.key});
+  final bool isEmbedded;
+  const DataLaporanScreen({super.key, this.isEmbedded = false});
 
   @override
   State<DataLaporanScreen> createState() => _DataLaporanScreenState();
@@ -224,36 +227,9 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/main',
-                (route) => false,
-              );
-            }
-          },
-        ),
-        title: const Text(
-          'Data Laporan',
-          style: TextStyle(
-            color: AppColors.textDark,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: false,
-      ),
-      body: Column(
+    final isDesktop = ResponsiveBreakpoints.isDesktop(context);
+
+    final mainBody = Column(
         children: [
           // Search Bar Only
           Container(
@@ -384,7 +360,51 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
             ),
           ),
         ],
+      );
+
+    if (widget.isEmbedded) {
+      return mainBody;
+    }
+
+    if (isDesktop) {
+      return WebDashboardLayout(
+        title: 'Data Laporan',
+        activeMenu: 'data_laporan',
+        showBackButton: true,
+        child: mainBody,
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                '/main',
+                (route) => false,
+              );
+            }
+          },
+        ),
+        title: const Text(
+          'Data Laporan',
+          style: TextStyle(
+            color: AppColors.textDark,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: false,
       ),
+      body: mainBody,
     );
   }
 

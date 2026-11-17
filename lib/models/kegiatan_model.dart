@@ -1,6 +1,7 @@
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
 import 'package:tata_saka_app/utils/indonesian_terbilang.dart';
+import 'package:tata_saka_app/utils/progress_calculator.dart';
 
 class KegiatanModel {
   String namaKegiatan;
@@ -74,6 +75,9 @@ class KegiatanModel {
   bool get hasAddendum => addendums.isNotEmpty;
   int get totalAddendumCount => addendums.length;
   Map<String, dynamic>? get latestAddendum => addendums.isNotEmpty ? addendums.last : null;
+
+  /// Nilai persentase progres fisik kegiatan (0.0 s.d. 100.0%).
+  double get currentProgresFisik => ProgressCalculator.calculateKegiatanProgress(toJson());
 
   KegiatanModel({
     required this.namaKegiatan,

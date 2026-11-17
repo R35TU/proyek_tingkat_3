@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
+import 'package:tata_saka_app/services/auth_service.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/screens/buat_laporan_screen.dart';
@@ -25,6 +26,8 @@ import 'package:tata_saka_app/screens/kelola_addendum_screen.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
+import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
+import 'package:tata_saka_app/utils/progress_calculator.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -37,7 +40,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final PageController _pageController = PageController();
   Timer? _timer;
   int _currentPage = 0;
-  bool _isWebSidebarOpen = true;
   String _activeWebMenu = 'dashboard';
 
   void _navigateFromSidebar(
@@ -46,15 +48,125 @@ class _DashboardScreenState extends State<DashboardScreen> {
     bool isDrawer = false,
   }) {
     if (isDrawer) Navigator.pop(context);
-    setState(() => _activeWebMenu = menuKey);
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => destination),
-    ).then((_) {
-      if (mounted) {
-        setState(() => _activeWebMenu = 'dashboard');
-      }
-    });
+    final isWeb = ResponsiveBreakpoints.isDesktop(context);
+    WebDashboardLayout.activeWebMenu.value = menuKey;
+    if (isWeb) {
+      setState(() {
+        _activeWebMenu = menuKey;
+      });
+    } else {
+      setState(() => _activeWebMenu = menuKey);
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => destination),
+      ).then((_) {
+        if (mounted) {
+          setState(() => _activeWebMenu = 'dashboard');
+          WebDashboardLayout.activeWebMenu.value = 'dashboard';
+        }
+      });
+    }
+  }
+
+  String _getHeaderTitle(UserProfileProvider userProf) {
+    switch (_activeWebMenu) {
+      case 'kontrak':
+        return userProf.tr('nav_kontrak');
+      case 'kegiatan':
+        return userProf.tr('nav_kegiatan_saya');
+      case 'rab':
+      case 'rab_boq':
+        return 'RAB / BoQ (Rencana Kerja)';
+      case 'addendum':
+      case 'addendum_cco':
+        return 'Addendum CCO & Tambah Kurang';
+      case 'laporan':
+        return 'Laporan Proyek';
+      case 'data_laporan':
+        return 'Data & Arsip Laporan';
+      case 'laporan_harian':
+        return 'Laporan Harian (Buku Harian Standar)';
+      case 'laporan_mingguan':
+        return 'Laporan Mingguan Proyek';
+      case 'laporan_bulanan':
+        return 'Laporan Bulanan Supervisi';
+      case 'timeline':
+        return 'Timeline & Histori Proyek';
+      case 'pengaturan':
+        return 'Pengaturan Akun';
+      case 'keamanan':
+        return 'Keamanan & Sandi';
+      case 'edit_profil':
+        return 'Edit Profil Pengguna';
+      case 'panduan_faq':
+        return 'Panduan & FAQ';
+      case 'dashboard':
+      default:
+        return userProf.isKontraktor
+            ? 'Dashboard Kontraktor'
+            : userProf.tr('nav_dashboard');
+    }
+  }
+
+  Widget _buildActiveWebContent(
+    BuildContext context,
+    UserProfileProvider userProf,
+    List<ContractModel> contracts,
+    Widget defaultDashboardBody,
+  ) {
+    switch (_activeWebMenu) {
+      case 'kontrak':
+      case 'kegiatan':
+        return const KontrakScreen(isEmbedded: true);
+      case 'rab':
+      case 'rab_boq':
+        if (contracts.isNotEmpty) {
+          return DetailKontrakScreen(
+            contract: contracts.first,
+            isEmbedded: true,
+          );
+        }
+        return const KontrakScreen(isEmbedded: true);
+      case 'addendum':
+      case 'addendum_cco':
+        if (contracts.isNotEmpty && contracts.first.kegiatans.isNotEmpty) {
+          return KelolaAddendumScreen(
+            contract: contracts.first,
+            kegiatanIndex: 0,
+            isEmbedded: true,
+          );
+        }
+        return const KontrakScreen(isEmbedded: true);
+      case 'laporan':
+        return const LaporanScreen(isEmbedded: true);
+      case 'data_laporan':
+        return const DataLaporanScreen(isEmbedded: true);
+      case 'laporan_harian':
+        return const BuatLaporanScreen(isEmbedded: true);
+      case 'laporan_mingguan':
+        return const BuatLaporanMingguanScreen(isEmbedded: true);
+      case 'laporan_bulanan':
+        return const LaporanBulananScreen(isEmbedded: true);
+      case 'timeline':
+        return const TimelineScreen(isEmbedded: true);
+      case 'pengaturan':
+        return const PengaturanScreen(isEmbedded: true);
+      case 'keamanan':
+        return const KeamananScreen(isEmbedded: true);
+      case 'edit_profil':
+        return const EditProfilScreen(isEmbedded: true);
+      case 'panduan_faq':
+        return PanduanFaqScreen(
+          role: userProf.isKontraktor
+              ? 'kontraktor'
+              : (userProf.role.toLowerCase() == 'konsultan'
+                  ? 'konsultan'
+                  : null),
+        );
+      case 'dashboard':
+      default:
+        return defaultDashboardBody;
+    }
   }
 
   void _handleLogout(BuildContext context, {bool isDrawer = false}) {
@@ -104,6 +216,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _startTimer();
+    WebDashboardLayout.activeWebMenu.addListener(_onWebDashboardMenuChanged);
+  }
+
+  void _onWebDashboardMenuChanged() {
+    if (mounted && _activeWebMenu != WebDashboardLayout.activeWebMenu.value) {
+      setState(() {
+        _activeWebMenu = WebDashboardLayout.activeWebMenu.value;
+      });
+    }
   }
 
   void _startTimer() {
@@ -136,6 +257,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
+    WebDashboardLayout.activeWebMenu.removeListener(_onWebDashboardMenuChanged);
     _timer?.cancel();
     _pageController.dispose();
     super.dispose();
@@ -441,82 +563,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
 
+    if (isWeb) {
+      return WebDashboardLayout(
+        title: _activeWebMenu != 'dashboard'
+            ? _getHeaderTitle(safeUserProf)
+            : safeUserProf.tr('nav_dashboard'),
+        activeMenu: _activeWebMenu,
+        onMenuSelected: (menuKey) {
+          setState(() {
+            _activeWebMenu = menuKey;
+          });
+        },
+        child: _buildActiveWebContent(
+          context,
+          safeUserProf,
+          contracts,
+          mainBody,
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.getBackground(context),
       appBar: AppBar(
-        backgroundColor: isWeb
-            ? AppColors.navySlate
-            : AppColors.getCardBackground(context),
+        backgroundColor: AppColors.getCardBackground(context),
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Divider(
             height: 1,
-            color: isWeb ? AppColors.slateDark : AppColors.getBorder(context),
+            color: AppColors.getBorder(context),
           ),
         ),
         leading: Builder(
           builder: (scaffoldCtx) => IconButton(
             icon: Icon(
               Icons.menu,
-              color: isWeb ? Colors.white : AppColors.getTextDark(context),
+              color: AppColors.getTextDark(context),
             ),
-            tooltip: isWeb
-                ? (_isWebSidebarOpen ? 'Ciutkan Sidebar' : 'Buka Sidebar')
-                : 'Buka Menu',
+            tooltip: 'Buka Menu',
             onPressed: () {
-              if (isWeb) {
-                setState(() {
-                  _isWebSidebarOpen = !_isWebSidebarOpen;
-                });
-              } else {
-                Scaffold.of(scaffoldCtx).openDrawer();
-              }
+              Scaffold.of(scaffoldCtx).openDrawer();
             },
           ),
         ),
         title: Text(
           safeUserProf.tr('nav_dashboard'),
           style: TextStyle(
-            color: isWeb ? Colors.white : AppColors.getTextDark(context),
+            color: AppColors.getTextDark(context),
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.notifications_none,
-              color: isWeb ? Colors.white : AppColors.getTextDark(context),
-            ),
-            onPressed: () {},
-          ),
-        ],
       ),
-      drawer: isWeb
-          ? null
-          : _buildWebSidebar(context, userProf: safeUserProf, isDrawer: true),
-      body: isWeb
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildWebSidebar(
-                  context,
-                  userProf: safeUserProf,
-                  isCollapsed: !_isWebSidebarOpen,
-                  isDrawer: false,
-                ),
-                const VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: Color(0xFF1E293B),
-                ),
-                Expanded(child: mainBody),
-              ],
-            )
-          : mainBody,
+      drawer: _buildWebSidebar(context, userProf: safeUserProf, isDrawer: true),
+      body: mainBody,
     );
   }
 
@@ -695,7 +798,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        '${(contract.progressFisik * 100).toInt()}%',
+                        '${contract.progressPercent.toStringAsFixed(contract.progressPercent % 1 == 0 ? 0 : 1)}%',
                         style: const TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 16,
@@ -917,7 +1020,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     List<ContractModel> contracts,
   ) {
     final contractorName = userProf.namaLengkap.toLowerCase();
-    final currentUserUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final currentUserUid = AuthService.currentUser?.uid ?? '';
     final List<Map<String, dynamic>> myKegiatans = [];
     final List<int> kegIndices = [];
     final List<ContractModel> parentContracts = [];
@@ -1304,53 +1407,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
 
+    if (isWeb) {
+      return WebDashboardLayout(
+        title: _activeWebMenu != 'dashboard'
+            ? _getHeaderTitle(userProf)
+            : 'Dashboard Kontraktor',
+        activeMenu: _activeWebMenu,
+        onMenuSelected: (menuKey) {
+          setState(() {
+            _activeWebMenu = menuKey;
+          });
+        },
+        child: _buildActiveWebContent(
+          context,
+          userProf,
+          contracts,
+          contractorBody,
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: isWeb ? AppColors.navySlate : Colors.white,
+        backgroundColor: Colors.white,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Divider(
             height: 1,
-            color: isWeb ? AppColors.slateDark : AppColors.border,
+            color: AppColors.border,
           ),
         ),
         leading: Builder(
           builder: (scaffoldCtx) => IconButton(
-            icon: Icon(
+            icon: const Icon(
               Icons.menu,
-              color: isWeb ? Colors.white : AppColors.navySlate,
+              color: AppColors.navySlate,
             ),
-            tooltip: isWeb
-                ? (_isWebSidebarOpen ? 'Ciutkan Sidebar' : 'Buka Sidebar')
-                : 'Buka Menu',
+            tooltip: 'Buka Menu',
             onPressed: () {
-              if (isWeb) {
-                setState(() {
-                  _isWebSidebarOpen = !_isWebSidebarOpen;
-                });
-              } else {
-                Scaffold.of(scaffoldCtx).openDrawer();
-              }
+              Scaffold.of(scaffoldCtx).openDrawer();
             },
           ),
         ),
         title: Column(
           children: [
-            Text(
+            const Text(
               'Dashboard Kontraktor',
               style: TextStyle(
-                color: isWeb ? Colors.white : AppColors.navySlate,
+                color: AppColors.navySlate,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
             ),
             Text(
               userProf.namaLengkap,
-              style: TextStyle(
-                color: isWeb ? AppColors.slateLight : AppColors.slate,
+              style: const TextStyle(
+                color: AppColors.slate,
                 fontSize: 11,
               ),
             ),
@@ -1358,89 +1473,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         centerTitle: true,
       ),
-      drawer: isWeb
-          ? null
-          : _buildWebSidebar(context, userProf: userProf, isDrawer: true),
-      body: isWeb
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildWebSidebar(
-                  context,
-                  userProf: userProf,
-                  isCollapsed: !_isWebSidebarOpen,
-                  isDrawer: false,
-                ),
-                const VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: Color(0xFF1E293B),
-                ),
-                Expanded(child: contractorBody),
-              ],
-            )
-          : contractorBody,
+      drawer: _buildWebSidebar(context, userProf: userProf, isDrawer: true),
+      body: contractorBody,
     );
   }
 
-  double _calcKegiatanProgress(Map<String, dynamic> keg) {
-    final activeRkk = (keg['rkkDivisiList'] as List? ?? []);
-    final laporans = (keg['laporans'] as List? ?? []);
-
-    if (activeRkk.isNotEmpty && laporans.isNotEmpty) {
-      double totalRealisasiBobot = 0.0;
-      for (final rep in laporans) {
-        if (rep is! Map) continue;
-        final pList = (rep['pekerjaanList'] as List? ?? []);
-        for (final p in pList) {
-          if (p is! Map) continue;
-          final volStr = (p['volume'] ?? '').toString();
-          final vol =
-              double.tryParse(volStr.split(' ').first.replaceAll(',', '.')) ??
-              0.0;
-          final itId = (p['rkkItemId'] ?? '').toString().trim();
-          final noMata = (p['noMataPembayaran'] ?? '').toString().trim();
-          final jenis = (p['uraian'] ?? p['jenisPekerjaan'] ?? '')
-              .toString()
-              .trim()
-              .toLowerCase();
-
-          for (final div in activeRkk) {
-            for (final it in (div['items'] as List? ?? [])) {
-              final bId = (it['id'] ?? '').toString().trim();
-              final bNo = (it['noMataPembayaran'] ?? '').toString().trim();
-              final bUr = (it['uraian'] ?? '').toString().trim().toLowerCase();
-
-              final match =
-                  (itId.isNotEmpty && bId.isNotEmpty && itId == bId) ||
-                  (noMata.isNotEmpty && bNo.isNotEmpty && noMata == bNo) ||
-                  (jenis.isNotEmpty && (bUr == jenis || bUr.contains(jenis)));
-
-              if (match) {
-                final targetVol =
-                    (it['volumeCCO'] ?? it['volume'] as num?)?.toDouble() ??
-                    0.0;
-                final bobotItem = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
-                if (targetVol > 0) {
-                  totalRealisasiBobot += (vol / targetVol) * bobotItem;
-                }
-                break;
-              }
-            }
-          }
-        }
-      }
-      return totalRealisasiBobot.clamp(0.0, 100.0);
-    }
-
-    final weekly = (keg['laporanMingguan'] as List? ?? []);
-    if (weekly.isNotEmpty && weekly.last is Map) {
-      final lastW = weekly.last as Map;
-      return (lastW['realisasiPersen'] as num?)?.toDouble() ?? 0.0;
-    }
-
-    return 0.0;
-  }
+  double _calcKegiatanProgress(Map<String, dynamic> keg) =>
+      ProgressCalculator.calculateKegiatanProgress(keg);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ─── SIDEBAR DASHBOARD WEB ───
@@ -1510,9 +1549,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                           tooltip: 'Buka Sidebar',
                           onPressed: () {
-                            setState(() {
-                              _isWebSidebarOpen = true;
-                            });
+                            WebDashboardLayout.isSidebarOpen.value = true;
                           },
                         ),
                       ],
@@ -1581,9 +1618,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                             tooltip: 'Ciutkan Sidebar',
                             onPressed: () {
-                              setState(() {
-                                _isWebSidebarOpen = false;
-                              });
+                              WebDashboardLayout.isSidebarOpen.value = false;
                             },
                           ),
                       ],
@@ -1739,41 +1774,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         const KontrakScreen(),
                         isDrawer: isDrawer,
                       ),
+                    )
+                  else
+                    _buildSidebarItem(
+                      isDrawer: isDrawer,
+                      key: 'kegiatan',
+                      label: userProf.tr('nav_kegiatan_saya'),
+                      icon: Icons.assignment_rounded,
+                      isActive: _activeWebMenu == 'kegiatan',
+                      isCollapsed: isCollapsed,
+                      onTap: () => _navigateFromSidebar(
+                        'kegiatan',
+                        const KontrakScreen(),
+                        isDrawer: isDrawer,
+                      ),
                     ),
 
                   const SizedBox(height: 14),
 
-                  // 3. KATEGORI PELAPORAN
-                  const SizedBox(height: 14),
-                  _buildSidebarCategory('PELAPORAN', isCollapsed, isDrawer),
-                  if (userProf.isKontraktor) ...[
-                    _buildSidebarItem(
-                      isDrawer: isDrawer,
-                      key: 'data_laporan',
-                      label: 'Data Laporan',
-                      icon: Icons.folder_outlined,
-                      isActive: _activeWebMenu == 'data_laporan',
-                      isCollapsed: isCollapsed,
-                      onTap: () => _navigateFromSidebar(
-                        'data_laporan',
-                        const DataLaporanScreen(),
-                        isDrawer: isDrawer,
-                      ),
-                    ),
-                    _buildSidebarItem(
-                      isDrawer: isDrawer,
-                      key: 'laporan_harian',
-                      label: 'Laporan Harian',
-                      icon: Icons.today_rounded,
-                      isActive: _activeWebMenu == 'laporan_harian',
-                      isCollapsed: isCollapsed,
-                      onTap: () => _navigateFromSidebar(
-                        'laporan_harian',
-                        const BuatLaporanScreen(),
-                        isDrawer: isDrawer,
-                      ),
-                    ),
-                  ] else ...[
+                  // 2. KATEGORI PELAPORAN (Hanya Konsultan & Dinas)
+                  if (!userProf.isKontraktor) ...[
+                    _buildSidebarCategory('PELAPORAN', isCollapsed, isDrawer),
                     _buildSidebarItem(
                       isDrawer: isDrawer,
                       key: 'laporan',
@@ -1791,7 +1812,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       isDrawer: isDrawer,
                       key: 'data_laporan',
                       label: 'Data Laporan',
-                      icon: Icons.folder_outlined,
+                      icon: Icons.folder_special_rounded,
                       isActive: _activeWebMenu == 'data_laporan',
                       isCollapsed: isCollapsed,
                       onTap: () => _navigateFromSidebar(
@@ -1839,12 +1860,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         isDrawer: isDrawer,
                       ),
                     ),
+                    const SizedBox(height: 14),
                   ],
 
-                  const SizedBox(height: 14),
-
-                  // 4. KATEGORI DOKUMEN & HISTORI
-                  _buildSidebarCategory('HISTORI', isCollapsed, isDrawer),
+                  // 3. KATEGORI DOKUMEN & HISTORI
+                  _buildSidebarCategory('DOKUMEN & HISTORI', isCollapsed, isDrawer),
                   _buildSidebarItem(
                     isDrawer: isDrawer,
                     key: 'timeline',
@@ -1861,7 +1881,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                   const SizedBox(height: 14),
 
-                  // 5. KATEGORI AKUN
+                  // 4. KATEGORI AKUN & PENGATURAN
                   _buildSidebarCategory(
                     'AKUN & PENGATURAN',
                     isCollapsed,
@@ -1909,7 +1929,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                   const SizedBox(height: 14),
 
-                  // 6. KATEGORI BANTUAN
+                  // 5. KATEGORI BANTUAN
                   _buildSidebarCategory('BANTUAN', isCollapsed, isDrawer),
                   _buildSidebarItem(
                     isDrawer: isDrawer,

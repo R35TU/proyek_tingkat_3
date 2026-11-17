@@ -6,7 +6,8 @@ import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 
 class EditProfilScreen extends StatefulWidget {
-  const EditProfilScreen({super.key});
+  final bool isEmbedded;
+  const EditProfilScreen({super.key, this.isEmbedded = false});
 
   @override
   State<EditProfilScreen> createState() => _EditProfilScreenState();
@@ -181,8 +182,10 @@ class _EditProfilScreenState extends State<EditProfilScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              backgroundColor: Colors.white,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(

@@ -16,6 +16,8 @@ import 'package:pdf/pdf.dart';
 import 'package:tata_saka_app/screens/pdf_viewer_screen.dart';
 import 'package:tata_saka_app/services/pdf_report_service.dart';
 import 'package:tata_saka_app/widgets/horizontal_drag_scroll_area.dart';
+import 'package:tata_saka_app/widgets/responsive_layout.dart';
+import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 
 class DetailDataLaporanScreen extends StatefulWidget {
   final ContractModel contract;
@@ -2943,92 +2945,69 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
       userProf = null;
     }
     final isKonsultan = userProf?.isKonsultan ?? true;
+    final isDesktop = ResponsiveBreakpoints.isDesktop(context);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
-            }
-          },
-        ),
-        title: const Text(
-          'Data Laporan',
-          style: TextStyle(
-            color: AppColors.textDark,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: false,
-        actions: [
-          if (liveContract.kegiatans.length > 1)
-            PopupMenuButton<int>(
-              tooltip: 'Ganti Kegiatan',
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              icon: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.slateLighter,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.swap_horiz, color: AppColors.primaryBlue, size: 18),
-                    SizedBox(width: 4),
-                    Text(
-                      'Kegiatan',
-                      style: TextStyle(
-                        color: AppColors.primaryBlue,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              onSelected: (idx) {
-                setState(() {
-                  _currentKegiatanIndex = idx;
-                });
-              },
-              itemBuilder: (ctx) => liveContract.kegiatans.asMap().entries.map((e) {
-                return PopupMenuItem<int>(
-                  value: e.key,
-                  child: Row(
-                    children: [
-                      Icon(
-                        e.key == _currentKegiatanIndex ? Icons.check_circle : Icons.circle_outlined,
-                        color: e.key == _currentKegiatanIndex ? AppColors.primaryBlue : AppColors.textLight,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          e.value['namaKegiatan'] ?? 'Kegiatan ${e.key + 1}',
-                          style: TextStyle(
-                            fontWeight: e.key == _currentKegiatanIndex ? FontWeight.bold : FontWeight.normal,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
+    final headerActions = [
+      if (liveContract.kegiatans.length > 1)
+        PopupMenuButton<int>(
+          tooltip: 'Ganti Kegiatan',
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          icon: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: isDesktop ? AppColors.slateDark : AppColors.slateLighter,
+              borderRadius: BorderRadius.circular(8),
             ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: Column(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.swap_horiz, color: isDesktop ? Colors.white : AppColors.primaryBlue, size: 18),
+                const SizedBox(width: 4),
+                Text(
+                  'Kegiatan',
+                  style: TextStyle(
+                    color: isDesktop ? Colors.white : AppColors.primaryBlue,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          onSelected: (idx) {
+            setState(() {
+              _currentKegiatanIndex = idx;
+            });
+          },
+          itemBuilder: (ctx) => liveContract.kegiatans.asMap().entries.map((e) {
+            return PopupMenuItem<int>(
+              value: e.key,
+              child: Row(
+                children: [
+                  Icon(
+                    e.key == _currentKegiatanIndex ? Icons.check_circle : Icons.circle_outlined,
+                    color: e.key == _currentKegiatanIndex ? AppColors.primaryBlue : AppColors.textLight,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      e.value['namaKegiatan'] ?? 'Kegiatan ${e.key + 1}',
+                      style: TextStyle(
+                        fontWeight: e.key == _currentKegiatanIndex ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      const SizedBox(width: 8),
+    ];
+
+    final mainBody = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header Card (Kegiatan & Kontrak Info)
@@ -3355,7 +3334,45 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
             ),
           ],
         ],
+      );
+
+    if (isDesktop) {
+      return WebDashboardLayout(
+        title: 'Data Laporan: $namaKegiatan',
+        activeMenu: 'data_laporan',
+        showBackButton: true,
+        actions: headerActions,
+        child: mainBody,
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+            }
+          },
+        ),
+        title: const Text(
+          'Data Laporan',
+          style: TextStyle(
+            color: AppColors.textDark,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: false,
+        actions: headerActions,
       ),
+      body: mainBody,
     );
   }
 

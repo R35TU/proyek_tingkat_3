@@ -908,4 +908,13 @@ class ContractProvider with ChangeNotifier {
     var values = List<int>.generate(10, (i) => random.nextInt(256));
     return values.join();
   }
+
+  @override
+  void dispose() {
+    _contractsSub?.cancel();
+    for (final sub in _dokumenSubs.values) {
+      sub.cancel();
+    }
+    super.dispose();
+  }
 }

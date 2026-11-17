@@ -21,6 +21,9 @@ import 'package:tata_saka_app/screens/form_kegiatan_screen.dart';
 import 'package:tata_saka_app/screens/kelola_rkk_screen.dart';
 import 'package:tata_saka_app/screens/kelola_addendum_screen.dart';
 import 'package:tata_saka_app/widgets/lembar_tambah_kurang_widget.dart';
+import 'package:tata_saka_app/widgets/responsive_layout.dart';
+import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
+import 'package:tata_saka_app/utils/progress_calculator.dart';
 
 class _DocData {
   String id;
@@ -1082,68 +1085,46 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
           }).toList()
         : _folders;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+    final isDesktop = ResponsiveBreakpoints.isDesktop(context);
+
+    final headerActions = [
+      if (isKonsultan)
+        PopupMenuButton<String>(
+          icon: Icon(Icons.more_vert, color: isDesktop ? Colors.white : AppColors.textDark),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          onSelected: (value) {
+            if (value == 'edit') {
+              _editKegiatanSelf();
+            } else if (value == 'delete') {
+              _confirmDeleteKegiatanSelf();
             }
           },
-        ),
-        title: const Text(
-          'Detail Kegiatan',
-          style: TextStyle(
-            color: AppColors.textDark,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: false,
-        actions: [
-          if (isKonsultan)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: AppColors.textDark),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              onSelected: (value) {
-                if (value == 'edit') {
-                  _editKegiatanSelf();
-                } else if (value == 'delete') {
-                  _confirmDeleteKegiatanSelf();
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit_outlined, size: 20, color: AppColors.primaryBlue),
-                      SizedBox(width: 12),
-                      Text('Edit Kegiatan', style: TextStyle(fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                      SizedBox(width: 12),
-                      Text('Hapus Kegiatan', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ],
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'edit',
+              child: Row(
+                children: [
+                  Icon(Icons.edit_outlined, size: 20, color: AppColors.primaryBlue),
+                  SizedBox(width: 12),
+                  Text('Edit Kegiatan', style: TextStyle(fontWeight: FontWeight.w600)),
+                ],
+              ),
             ),
-        ],
-      ),
-      body: ListView(
+            const PopupMenuItem(
+              value: 'delete',
+              child: Row(
+                children: [
+                  Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                  SizedBox(width: 12),
+                  Text('Hapus Kegiatan', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red)),
+                ],
+              ),
+            ),
+          ],
+        ),
+    ];
+
+    final mainBody = ListView(
         padding: const EdgeInsets.all(20.0),
         children: [
           // Info Kegiatan Top Section (Executive Card)
@@ -1278,7 +1259,45 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
             return _buildFolderItem(folder, index, isKonsultan: isKonsultan);
           }),
         ],
+      );
+
+    if (isDesktop) {
+      return WebDashboardLayout(
+        title: 'Detail Kegiatan: $_namaKegiatan',
+        activeMenu: 'kontrak',
+        showBackButton: true,
+        actions: headerActions,
+        child: mainBody,
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+            }
+          },
+        ),
+        title: const Text(
+          'Detail Kegiatan',
+          style: TextStyle(
+            color: AppColors.textDark,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: false,
+        actions: headerActions,
       ),
+      body: mainBody,
     );
   }
 
@@ -2131,67 +2150,8 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
     );
   }
 
-  double get _currentProgresFisik {
-    // 1. Live real-time calculation from all daily reports (laporans) against active RKK
-    final dailyReports = (_kegiatanMap['laporans'] as List?) ?? [];
-    final rawRkk = _kegiatan.activeRkkDivisiList;
-
-    if (dailyReports.isNotEmpty && rawRkk.isNotEmpty) {
-      double totalProgress = 0.0;
-      for (final div in rawRkk) {
-        final items = (div['items'] as List?) ?? [];
-        final romawi = (div['nomorRomawi'] ?? 'I').toString();
-        for (final rawIt in items) {
-          final it = Map<String, dynamic>.from(rawIt);
-          final noMata = (it['noMataPembayaran'] ?? '').toString().trim();
-          final uraian = (it['uraian'] ?? '').toString().trim().toLowerCase();
-          final rkkId = '${romawi}_${it['uraian']}';
-          final volKontrak = (it['volumeCCO'] ?? it['volume'] as num?)?.toDouble() ?? 0.0;
-          final bbtKontrak = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
-          if (volKontrak <= 0 || bbtKontrak <= 0) continue;
-
-          double volReal = 0.0;
-          for (final rep in dailyReports) {
-            if (rep is! Map) continue;
-            final pList = (rep['pekerjaanList'] as List?) ?? [];
-            for (final p in pList) {
-              if (p is! Map) continue;
-              final pId = p['rkkItemId']?.toString().trim() ?? '';
-              final pNoMata = p['noMataPembayaran']?.toString().trim() ?? '';
-              final pUraian = (p['uraian'] ?? p['jenis'])?.toString().trim().toLowerCase() ?? '';
-
-              final matchId = pId.isNotEmpty && pId == rkkId;
-              final matchNoMata = noMata.isNotEmpty && pNoMata == noMata;
-              final matchUraian = uraian.isNotEmpty && (pUraian == uraian || uraian.contains(pUraian) || pUraian.contains(uraian));
-
-              if (matchId || matchNoMata || matchUraian) {
-                final vStr = (p['volume'] ?? '').toString();
-                final vNum = double.tryParse(vStr.split(' ').first.replaceAll(',', '.')) ?? 0.0;
-                volReal += vNum;
-              }
-            }
-          }
-
-          final bbtItem = (volReal / volKontrak) * bbtKontrak;
-          totalProgress += bbtItem;
-        }
-      }
-
-      if (totalProgress > 0) return totalProgress;
-    }
-
-    // 2. Fallback: Laporan Mingguan terakhir jika laporan harian belum tersedia
-    final rawMingguan = _kegiatanMap['laporanMingguan'];
-    if (rawMingguan != null && rawMingguan is List && rawMingguan.isNotEmpty) {
-      final latest = rawMingguan.last;
-      if (latest is Map && latest['realisasiPersen'] != null) {
-        final val = (latest['realisasiPersen'] as num).toDouble();
-        if (val > 0) return val;
-      }
-    }
-
-    return 0.0;
-  }
+  double get _currentProgresFisik =>
+      ProgressCalculator.calculateKegiatanProgress(_kegiatanMap);
 
   void _bukaLembarTambahKurangLatest() {
     if (!_kegiatan.hasAddendum) return;

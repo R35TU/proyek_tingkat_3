@@ -8,6 +8,8 @@ import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/utils/indonesian_terbilang.dart';
 import 'package:flutter/services.dart';
 import '../utils/rupiah_input_formatter.dart';
+import 'package:tata_saka_app/widgets/responsive_layout.dart';
+import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 
 class FormKegiatanScreen extends StatefulWidget {
   final ContractModel contract;
@@ -423,6 +425,86 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = ResponsiveBreakpoints.isDesktop(context);
+    final pageTitle = isEditing ? 'Edit Data Kegiatan' : 'Tambah Kegiatan Baru';
+
+    final headerActions = [
+      Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: TextButton(
+          onPressed: _simpan,
+          child: Text(
+            'Simpan',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: isDesktop ? Colors.white : const Color(0xFF111827),
+              fontSize: 14,
+            ),
+          ),
+        ),
+      ),
+    ];
+
+    final mainBody = Form(
+      key: _formKey,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. DATA POKOK KEGIATAN
+            _buildSection1DataPokok(),
+            const SizedBox(height: 16),
+
+            // 2. KONSULTAN PENGAWAS
+            _buildSection2KonsultanPengawas(),
+            const SizedBox(height: 16),
+
+            // 3. PENYEDIA JASA / KONTRAKTOR PELAKSANA
+            _buildSection3KontraktorPelaksana(),
+            const SizedBox(height: 16),
+
+            // 4. STRUKTUR ORGANISASI KEGIATAN
+            _buildSection4StrukturKegiatan(),
+            const SizedBox(height: 16),
+
+            // 5. STRUKTUR ORGANISASI PENYEDIA JASA
+            _buildSection5StrukturPenyediaJasa(),
+            const SizedBox(height: 28),
+
+            // TOMBOL SIMPAN
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _simpan,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1F2937),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
+                child: Text(
+                  isEditing ? 'Perbarui Data Kegiatan' : 'Simpan Data Kegiatan',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                ),
+              ),
+            ),
+            const SizedBox(height: 36),
+          ],
+        ),
+      ),
+    );
+
+    if (isDesktop) {
+      return WebDashboardLayout(
+        title: '$pageTitle: ${widget.contract.namaKontrak}',
+        activeMenu: 'kontrak',
+        showBackButton: true,
+        actions: headerActions,
+        child: mainBody,
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F4),
       appBar: AppBar(
@@ -436,7 +518,7 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              isEditing ? 'Edit Data Kegiatan' : 'Tambah Kegiatan Baru',
+              pageTitle,
               style: const TextStyle(
                 color: Color(0xFF111827),
                 fontSize: 16,
@@ -451,68 +533,9 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
             ),
           ],
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: TextButton(
-              onPressed: _simpan,
-              child: const Text(
-                'Simpan',
-                style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF111827), fontSize: 14),
-              ),
-            ),
-          ),
-        ],
+        actions: headerActions,
       ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. DATA POKOK KEGIATAN
-              _buildSection1DataPokok(),
-              const SizedBox(height: 16),
-
-              // 2. KONSULTAN PENGAWAS
-              _buildSection2KonsultanPengawas(),
-              const SizedBox(height: 16),
-
-              // 3. PENYEDIA JASA / KONTRAKTOR PELAKSANA
-              _buildSection3KontraktorPelaksana(),
-              const SizedBox(height: 16),
-
-              // 4. STRUKTUR ORGANISASI KEGIATAN
-              _buildSection4StrukturKegiatan(),
-              const SizedBox(height: 16),
-
-              // 5. STRUKTUR ORGANISASI PENYEDIA JASA
-              _buildSection5StrukturPenyediaJasa(),
-              const SizedBox(height: 28),
-
-              // TOMBOL SIMPAN
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _simpan,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1F2937),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    isEditing ? 'Perbarui Data Kegiatan' : 'Simpan Data Kegiatan',
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 36),
-            ],
-          ),
-        ),
-      ),
+      body: mainBody,
     );
   }
 
