@@ -12,6 +12,7 @@ import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/kegiatan_model.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/services/storage_service.dart';
 import 'package:tata_saka_app/screens/detail_data_laporan_screen.dart';
 import 'package:tata_saka_app/screens/form_kegiatan_screen.dart';
 import 'package:tata_saka_app/screens/kelola_rkk_screen.dart';
@@ -26,6 +27,7 @@ class _DocData {
   String sizeFormatted;
   DateTime uploadDate;
   String? localPath;
+  String? remoteUrl;
 
   _DocData({
     String? id,
@@ -35,6 +37,7 @@ class _DocData {
     this.sizeFormatted = '',
     DateTime? uploadDate,
     this.localPath,
+    this.remoteUrl,
   })  : id = id ?? 'doc_${DateTime.now().millisecondsSinceEpoch}',
         uploadDate = uploadDate ?? DateTime.now();
 
@@ -46,6 +49,7 @@ class _DocData {
         'sizeFormatted': sizeFormatted,
         'uploadDate': uploadDate.toIso8601String(),
         'localPath': localPath,
+        'remoteUrl': remoteUrl,
       };
 
   factory _DocData.fromJson(Map<String, dynamic> json) => _DocData(
@@ -58,6 +62,7 @@ class _DocData {
             ? (DateTime.tryParse(json['uploadDate']) ?? DateTime.now())
             : DateTime.now(),
         localPath: json['localPath']?.toString(),
+        remoteUrl: json['remoteUrl']?.toString(),
       );
 }
 
@@ -616,6 +621,25 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                                     savedPath = targetFile.path;
                                   }
 
+                                  // Unggah salinan ke Cloudflare R2 (URL publik).
+                                  String? remoteUrl;
+                                  if (savedPath != null) {
+                                    try {
+                                      remoteUrl = await StorageService
+                                          .uploadBytes(
+                                            bytes: await File(
+                                              savedPath,
+                                            ).readAsBytes(),
+                                            remotePath:
+                                                'dokumen/${widget.contract.id}/'
+                                                '${DateTime.now().millisecondsSinceEpoch}_$pickedFileName',
+                                            contentType: detectedType == 'IMG'
+                                                ? 'image/jpeg'
+                                                : 'application/pdf',
+                                          );
+                                    } catch (_) {}
+                                  }
+
                                   final formattedSize = _formatFileSize(pickedFileBytes > 0 ? pickedFileBytes : 1024 * 350);
                                   final newDoc = _DocData(
                                     id: 'doc_${DateTime.now().millisecondsSinceEpoch}',
@@ -625,6 +649,7 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                                     sizeFormatted: formattedSize,
                                     uploadDate: DateTime.now(),
                                     localPath: savedPath,
+                                    remoteUrl: remoteUrl,
                                   );
 
                                   final targetFolder = _folders[selectedFolderIdx];
