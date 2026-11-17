@@ -11,6 +11,7 @@ import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/kegiatan_model.dart';
 import 'package:tata_saka_app/models/monthly_report_model.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
+import 'package:tata_saka_app/services/storage_service.dart';
 import 'package:tata_saka_app/utils/rupiah_input_formatter.dart';
 
 class PdfReportService {
@@ -933,6 +934,14 @@ class PdfReportService {
     }
     final file = File('${reportsDir.path}/$sanitized');
     await file.writeAsBytes(bytes, flush: true);
+    // Salinan cadangan ke Cloudflare R2 (URL publik). Gagal → file lokal tetap ada.
+    try {
+      await StorageService.uploadBytes(
+        bytes: bytes,
+        remotePath: 'laporan-pdf/$sanitized',
+        contentType: 'application/pdf',
+      );
+    } catch (_) {}
     return file;
   }
 
