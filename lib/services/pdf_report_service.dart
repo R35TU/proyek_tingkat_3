@@ -1,11 +1,12 @@
-import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:open_filex/open_filex.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:tata_saka_app/services/pdf_saver_stub.dart'
+    if (dart.library.html) 'package:tata_saka_app/services/pdf_saver_web.dart'
+    if (dart.library.io) 'package:tata_saka_app/services/pdf_saver_native.dart';
 import 'package:tata_saka_app/models/addendum_model.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/kegiatan_model.dart';
@@ -921,50 +922,20 @@ class PdfReportService {
   // ═══════════════════════════════════════════════════════════════════════════
   // ─── FILE MANAGEMENT & DOWNLOAD HELPERS ───────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
-  static Future<File> savePdfFile({
-    required Uint8List bytes,
-    required String fileName,
-  }) async {
-    final sanitized = fileName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-    final dir = await getApplicationDocumentsDirectory();
-    final reportsDir = Directory('${dir.path}/laporan_pdf');
-    if (!await reportsDir.exists()) {
-      await reportsDir.create(recursive: true);
-    }
-    final file = File('${reportsDir.path}/$sanitized');
-    await file.writeAsBytes(bytes, flush: true);
-    return file;
-  }
 
+  /// Downloads/saves the PDF.
+  /// On web: triggers a browser download via Blob + AnchorElement.
+  /// On mobile/desktop: saves to Documents directory and opens the file.
   static Future<void> downloadAndOpenPdf({
     required BuildContext context,
     required Uint8List bytes,
     required String fileName,
   }) async {
     try {
-      final file = await savePdfFile(bytes: bytes, fileName: fileName);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.picture_as_pdf, color: Colors.white, size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text('Dokumen PDF berhasil diunduh:\n${file.path.split(Platform.pathSeparator).last}'),
-              ),
-            ],
-          ),
-          backgroundColor: const Color(0xFF059669),
-          duration: const Duration(seconds: 4),
-          action: SnackBarAction(
-            label: 'Buka File',
-            textColor: Colors.white,
-            onPressed: () {
-              OpenFilex.open(file.path);
-            },
-          ),
-        ),
+      await savePdfPlatform(
+        context: context,
+        bytes: bytes,
+        fileName: fileName,
       );
     } catch (e) {
       if (!context.mounted) return;
