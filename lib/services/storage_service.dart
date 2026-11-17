@@ -13,9 +13,30 @@ import 'package:http/http.dart' as http;
 class StorageService {
   StorageService._();
 
-  static const String accessKeyId = '567c333e5455296bbed937215bd7a41a';
+  // ─── KREDENSIAL (WAJIB lewat --dart-define, TIDAK ditulis di source) ───
+  //
+  // Jalankan build/run dengan:
+  //   --dart-define=R2_ACCESS_KEY_ID=... --dart-define=R2_SECRET_ACCESS_KEY=...
+  // atau pakai file config lokal (gitignored):
+  //   --dart-define-from-file=r2_local.json
+  //
+  // Kredensial lama yang pernah di-commit sudah DI-ROTATE di Cloudflare —
+  // kunci baru HANYA ada di GitHub Secrets (CI) & r2_local.json (lokal).
+  static const String accessKeyId = String.fromEnvironment('R2_ACCESS_KEY_ID');
   static const String secretAccessKey =
-      '33ff3f872e12c1ee2e1d26cfee8ff54283a54efcc6b12d3c59e3d1ac0cd25127';
+      String.fromEnvironment('R2_SECRET_ACCESS_KEY');
+
+  /// true bila kredensial sudah tersedia di build ini.
+  static bool get hasCredentials =>
+      accessKeyId.isNotEmpty && secretAccessKey.isNotEmpty;
+
+  /// Pesan kesalahan bila kredensial belum dikonfigurasi.
+  static String get _missingCredentialsMessage =>
+      '[StorageService] Kredensial R2 belum dikonfigurasi. Jalankan build dengan '
+      '--dart-define=R2_ACCESS_KEY_ID=... --dart-define=R2_SECRET_ACCESS_KEY=... '
+      '(lokal: gunakan --dart-define-from-file=r2_local.json; CI: GitHub Secrets '
+      'R2_ACCESS_KEY_ID & R2_SECRET_ACCESS_KEY).';
+
   static const String endpoint =
       'ee37555d28507d9000c5c226461a5ca0.r2.cloudflarestorage.com';
   static const String bucket = 'lapakdir-media';
@@ -36,6 +57,9 @@ class StorageService {
     required String remotePath,
     String contentType = 'application/octet-stream',
   }) async {
+    if (!hasCredentials) {
+      throw StateError(_missingCredentialsMessage);
+    }
     final cleanKey = remotePath.startsWith('/') ? remotePath.substring(1) : remotePath;
     final now = DateTime.now().toUtc();
     final amzDate = _formatAmzDate(now);
@@ -123,6 +147,10 @@ class StorageService {
 
   /// Hapus file dari Cloudflare R2
   static Future<bool> deleteFile(String remotePath) async {
+    if (!hasCredentials) {
+      debugPrint(_missingCredentialsMessage);
+      return false;
+    }
     final cleanKey = remotePath.startsWith('/') ? remotePath.substring(1) : remotePath;
     final now = DateTime.now().toUtc();
     final amzDate = _formatAmzDate(now);

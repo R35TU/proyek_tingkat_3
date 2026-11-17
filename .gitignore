@@ -69,3 +69,6 @@ app.*.map.json
 
 # Firebase CLI cache
 .firebase/
+
+# Konfigurasi kredensial lokal (JANGAN pernah di-commit)
+r2_local.json
