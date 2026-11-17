@@ -20,6 +20,7 @@ import 'package:tata_saka_app/screens/timeline_screen.dart';
 import 'package:tata_saka_app/screens/pengaturan_screen.dart';
 import 'package:tata_saka_app/screens/keamanan_screen.dart';
 import 'package:tata_saka_app/screens/edit_profil_screen.dart';
+import 'package:tata_saka_app/screens/panduan_faq_screen.dart';
 import 'package:tata_saka_app/screens/kelola_addendum_screen.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
@@ -1869,6 +1870,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onTap: () => _navigateFromSidebar(
                       'edit_profil',
                       const EditProfilScreen(),
+                      isDrawer: isDrawer,
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // 6. KATEGORI BANTUAN
+                  _buildSidebarCategory('BANTUAN', isCollapsed, isDrawer),
+                  _buildSidebarItem(
+                    isDrawer: isDrawer,
+                    key: 'panduan_faq',
+                    label: 'Panduan & FAQ',
+                    icon: Icons.help_outline_rounded,
+                    isActive: _activeWebMenu == 'panduan_faq',
+                    isCollapsed: isCollapsed,
+                    onTap: () => _navigateFromSidebar(
+                      'panduan_faq',
+                      // Panduan hanya sesuai peran login; Dinas belum punya
+                      // guidebook → null → tampilan 3 tab default (tetap).
+                      PanduanFaqScreen(
+                        role: userProf.isKontraktor
+                            ? 'kontraktor'
+                            : (userProf.isKonsultan ? 'konsultan' : null),
+                      ),
                       isDrawer: isDrawer,
                     ),
                   ),

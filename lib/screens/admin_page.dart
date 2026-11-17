@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:tata_saka_app/services/auth_service.dart';
 
 import 'login_screen.dart';
+import 'panduan_faq_screen.dart';
 
 /// Akun pengguna tersimpan di Firestore collection `users` (doc id = uid Auth).
 /// Password TIDAK tersimpan di Firestore — dikelola Firebase Auth.
@@ -460,6 +461,22 @@ class _AdminPageState extends State<AdminPage> {
           ],
         ),
         actions: [
+          // Panduan & FAQ khusus peran Admin.
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 8, horizontal: isCompact ? 4 : 8),
+            child: Tooltip(
+              message: 'Panduan & FAQ Admin',
+              child: IconButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const PanduanFaqScreen(role: 'admin'),
+                  ),
+                ),
+                icon: const Icon(Icons.help_outline_rounded, size: 24),
+                color: Colors.white,
+              ),
+            ),
+          ),
           Padding(
             padding: EdgeInsets.symmetric(
               vertical: 8,
