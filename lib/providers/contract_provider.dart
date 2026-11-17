@@ -77,29 +77,69 @@ class ContractProvider with ChangeNotifier {
   /// Rebuild cerdas saat ada perubahan dari perangkat lain: tampil seketika,
   /// tapi no-op bila perubahan hanyalah pantulan tulisan perangkat ini sendiri
   /// (mencegah loop & menjaga referensi objek yang sedang dipegang layar).
+  /// Optimasi: hanya kontrak yang BENAR-BENAR berubah yang di-hydrate ulang
+  /// (bukan semua kontrak pada setiap event).
   Future<void> _onContractsSnapshot(
       QuerySnapshot<Map<String, dynamic>> snap) async {
     if (_isLoading || _snapshotRebuilding) return;
     try {
-      final incoming = <ContractModel>[];
-      for (final doc in snap.docs) {
-        final data = Map<String, dynamic>.from(doc.data());
-        data['id'] = doc.id;
-        incoming.add(ContractModel.fromJson(data));
+      // Kumpulkan kontrak yang benar-benar berubah isinya.
+      final changed = <String, Map<String, dynamic>>{};
+      final removedIds = <String>{};
+      bool anyRealChange = false;
+
+      for (final ch in snap.docChanges()) {
+        final id = ch.doc.id;
+        if (ch.type == DocumentChangeType.removed) {
+          removedIds.add(id);
+          anyRealChange = anyRealChange ||
+              _contracts.any((x) => x.id == id);
+          continue;
+        }
+        final data = Map<String, dynamic>.from(ch.doc.data());
+        data['id'] = id;
+        final candidate = ContractModel.fromJson(data);
+        final json = _comparisonJson(candidate);
+        changed[id] = data;
+
+        final idx = _contracts.indexWhere((x) => x.id == id);
+        if (idx < 0) {
+          anyRealChange = true; // kontrak baru
+        } else if (_comparisonJson(_contracts[idx]) != json) {
+          anyRealChange = true; // isi benar-benar beda
+        }
+        // Identik = pantulan ack tulisan sendiri → diabaikan.
       }
-      final incomingJson =
-          jsonEncode(incoming.map(_comparisonJson).toList());
-      final currentJson =
-          jsonEncode(_contracts.map(_comparisonJson).toList());
-      if (incomingJson == currentJson) return; // pantulan sendiri → no-op
+      // Kontrak yang hilang dari snapshot (dihapus perangkat lain).
+      for (final x in _contracts) {
+        if (!snap.docs.any((d) => d.id == x.id)) {
+          removedIds.add(x.id);
+          anyRealChange = true;
+        }
+      }
+      if (!anyRealChange) return;
 
       _snapshotRebuilding = true;
-      for (final c in incoming) {
+      // Terapkan: hydrate HANYA kontrak yang berubah.
+      for (final id in changed.keys) {
+        final data = changed[id]!;
+        final c = ContractModel.fromJson(data);
         _ensureKegiatanIds(c);
         await _hydrateReports(c);
         await _hydrateDokumen(c);
+        final idx = _contracts.indexWhere((x) => x.id == id);
+        if (idx >= 0) {
+          _contracts[idx] = c;
+        } else {
+          _contracts.add(c);
+        }
       }
-      _contracts = incoming;
+      for (final id in removedIds) {
+        _contracts.removeWhere((x) => x.id == id);
+        _dokumenSubs.remove(id)?.cancel();
+        _dokumenDocCache.remove(id);
+        _deletedDocIds.remove(id);
+      }
       notifyListeners();
     } catch (e) {
       debugPrint('[ContractProvider] Snapshot rebuild gagal: $e');
