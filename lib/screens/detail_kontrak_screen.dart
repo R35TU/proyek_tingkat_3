@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
@@ -321,6 +322,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
     String? pickedFilePath;
     String pickedFileName = '';
     int pickedFileBytes = 0;
+    Uint8List? pickedFileBytesData;
     String detectedType = 'PDF';
 
     await showModalBottomSheet(
@@ -422,9 +424,11 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                                       setModalState(() => uploadError = 'Ukuran file melebihi batas maksimal 25 MB.');
                                       return;
                                     }
+                                    final fBytesData = await f.readAsBytes();
                                     setModalState(() {
                                       uploadError = null;
                                       pickedFilePath = f.path;
+                                      pickedFileBytesData = fBytesData;
                                       pickedFileName = f.name;
                                       pickedFileBytes = fSize;
                                       final ext = (f.extension ?? 'PDF').toUpperCase();
@@ -528,6 +532,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                                   pickedFilePath = null;
                                   pickedFileName = '';
                                   pickedFileBytes = 0;
+                                  pickedFileBytesData = null;
                                   nameController.clear();
                                 });
                               },
@@ -594,14 +599,19 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                                   }
 
                                   // Unggah salinan ke Cloudflare R2 (URL publik).
+                                  // Web: tanpa path lokal → pakai bytes dari file_picker.
                                   String? remoteUrl;
+                                  Uint8List? uploadBytesData;
                                   if (savedPath != null) {
+                                    uploadBytesData = await File(savedPath).readAsBytes();
+                                  } else if (pickedFileBytesData != null) {
+                                    uploadBytesData = pickedFileBytesData;
+                                  }
+                                  if (uploadBytesData != null) {
                                     try {
                                       remoteUrl = await StorageService
                                           .uploadBytes(
-                                            bytes: await File(
-                                              savedPath,
-                                            ).readAsBytes(),
+                                            bytes: uploadBytesData,
                                             remotePath:
                                                 'dokumen/${widget.contract.id}/'
                                                 '${DateTime.now().millisecondsSinceEpoch}_$pickedFileName',
