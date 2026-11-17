@@ -41,6 +41,8 @@ class ContractProvider with ChangeNotifier {
   final Map<String, Set<String>> _deletedDocIds = {};
 
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _contractsSub;
+  final Map<String, StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>
+      _dokumenSubs = {};
   bool _snapshotRebuilding = false;
 
   bool get isLoading => _isLoading;
@@ -145,6 +147,40 @@ class ContractProvider with ChangeNotifier {
 
     _isLoading = false;
     notifyListeners();
+    _attachDokumenListeners();
+  }
+
+  /// Listener realtime per-subcollection `dokumen` — perubahan dokumen dari
+  /// perangkat lain tampil seketika tanpa restart.
+  void _attachDokumenListeners() {
+    try {
+      final ids = _contracts.map((c) => c.id).toSet();
+      for (final c in _contracts) {
+        if (_dokumenSubs.containsKey(c.id)) continue;
+        _dokumenSubs[c.id] = _db
+            .collection('contracts')
+            .doc(c.id)
+            .collection('dokumen')
+            .snapshots()
+            .listen((_) {
+          if (_isLoading || _snapshotRebuilding) return;
+          for (final x in _contracts) {
+            if (x.id != c.id) continue;
+            _hydrateDokumen(x).then((_) => notifyListeners());
+          }
+        }, onError: (e) {
+          debugPrint('[ContractProvider] Dokumen snapshot error: $e');
+        });
+      }
+      // Copot listener kontrak yang sudah dihapus.
+      for (final cid in List<String>.from(_dokumenSubs.keys)) {
+        if (!ids.contains(cid)) {
+          _dokumenSubs.remove(cid)?.cancel();
+        }
+      }
+    } catch (e) {
+      debugPrint('[ContractProvider] Attach dokumen listener gagal: $e');
+    }
   }
 
   /// Fallback offline: baca mirror JSON di SharedPreferences.
