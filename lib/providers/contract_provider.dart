@@ -96,7 +96,9 @@ class ContractProvider with ChangeNotifier {
               _contracts.any((x) => x.id == id);
           continue;
         }
-        final data = Map<String, dynamic>.from(ch.doc.data());
+        final raw = ch.doc.data();
+        if (raw == null) continue;
+        final data = Map<String, dynamic>.from(raw);
         data['id'] = id;
         final candidate = ContractModel.fromJson(data);
         final json = _comparisonJson(candidate);
