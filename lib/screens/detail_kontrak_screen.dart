@@ -12,6 +12,7 @@ import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/services/storage_service.dart';
+import 'package:tata_saka_app/services/file_downloader.dart';
 import 'package:tata_saka_app/screens/detail_kegiatan_screen.dart';
 import 'package:tata_saka_app/screens/tambah_kontrak_screen.dart';
 import 'package:tata_saka_app/screens/form_kegiatan_screen.dart';
@@ -862,6 +863,20 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                           );
                         } else if (doc.localPath != null && File(doc.localPath!).existsSync()) {
                           OpenFilex.open(doc.localPath!);
+                        } else if ((doc.remoteUrl ?? '').isNotEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Mengunduh dokumen dari penyimpanan awan...'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                          downloadAndOpenRemote(doc.remoteUrl!, doc.name).catchError((e) {
+                            if (!mounted) return null;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Gagal membuka dokumen: $e')),
+                            );
+                            return null;
+                          });
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('File fisik dokumen belum tersedia di penyimpanan lokal.')),
