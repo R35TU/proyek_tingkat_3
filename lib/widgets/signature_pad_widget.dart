@@ -326,6 +326,9 @@ class SignaturePadWidgetState extends State<SignaturePadWidget> {
   }
 
   Widget _buildSignatureImage(String b64) {
+    if (b64.startsWith('http')) {
+      return Image.network(b64, fit: BoxFit.contain, height: 130);
+    }
     try {
       String clean = b64;
       if (clean.contains(',')) {

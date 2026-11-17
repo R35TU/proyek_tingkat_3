@@ -1826,6 +1826,14 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
   }
 
   Widget _buildSignatureImagePreview(String b64) {
+    if (b64.startsWith('http')) {
+      return Image.network(
+        b64,
+        fit: BoxFit.contain,
+        height: 34,
+        errorBuilder: (context, error, stackTrace) => const SizedBox(height: 20),
+      );
+    }
     try {
       String clean = b64;
       if (clean.contains(',')) {
@@ -1911,6 +1919,15 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
   }
 
   Widget _buildPhotoWidget(String b64, {BoxFit fit = BoxFit.cover}) {
+    if (b64.startsWith('http')) {
+      return Image.network(
+        b64,
+        fit: fit,
+        errorBuilder: (context, error, stackTrace) => const Center(
+          child: Icon(Icons.broken_image, size: 28, color: Colors.grey),
+        ),
+      );
+    }
     try {
       String clean = b64;
       if (clean.contains(',')) {
