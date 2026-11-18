@@ -23,7 +23,7 @@ jobs:
 
       - name: Build web
         run: >
-          flutter build web --release
+          flutter build web --release --no-tree-shake-icons
           --dart-define=R2_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID }}
           --dart-define=R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }}
 
