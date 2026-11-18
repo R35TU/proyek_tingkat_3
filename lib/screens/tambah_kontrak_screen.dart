@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:provider/provider.dart';
@@ -36,6 +37,11 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
   
   // Dynamic list for dinas
   final List<TextEditingController> _dinasControllers = [TextEditingController()];
+
+  // Dinas user selection from Firestore
+  String? _selectedDinasUid;
+  List<Map<String, dynamic>> _dinasUsers = [];
+  bool _loadingDinasUsers = true;
   
   final TextEditingController _sumberDanaController = TextEditingController();
   final TextEditingController _deskripsiController = TextEditingController();
@@ -87,10 +93,65 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
           }
         }
       }
+      // Pre-fill dinasUid if editing
+      _selectedDinasUid = c.dinasUid.isNotEmpty ? c.dinasUid : null;
     }
 
     if (_inspektorControllers.isEmpty) {
       _inspektorControllers.add(TextEditingController());
+    }
+
+    _loadDinasUsers();
+  }
+
+  Future<void> _loadDinasUsers() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance.collection('users').get();
+      if (mounted) {
+        setState(() {
+          _dinasUsers = snapshot.docs
+              .where((doc) {
+                final data = doc.data();
+                final role = (data['role'] ?? '').toString().toLowerCase();
+                final isActive = data['isActive'] ?? true;
+                return role == 'dinas' && isActive != false;
+              })
+              .map((doc) {
+                final data = doc.data();
+                return {
+                  'uid': doc.id,
+                  'namaLengkap': (data['namaLengkap'] ?? '').toString().trim(),
+                  'companyOrAgency': (data['companyOrAgency'] ?? '').toString().trim(),
+                };
+              })
+              .toList();
+
+          // Auto-match if editing and UID was not saved but name matches
+          if (_selectedDinasUid == null && _dinasControllers.isNotEmpty) {
+            final firstDinas = _dinasControllers.first.text.trim().toLowerCase();
+            if (firstDinas.isNotEmpty) {
+              final matched = _dinasUsers.cast<Map<String, dynamic>?>().firstWhere(
+                (u) {
+                  final comp = (u?['companyOrAgency'] ?? '').toString().toLowerCase();
+                  final name = (u?['namaLengkap'] ?? '').toString().toLowerCase();
+                  return (comp.isNotEmpty && (firstDinas.contains(comp) || comp.contains(firstDinas))) ||
+                      (name.isNotEmpty && (firstDinas.contains(name) || name.contains(firstDinas)));
+                },
+                orElse: () => null,
+              );
+              if (matched != null) {
+                _selectedDinasUid = matched['uid'] as String?;
+              }
+            }
+          }
+          _loadingDinasUsers = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading dinas users: $e');
+      if (mounted) {
+        setState(() => _loadingDinasUsers = false);
+      }
     }
   }
 
@@ -403,6 +464,113 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
                 color: AppColors.textDark,
               ),
             ),
+            const SizedBox(height: 8),
+            // Dropdown to link Dinas account from Firestore
+            const Text(
+              'Tautkan Akun Dinas Terdaftar (Admin)',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF374151), letterSpacing: 0.3),
+            ),
+            const SizedBox(height: 8),
+            if (_loadingDinasUsers)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF9FAFB),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: const Row(
+                  children: [
+                    SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF3B82F6))),
+                    SizedBox(width: 10),
+                    Text('Memuat daftar akun dinas...', style: TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+                  ],
+                ),
+              )
+            else if (_dinasUsers.isEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: Color(0xFF15803D)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Belum ada akun Dinas aktif di menu Admin. Silakan ketik nama dinas manual.',
+                        style: TextStyle(fontSize: 11.5, color: Color(0xFF166534)),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              DropdownButtonFormField<String>(
+                value: _dinasUsers.any((u) => u['uid'] == _selectedDinasUid)
+                    ? _selectedDinasUid
+                    : null,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF374151), width: 1.5),
+                  ),
+                  fillColor: Colors.white,
+                  filled: true,
+                  hintText: 'Pilih akun dinas agar terhubung ke dashboard-nya',
+                  hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                ),
+                items: [
+                  const DropdownMenuItem<String>(
+                    value: null,
+                    child: Text(
+                      '— Tanpa Tautan Akun (Input Manual) —',
+                      style: TextStyle(fontSize: 12.5, color: Color(0xFF6B7280), fontStyle: FontStyle.italic),
+                    ),
+                  ),
+                  ..._dinasUsers.map((user) {
+                    final label = '${user['namaLengkap']} (${user['companyOrAgency']})';
+                    return DropdownMenuItem<String>(
+                      value: user['uid'] as String,
+                      child: Text(label, style: const TextStyle(fontSize: 12.5), overflow: TextOverflow.ellipsis),
+                    );
+                  }),
+                ],
+                onChanged: (uid) {
+                  setState(() {
+                    _selectedDinasUid = uid;
+                    if (uid != null) {
+                      final user = _dinasUsers.firstWhere(
+                        (u) => u['uid'] == uid,
+                        orElse: () => <String, dynamic>{},
+                      );
+                      if (user.isNotEmpty) {
+                        final chosenName = (user['companyOrAgency']?.toString().trim().isNotEmpty == true)
+                            ? user['companyOrAgency'].toString().trim()
+                            : user['namaLengkap']?.toString().trim() ?? '';
+                        if (chosenName.isNotEmpty) {
+                          if (_dinasControllers.isNotEmpty) {
+                            _dinasControllers.first.text = chosenName;
+                          } else {
+                            _dinasControllers.add(TextEditingController(text: chosenName));
+                          }
+                        }
+                      }
+                    }
+                  });
+                },
+              ),
             const SizedBox(height: 16),
             ..._dinasControllers.asMap().entries.map((entry) {
               int index = entry.key;
@@ -581,6 +749,42 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
                       .where((text) => text.isNotEmpty)
                       .toList();
 
+                  // SINKRONISASI RELASI DINAS: Tentukan dinasUid efektif
+                  String effectiveDinasUid = (_selectedDinasUid ?? '').trim();
+
+                  // Jika dropdown dipilih tapi textfield dinas kosong, isi dari profil akun dinas
+                  if (effectiveDinasUid.isNotEmpty && dinasList.isEmpty && _dinasUsers.isNotEmpty) {
+                    final u = _dinasUsers.firstWhere(
+                      (user) => user['uid'] == effectiveDinasUid,
+                      orElse: () => <String, dynamic>{},
+                    );
+                    final chosen = (u['companyOrAgency']?.toString().trim().isNotEmpty == true)
+                        ? u['companyOrAgency'].toString().trim()
+                        : u['namaLengkap']?.toString().trim() ?? '';
+                    if (chosen.isNotEmpty) {
+                      dinasList.add(chosen);
+                    }
+                  }
+
+                  // Jika dropdown tidak dipilih (manual) tetapi nama cocok dengan akun dinas terdaftar di Admin, otomatis kaitkan UID-nya
+                  if (effectiveDinasUid.isEmpty && dinasList.isNotEmpty && _dinasUsers.isNotEmpty) {
+                    for (final user in _dinasUsers) {
+                      final uid = user['uid']?.toString() ?? '';
+                      final comp = (user['companyOrAgency'] ?? '').toString().trim().toLowerCase();
+                      final name = (user['namaLengkap'] ?? '').toString().trim().toLowerCase();
+                      for (final d in dinasList) {
+                        final clean = d.trim().toLowerCase();
+                        if (clean.isEmpty) continue;
+                        if ((comp.isNotEmpty && (clean.contains(comp) || comp.contains(clean))) ||
+                            (name.isNotEmpty && (clean.contains(name) || name.contains(clean)))) {
+                          effectiveDinasUid = uid;
+                          break;
+                        }
+                      }
+                      if (effectiveDinasUid.isNotEmpty) break;
+                    }
+                  }
+
                   final siteEng = _siteEngineerController.text.trim();
                   final adminis = _administrasiController.text.trim();
                   final inspekList = _inspektorControllers
@@ -612,6 +816,7 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
                           ? 'Rp ${_nilaiKontrakController.text.trim()}'
                           : '',
                       instansiDinas: dinasList,
+                      dinasUid: effectiveDinasUid,
                       sumberDana: _sumberDanaController.text,
                       deskripsi: _deskripsiController.text,
                       progressFisik: widget.contractToEdit!.progressFisik,
@@ -653,6 +858,7 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
                           ? 'Rp ${_nilaiKontrakController.text.trim()}'
                           : '',
                       instansiDinas: dinasList,
+                      dinasUid: effectiveDinasUid,
                       sumberDana: _sumberDanaController.text,
                       deskripsi: _deskripsiController.text,
                       progressFisik: 0.0,

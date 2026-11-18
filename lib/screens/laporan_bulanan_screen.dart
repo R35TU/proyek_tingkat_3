@@ -4,6 +4,7 @@ import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/kegiatan_model.dart';
 import 'package:tata_saka_app/models/monthly_report_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
+import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/widgets/lembar_laporan_bulanan_widget.dart';
 import 'package:pdf/pdf.dart';
@@ -280,7 +281,17 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
   @override
   Widget build(BuildContext context) {
     final contractProvider = Provider.of<ContractProvider>(context);
-    final contracts = contractProvider.contracts;
+    final userProf = Provider.of<UserProfileProvider>(context, listen: false);
+    List<ContractModel> contracts = contractProvider.contracts;
+    if (userProf.isDinas) {
+      contracts = contracts.where((c) {
+        return c.isOwnedByDinas(
+          dinasUserUid: userProf.uid,
+          companyOrAgency: userProf.companyOrAgency,
+          userFullName: userProf.namaLengkap,
+        );
+      }).toList();
+    }
     final isDesktop = ResponsiveBreakpoints.isDesktop(context);
 
     if (contracts.isEmpty) {

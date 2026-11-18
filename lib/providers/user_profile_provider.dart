@@ -76,6 +76,7 @@ class UserProfileProvider with ChangeNotifier {
   static List<String> get registeredAgencyNames => [];
 
   // ─── 1. ACTIVE USER PROFILE & ROLE ───
+  String _uid = '';
   String _namaLengkap = '';
   String _username = '';
   String _role = '';
@@ -103,6 +104,7 @@ class UserProfileProvider with ChangeNotifier {
   final List<LoginActivityItem> _loginActivities = [];
 
   // Getters Profile & Roles
+  String get uid => _uid.isNotEmpty ? _uid : (AuthService.currentUser?.uid ?? '');
   String get namaLengkap => _namaLengkap;
   String get username => _username;
   String get role => _role;
@@ -153,6 +155,7 @@ class UserProfileProvider with ChangeNotifier {
       final profileJson = prefs.getString(_prefProfileKey);
       if (profileJson != null) {
         final Map<String, dynamic> p = jsonDecode(profileJson);
+        _uid = p['uid'] ?? AuthService.currentUser?.uid ?? _uid;
         _namaLengkap = p['namaLengkap'] ?? _namaLengkap;
         _username = p['username'] ?? _username;
         _role = p['role'] ?? _role;
@@ -184,6 +187,7 @@ class UserProfileProvider with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
 
       final profileMap = {
+        'uid': _uid,
         'namaLengkap': _namaLengkap,
         'username': _username,
         'role': _role,
@@ -228,6 +232,7 @@ class UserProfileProvider with ChangeNotifier {
         await AuthService.signOut();
         return false;
       }
+      _uid = uid;
       final fallbackUsername = cleanInput.contains('@') ? cleanInput.split('@').first : cleanInput;
       _username = (doc?['username'] ?? fallbackUsername).toString();
       _role = (doc?['role'] ?? roleHint ?? 'Konsultan').toString();
@@ -360,6 +365,7 @@ class UserProfileProvider with ChangeNotifier {
     try {
       await AuthService.signOut();
     } catch (_) {}
+    _uid = '';
     _username = '';
     _role = '';
     _namaLengkap = '';
