@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:tata_saka_app/models/monthly_report_model.dart';
@@ -206,7 +207,11 @@ class _LembarLaporanBulananWidgetState extends State<LembarLaporanBulananWidget>
 
                         // Bottom Summary (Rencana, Realisasi, Deviasi)
                         _buildBottomSummary(report),
-                        const SizedBox(height: 48),
+                        const SizedBox(height: 24),
+
+                        // Tanda Tangan Multi-Pihak Digital
+                        _buildSignaturesPreview(report),
+                        const SizedBox(height: 36),
                       ],
                     ),
                   ),
@@ -621,6 +626,104 @@ class _LembarLaporanBulananWidgetState extends State<LembarLaporanBulananWidget>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSignaturesPreview(MonthlyReportModel report) {
+    final rawSigners = report.ttdList ?? [];
+    final List<Map<String, dynamic>> signers = [];
+    if (rawSigners.isNotEmpty) {
+      signers.addAll(rawSigners);
+    } else {
+      final dateStr = report.periodeFormatted.split('-').last.trim();
+      signers.addAll([
+        {
+          'peran': 'Kontraktor Pelaksana',
+          'instansi': report.pelaksanaKontraktor,
+          'nama': report.ttdKontraktorNama ?? '',
+          'tanggal': report.ttdKontraktorTanggal ?? dateStr,
+          'signature': report.ttdKontraktorSignature,
+        },
+        {
+          'peran': 'Konsultan Supervisi',
+          'instansi': 'CV. TATA SAKA CONSULTANT',
+          'nama': report.ttdKonsultanNama ?? '',
+          'tanggal': report.ttdKonsultanTanggal ?? dateStr,
+          'signature': report.ttdKonsultanSignature,
+        },
+        {
+          'peran': 'Pejabat Pembuat Komitmen (PPK)',
+          'instansi': 'DPU-PR Kab. Purbalingga',
+          'nama': report.ttdPpkNama ?? '',
+          'tanggal': report.ttdPpkTanggal ?? dateStr,
+          'signature': report.ttdPpkSignature,
+        },
+      ]);
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      child: Row(
+        mainAxisAlignment: signers.length == 1
+            ? MainAxisAlignment.center
+            : MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: signers.map((s) {
+          final peran = (s['peran'] ?? s['jabatan'] ?? '').toString().trim();
+          final instansi = (s['instansi'] ?? '').toString().trim();
+          final nama = (s['nama'] ?? '').toString().trim();
+          final tanggal = (s['tanggal'] ?? '').toString().trim();
+          final sigStr = s['signature']?.toString();
+
+          final List<String> headerLines = [];
+          if (tanggal.isNotEmpty) headerLines.add(tanggal);
+          if (peran.isNotEmpty) headerLines.add(peran);
+          if (instansi.isNotEmpty) headerLines.add(instansi);
+
+          Widget? sigWidget;
+          if (sigStr != null && sigStr.isNotEmpty) {
+            try {
+              if (sigStr.startsWith('data:image')) {
+                final base64Content = sigStr.split(',').last;
+                final bytes = base64Decode(base64Content);
+                sigWidget = Image.memory(bytes, height: 36, fit: BoxFit.contain);
+              }
+            } catch (_) {}
+          }
+
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    headerLines.isNotEmpty ? headerLines.join('\n') : 'Penandatangan',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 8.5, color: Color(0xFF1E293B)),
+                  ),
+                  const SizedBox(height: 4),
+                  sigWidget ?? const SizedBox(height: 36),
+                  const Text(
+                    '_______________________',
+                    style: TextStyle(fontSize: 8.5, color: Color(0xFF1E293B)),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    nama.isNotEmpty ? nama : '( .................................... )',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 8.5,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 }

@@ -11,7 +11,44 @@ import 'package:pdf/pdf.dart';
 import 'package:tata_saka_app/screens/pdf_viewer_screen.dart';
 import 'package:tata_saka_app/services/pdf_report_service.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
+import 'package:tata_saka_app/widgets/signature_pad_widget.dart';
 import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
+
+class _TtdBulananDraftItem {
+  final TextEditingController peranController;
+  final TextEditingController instansiController;
+  final TextEditingController namaController;
+  final TextEditingController tanggalController;
+  String? signatureBase64;
+
+  _TtdBulananDraftItem({
+    required String peran,
+    required String instansi,
+    required String nama,
+    required String tanggal,
+    this.signatureBase64,
+  })  : peranController = TextEditingController(text: peran),
+        instansiController = TextEditingController(text: instansi),
+        namaController = TextEditingController(text: nama),
+        tanggalController = TextEditingController(text: tanggal);
+
+  void dispose() {
+    peranController.dispose();
+    instansiController.dispose();
+    namaController.dispose();
+    tanggalController.dispose();
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'peran': peranController.text.trim(),
+      'instansi': instansiController.text.trim(),
+      'nama': namaController.text.trim(),
+      'tanggal': tanggalController.text.trim(),
+      'signature': signatureBase64,
+    };
+  }
+}
 
 class LaporanBulananScreen extends StatefulWidget {
   final ContractModel? initialContract;
@@ -214,6 +251,19 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
                         ],
                       ),
                     ),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _openTandaTanganBulananModal(context, report);
+                      },
+                      icon: const Icon(Icons.draw_outlined, size: 14, color: AppColors.primaryBlue),
+                      label: const Text('Tanda Tangan', style: TextStyle(fontSize: 12, color: AppColors.primaryBlue)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.primaryBlue),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     ElevatedButton.icon(
                       onPressed: () {
                         Navigator.push(
@@ -273,6 +323,361 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
               ),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  void _openTandaTanganBulananModal(BuildContext context, MonthlyReportModel report) {
+    if (_selectedContract == null) return;
+    final kegMap = _selectedContract!.kegiatans[_selectedKegiatanIndex];
+
+    final existingKey = 'laporanBulanan_${report.bulanKe}';
+    final existingData = kegMap[existingKey] as Map<String, dynamic>?;
+
+    final List<_TtdBulananDraftItem> items = [];
+    final rawList = existingData != null && existingData['ttdList'] is List
+        ? (existingData['ttdList'] as List)
+        : (report.ttdList ?? []);
+
+    if (rawList.isNotEmpty) {
+      for (final it in rawList) {
+        if (it is Map) {
+          items.add(
+            _TtdBulananDraftItem(
+              peran: it['peran']?.toString() ?? it['jabatan']?.toString() ?? '',
+              instansi: it['instansi']?.toString() ?? '',
+              nama: it['nama']?.toString() ?? '',
+              tanggal: it['tanggal']?.toString() ?? '',
+              signatureBase64: it['signature']?.toString(),
+            ),
+          );
+        }
+      }
+    }
+
+    if (items.isEmpty) {
+      final dateStr = report.periodeFormatted.split('-').last.trim();
+      items.add(
+        _TtdBulananDraftItem(
+          peran: 'Kontraktor Pelaksana',
+          instansi: report.pelaksanaKontraktor,
+          nama: report.ttdKontraktorNama ?? '',
+          tanggal: report.ttdKontraktorTanggal ?? dateStr,
+          signatureBase64: report.ttdKontraktorSignature,
+        ),
+      );
+      items.add(
+        _TtdBulananDraftItem(
+          peran: 'Konsultan Supervisi',
+          instansi: 'CV. TATA SAKA CONSULTANT',
+          nama: report.ttdKonsultanNama ?? '',
+          tanggal: report.ttdKonsultanTanggal ?? dateStr,
+          signatureBase64: report.ttdKonsultanSignature,
+        ),
+      );
+      items.add(
+        _TtdBulananDraftItem(
+          peran: 'Pejabat Pembuat Komitmen (PPK)',
+          instansi: 'DPU-PR Kab. Purbalingga',
+          nama: report.ttdPpkNama ?? '',
+          tanggal: report.ttdPpkTanggal ?? dateStr,
+          signatureBase64: report.ttdPpkSignature,
+        ),
+      );
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (modalCtx) {
+        return StatefulBuilder(
+          builder: (builderCtx, setModalState) {
+            void addRow() {
+              setModalState(() {
+                items.add(
+                  _TtdBulananDraftItem(
+                    peran: 'Pengawas Lapangan',
+                    instansi: '',
+                    nama: '',
+                    tanggal: report.periodeFormatted.split('-').last.trim(),
+                  ),
+                );
+              });
+            }
+
+            void removeRow(int idx) {
+              if (items.length > 1) {
+                setModalState(() {
+                  items[idx].dispose();
+                  items.removeAt(idx);
+                });
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Minimal harus ada 1 penandatangan.'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            }
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.88,
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Handle bar
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Header Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Tanda Tangan Digital - Bulan ${report.bulanRomawi}',
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textDark,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Kelola penandatangan dokumen dan bubuhkan tanda tangan canvas untuk lembar Laporan Bulanan',
+                              style: TextStyle(fontSize: 12, color: AppColors.textLight),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(modalCtx),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+
+                  // List of signers
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: items.length,
+                      itemBuilder: (ctx, idx) {
+                        final it = items[idx];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 12,
+                                        backgroundColor: AppColors.primaryBlue,
+                                        child: Text(
+                                          '${idx + 1}',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        it.peranController.text.isNotEmpty
+                                            ? it.peranController.text
+                                            : 'Penandatangan ${idx + 1}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (items.length > 1)
+                                    IconButton(
+                                      tooltip: 'Hapus Penandatangan',
+                                      icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                                      onPressed: () => removeRow(idx),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: it.peranController,
+                                      decoration: InputDecoration(
+                                        labelText: 'Peran / Jabatan',
+                                        hintText: 'Misal: Kontraktor Pelaksana',
+                                        filled: true,
+                                        fillColor: Colors.white,
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                                        ),
+                                      ),
+                                      onChanged: (_) => setModalState(() {}),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: it.instansiController,
+                                      decoration: InputDecoration(
+                                        labelText: 'Instansi / Perusahaan',
+                                        hintText: 'Misal: CV. DIVAN INSAN CEMERLANG',
+                                        filled: true,
+                                        fillColor: Colors.white,
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                                        ),
+                                      ),
+                                      onChanged: (_) => setModalState(() {}),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              SignaturePadWidget(
+                                nameController: it.namaController,
+                                roleController: it.instansiController,
+                                dateController: it.tanggalController,
+                                initialSignatureBase64: it.signatureBase64,
+                                nameLabel: 'Nama Lengkap Penandatangan',
+                                roleLabel: 'Instansi / Perusahaan',
+                                dateLabel: 'Tanggal Tanda Tangan',
+                                onSignatureChanged: (base64) {
+                                  it.signatureBase64 = base64;
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  // Bottom Buttons
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: addRow,
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Tambah'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primaryBlue,
+                          side: const BorderSide(color: AppColors.primaryBlue),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            final cleanList = items.map((e) => e.toMap()).toList();
+                            final Map<String, dynamic> dataToSave = Map<String, dynamic>.from(existingData ?? {});
+                            dataToSave['bulanKe'] = report.bulanKe;
+                            dataToSave['ttdList'] = cleanList;
+
+                            final ttdK = items.isNotEmpty ? items[0] : null;
+                            final ttdS = items.length > 1 ? items[1] : null;
+                            final ttdP = items.length > 2 ? items[2] : null;
+
+                            dataToSave['ttdKontraktorNama'] = ttdK?.namaController.text.trim();
+                            dataToSave['ttdKontraktorJabatan'] = ttdK?.peranController.text.trim();
+                            dataToSave['ttdKontraktorSignature'] = ttdK?.signatureBase64;
+                            dataToSave['ttdKontraktorTanggal'] = ttdK?.tanggalController.text.trim();
+
+                            dataToSave['ttdKonsultanNama'] = ttdS?.namaController.text.trim();
+                            dataToSave['ttdKonsultanJabatan'] = ttdS?.peranController.text.trim();
+                            dataToSave['ttdKonsultanSignature'] = ttdS?.signatureBase64;
+                            dataToSave['ttdKonsultanTanggal'] = ttdS?.tanggalController.text.trim();
+
+                            dataToSave['ttdPpkNama'] = ttdP?.namaController.text.trim();
+                            dataToSave['ttdPpkJabatan'] = ttdP?.peranController.text.trim();
+                            dataToSave['ttdPpkSignature'] = ttdP?.signatureBase64;
+                            dataToSave['ttdPpkTanggal'] = ttdP?.tanggalController.text.trim();
+
+                            kegMap[existingKey] = dataToSave;
+
+                            // Update in list as well
+                            final rawBulananList = List<dynamic>.from(kegMap['laporanBulanan'] ?? []);
+                            final bIdx = rawBulananList.indexWhere(
+                              (b) => b is Map && (b['bulanKe'] == report.bulanKe || b['bulanKe']?.toString() == '${report.bulanKe}'),
+                            );
+                            if (bIdx >= 0) {
+                              rawBulananList[bIdx] = dataToSave;
+                            } else {
+                              rawBulananList.add(dataToSave);
+                            }
+                            kegMap['laporanBulanan'] = rawBulananList;
+
+                            _selectedContract!.kegiatans[_selectedKegiatanIndex] = kegMap;
+                            Provider.of<ContractProvider>(context, listen: false).updateContract(_selectedContract!);
+
+                            Navigator.pop(modalCtx);
+                            setState(() {});
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Tanda tangan Laporan Bulanan ${report.bulanRomawi} berhasil disimpan!'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.check, size: 18, color: Colors.white),
+                          label: const Text('Simpan Tanda Tangan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryBlue,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -764,6 +1169,18 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
                               ? const Color(0xFF137333)
                               : const Color(0xFFC5221F),
                           bold: true,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        onPressed: () => _openTandaTanganBulananModal(context, report),
+                        icon: const Icon(Icons.draw_outlined, size: 13, color: AppColors.primaryBlue),
+                        label: const Text('Tanda Tangan', style: TextStyle(fontSize: 11, color: AppColors.primaryBlue)),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.primaryBlue),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                       ),
                       const SizedBox(width: 8),

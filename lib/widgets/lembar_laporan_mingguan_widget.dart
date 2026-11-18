@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
 import 'package:tata_saka_app/widgets/horizontal_drag_scroll_area.dart';
@@ -73,6 +74,10 @@ class LembarLaporanMingguanWidget extends StatelessWidget {
 
               // 3. TABEL BOBOT S/D MINGGU INI (TABEL BAWAH)
               _buildWeeklyProgressTable(),
+              const SizedBox(height: 14),
+
+              // 4. TANDA TANGAN MULTI-PIHAK DIGITAL
+              _buildSignaturesPreview(),
               const SizedBox(height: 14),
             ],
           ),
@@ -596,6 +601,103 @@ class LembarLaporanMingguanWidget extends StatelessWidget {
           fontWeight: fontWeight,
           color: Colors.black,
         ),
+      ),
+    );
+  }
+
+  Widget _buildSignaturesPreview() {
+    final rawSigners = report.ttdList ?? [];
+    final List<Map<String, dynamic>> signers = [];
+    if (rawSigners.isNotEmpty) {
+      signers.addAll(rawSigners);
+    } else {
+      signers.addAll([
+        {
+          'peran': 'Kontraktor Pelaksana',
+          'instansi': report.kontraktor,
+          'nama': report.ttdKontraktorNama ?? '',
+          'tanggal': report.ttdKontraktorTanggal ?? '',
+          'signature': report.ttdKontraktorSignature,
+        },
+        {
+          'peran': 'Konsultan Supervisi',
+          'instansi': 'CV. TATA SAKA CONSULTANT',
+          'nama': report.ttdKonsultanNama ?? '',
+          'tanggal': report.ttdKonsultanTanggal ?? '',
+          'signature': report.ttdKonsultanSignature,
+        },
+        {
+          'peran': 'Pejabat Pembuat Komitmen (PPK)',
+          'instansi': 'DPU-PR Kab. Purbalingga',
+          'nama': report.ttdPpkNama ?? '',
+          'tanggal': report.ttdPpkTanggal ?? report.periodeAkhir,
+          'signature': report.ttdPpkSignature,
+        },
+      ]);
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      child: Row(
+        mainAxisAlignment: signers.length == 1
+            ? MainAxisAlignment.center
+            : MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: signers.map((s) {
+          final peran = (s['peran'] ?? s['jabatan'] ?? '').toString().trim();
+          final instansi = (s['instansi'] ?? '').toString().trim();
+          final nama = (s['nama'] ?? '').toString().trim();
+          final tanggal = (s['tanggal'] ?? '').toString().trim();
+          final sigStr = s['signature']?.toString();
+
+          final List<String> headerLines = [];
+          if (tanggal.isNotEmpty) headerLines.add(tanggal);
+          if (peran.isNotEmpty) headerLines.add(peran);
+          if (instansi.isNotEmpty) headerLines.add(instansi);
+
+          Widget? sigWidget;
+          if (sigStr != null && sigStr.isNotEmpty) {
+            try {
+              if (sigStr.startsWith('data:image')) {
+                final base64Content = sigStr.split(',').last;
+                final bytes = base64Decode(base64Content);
+                sigWidget = Image.memory(bytes, height: 36, fit: BoxFit.contain);
+              }
+            } catch (_) {}
+          }
+
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    headerLines.isNotEmpty ? headerLines.join('\n') : 'Penandatangan',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 8.5, color: Colors.black),
+                  ),
+                  const SizedBox(height: 4),
+                  sigWidget ?? const SizedBox(height: 36),
+                  const Text(
+                    '_______________________',
+                    style: TextStyle(fontSize: 8.5, color: Colors.black),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    nama.isNotEmpty ? nama : '( .................................... )',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 8.5,
+                      color: Colors.black,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

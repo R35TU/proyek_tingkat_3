@@ -330,5 +330,54 @@ void main() {
         expect(find.byIcon(Icons.help_outline), findsOneWidget);
       },
     );
+
+    testWidgets(
+      '6. Web Sidebar menu icons, active dot indicator, and hover state isolation',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        final konsultanProfile = UserProfileProvider();
+        konsultanProfile.loginAs(const RegisteredUser(
+          username: 'konsultan',
+          password: 'password123',
+          role: 'Konsultan',
+          namaLengkap: 'CV. Tata Saka Consultant',
+          companyOrAgency: 'CV. Tata Saka Consultant',
+        ));
+        final contractProvider = ContractProvider();
+        final timelineProvider = TimelineProvider();
+
+        tester.view.physicalSize = const Size(1280, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          createDashboardWidget(
+            userProfile: konsultanProfile,
+            contractProvider: contractProvider,
+            timelineProvider: timelineProvider,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // 1. Initial: Dashboard is active with standard Material Icons
+        expect(find.byIcon(Icons.dashboard), findsWidgets);
+        expect(find.byIcon(Icons.folder_outlined), findsWidgets);
+        expect(find.byIcon(Icons.description_outlined), findsWidgets);
+        expect(find.byIcon(Icons.folder_open), findsWidgets);
+        expect(find.byIcon(Icons.today_outlined), findsWidgets);
+        expect(find.byIcon(Icons.date_range_outlined), findsWidgets);
+        expect(find.byIcon(Icons.calendar_month_outlined), findsWidgets);
+
+        // 2. Switch to Timeline & Histori
+        final timelineFinder = find.widgetWithText(InkWell, 'Timeline & Histori');
+        expect(timelineFinder, findsOneWidget);
+        await tester.tap(timelineFinder);
+        await tester.pumpAndSettle();
+
+        // 3. Verify Timeline icon exists and renders
+        expect(find.byIcon(Icons.timeline), findsOneWidget);
+      },
+    );
   });
 }

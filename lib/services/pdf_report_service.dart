@@ -1328,6 +1328,54 @@ class PdfReportService {
     const Color yellowHighlightVal = Color(0xFFFFDE59);
     final pdfYellowHighlight = PdfColor.fromInt(yellowHighlightVal.value);
 
+    // Resolve dynamic multi-signers asynchronously
+    final List<Map<String, dynamic>> resolvedSigners = [];
+    final rawSigners = report.ttdList;
+    if (rawSigners != null && rawSigners.isNotEmpty) {
+      for (final s in rawSigners) {
+        final sigStr = s['signature']?.toString();
+        Uint8List? sigBytes;
+        if (sigStr != null && sigStr.isNotEmpty) {
+          sigBytes = await _resolveImageBytes(sigStr);
+        }
+        resolvedSigners.add({
+          'peran': s['peran'] ?? s['jabatan'] ?? '',
+          'instansi': s['instansi'] ?? '',
+          'nama': s['nama'] ?? '',
+          'tanggal': s['tanggal'] ?? '',
+          'bytes': sigBytes,
+        });
+      }
+    } else {
+      final kontraktorSig = await _resolveImageBytes(report.ttdKontraktorSignature);
+      final konsultanSig = await _resolveImageBytes(report.ttdKonsultanSignature);
+      final ppkSig = await _resolveImageBytes(report.ttdPpkSignature);
+
+      resolvedSigners.addAll([
+        {
+          'peran': 'Kontraktor Pelaksana',
+          'instansi': report.kontraktor,
+          'nama': report.ttdKontraktorNama ?? '',
+          'tanggal': report.ttdKontraktorTanggal ?? '',
+          'bytes': kontraktorSig,
+        },
+        {
+          'peran': 'Konsultan Supervisi',
+          'instansi': 'CV. TATA SAKA CONSULTANT',
+          'nama': report.ttdKonsultanNama ?? '',
+          'tanggal': report.ttdKonsultanTanggal ?? '',
+          'bytes': konsultanSig,
+        },
+        {
+          'peran': 'Pejabat Pembuat Komitmen (PPK)',
+          'instansi': 'DPU-PR Kab. Purbalingga',
+          'nama': report.ttdPpkNama ?? '',
+          'tanggal': report.ttdPpkTanggal ?? report.periodeAkhir,
+          'bytes': ppkSig,
+        },
+      ]);
+    }
+
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
@@ -1488,18 +1536,8 @@ class PdfReportService {
           ),
           pw.SizedBox(height: 16),
 
-          // TANDA TANGAN 3 PIHAK
-          _buildTripleSignatures(
-            leftRole: 'Kontraktor Pelaksana',
-            leftName: report.kontraktor,
-            centerRole: 'Konsultan Supervisi\nCV. TATA SAKA CONSULTANT',
-            centerName: contract.siteEngineer.isNotEmpty
-                ? contract.siteEngineer
-                : 'SENDAYU GALIH K., ST\n(Site Engineer)',
-            rightRole: 'Pejabat Pembuat Komitmen (PPK)\nDPU-PR Kab. Purbalingga',
-            rightName: 'PPK DINAS PU-PR',
-            date: report.periodeAkhir,
-          ),
+          // TANDA TANGAN DOKUMEN DIGITAL (BERDASARKAN INPUT PENGGUNA)
+          _buildDynamicSignatures(signers: resolvedSigners),
         ],
       ),
     );
@@ -1528,6 +1566,53 @@ class PdfReportService {
     };
 
     // Calculate divisi list accurately matching LembarBoqMingguanWidget
+    final List<Map<String, dynamic>> resolvedSigners = [];
+    final rawSigners = report.ttdList;
+    if (rawSigners != null && rawSigners.isNotEmpty) {
+      for (final s in rawSigners) {
+        final sigStr = s['signature']?.toString();
+        Uint8List? sigBytes;
+        if (sigStr != null && sigStr.isNotEmpty) {
+          sigBytes = await _resolveImageBytes(sigStr);
+        }
+        resolvedSigners.add({
+          'peran': s['peran'] ?? s['jabatan'] ?? '',
+          'instansi': s['instansi'] ?? '',
+          'nama': s['nama'] ?? '',
+          'tanggal': s['tanggal'] ?? '',
+          'bytes': sigBytes,
+        });
+      }
+    } else {
+      final kontraktorSig = await _resolveImageBytes(report.ttdKontraktorSignature);
+      final konsultanSig = await _resolveImageBytes(report.ttdKonsultanSignature);
+      final ppkSig = await _resolveImageBytes(report.ttdPpkSignature);
+
+      resolvedSigners.addAll([
+        {
+          'peran': 'Kontraktor Pelaksana',
+          'instansi': metadata['kontraktor'] ?? report.kontraktor,
+          'nama': report.ttdKontraktorNama ?? '',
+          'tanggal': report.ttdKontraktorTanggal ?? '',
+          'bytes': kontraktorSig,
+        },
+        {
+          'peran': 'Konsultan Supervisi',
+          'instansi': (kegiatan['konsultanPengawas'] ?? 'CV. TATA SAKA CONSULTANT').toString(),
+          'nama': report.ttdKonsultanNama ?? '',
+          'tanggal': report.ttdKonsultanTanggal ?? '',
+          'bytes': konsultanSig,
+        },
+        {
+          'peran': 'Pejabat Pembuat Komitmen (PPK)',
+          'instansi': 'DPU-PR Kab. Purbalingga',
+          'nama': report.ttdPpkNama ?? '',
+          'tanggal': report.ttdPpkTanggal ?? report.periodeAkhir,
+          'bytes': ppkSig,
+        },
+      ]);
+    }
+
     List<Map<String, dynamic>> divisiList = [];
     if (report.boqProgressList != null && report.boqProgressList!.isNotEmpty) {
       divisiList = report.boqProgressList!;
@@ -1863,18 +1948,8 @@ class PdfReportService {
           ),
           pw.SizedBox(height: 14),
 
-          // TANDA TANGAN 3 PIHAK LANDSCAPE
-          _buildTripleSignatures(
-            leftRole: 'Kontraktor Pelaksana',
-            leftName: metadata['kontraktor'] ?? '-',
-            centerRole: 'Konsultan Supervisi\nCV. TATA SAKA CONSULTANT',
-            centerName: contract.siteEngineer.isNotEmpty
-                ? contract.siteEngineer
-                : 'SENDAYU GALIH K., ST\n(Site Engineer)',
-            rightRole: 'Pejabat Pembuat Komitmen (PPK)\nDPU-PR Kab. Purbalingga',
-            rightName: 'PPK DINAS PU-PR',
-            date: report.periodeAkhir,
-          ),
+          // TANDA TANGAN DOKUMEN DIGITAL (BERDASARKAN INPUT PENGGUNA)
+          _buildDynamicSignatures(signers: resolvedSigners),
         ],
       ),
     );
@@ -1890,6 +1965,55 @@ class PdfReportService {
     required ContractModel contract,
   }) async {
     final pdf = pw.Document();
+
+    // Resolve dynamic multi-signers asynchronously
+    final List<Map<String, dynamic>> resolvedSigners = [];
+    final rawSigners = report.ttdList;
+    if (rawSigners != null && rawSigners.isNotEmpty) {
+      for (final s in rawSigners) {
+        final sigStr = s['signature']?.toString();
+        Uint8List? sigBytes;
+        if (sigStr != null && sigStr.isNotEmpty) {
+          sigBytes = await _resolveImageBytes(sigStr);
+        }
+        resolvedSigners.add({
+          'peran': s['peran'] ?? s['jabatan'] ?? '',
+          'instansi': s['instansi'] ?? '',
+          'nama': s['nama'] ?? '',
+          'tanggal': s['tanggal'] ?? '',
+          'bytes': sigBytes,
+        });
+      }
+    } else {
+      final kontraktorSig = await _resolveImageBytes(report.ttdKontraktorSignature);
+      final konsultanSig = await _resolveImageBytes(report.ttdKonsultanSignature);
+      final ppkSig = await _resolveImageBytes(report.ttdPpkSignature);
+
+      final dateStr = report.periodeFormatted.split('-').last.trim();
+      resolvedSigners.addAll([
+        {
+          'peran': 'Kontraktor Pelaksana',
+          'instansi': report.pelaksanaKontraktor,
+          'nama': report.ttdKontraktorNama ?? '',
+          'tanggal': report.ttdKontraktorTanggal ?? dateStr,
+          'bytes': kontraktorSig,
+        },
+        {
+          'peran': 'Konsultan Supervisi',
+          'instansi': 'CV. TATA SAKA CONSULTANT',
+          'nama': report.ttdKonsultanNama ?? '',
+          'tanggal': report.ttdKonsultanTanggal ?? dateStr,
+          'bytes': konsultanSig,
+        },
+        {
+          'peran': 'Pejabat Pembuat Komitmen (PPK)',
+          'instansi': 'DPU-PR Kab. Purbalingga',
+          'nama': report.ttdPpkNama ?? '',
+          'tanggal': report.ttdPpkTanggal ?? dateStr,
+          'bytes': ppkSig,
+        },
+      ]);
+    }
 
     pdf.addPage(
       pw.MultiPage(
@@ -2082,18 +2206,8 @@ class PdfReportService {
           ),
           pw.SizedBox(height: 14),
 
-          // TANDA TANGAN 3 PIHAK LANDSCAPE
-          _buildTripleSignatures(
-            leftRole: 'Kontraktor Pelaksana',
-            leftName: report.pelaksanaKontraktor,
-            centerRole: 'Konsultan Supervisi\nCV. TATA SAKA CONSULTANT',
-            centerName: contract.siteEngineer.isNotEmpty
-                ? contract.siteEngineer
-                : 'SENDAYU GALIH K., ST\n(Site Engineer)',
-            rightRole: 'Pejabat Pembuat Komitmen (PPK)\nDPU-PR Kab. Purbalingga',
-            rightName: 'PPK DINAS PU-PR',
-            date: report.periodeFormatted.split('-').last.trim(),
-          ),
+          // TANDA TANGAN DOKUMEN DIGITAL (BERDASARKAN INPUT PENGGUNA)
+          _buildDynamicSignatures(signers: resolvedSigners),
         ],
       ),
     );
@@ -2874,6 +2988,77 @@ class PdfReportService {
             style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: PdfColors.grey800),
           ),
         ],
+      ),
+    );
+  }
+
+  static pw.Widget _buildDynamicSignatures({
+    required List<Map<String, dynamic>> signers,
+  }) {
+    if (signers.isEmpty) {
+      return pw.SizedBox();
+    }
+
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(top: 10),
+      child: pw.Row(
+        mainAxisAlignment: signers.length == 1
+            ? pw.MainAxisAlignment.center
+            : pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: signers.map((s) {
+          final peran = (s['peran'] ?? s['jabatan'] ?? '').toString().trim();
+          final instansi = (s['instansi'] ?? '').toString().trim();
+          final nama = (s['nama'] ?? '').toString().trim();
+          final tanggal = (s['tanggal'] ?? '').toString().trim();
+          final bytes = s['bytes'] as Uint8List?;
+
+          final List<String> headerLines = [];
+          if (tanggal.isNotEmpty) headerLines.add(tanggal);
+          if (peran.isNotEmpty) headerLines.add(peran);
+          if (instansi.isNotEmpty) headerLines.add(instansi);
+
+          return pw.Expanded(
+            child: pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 4),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.Text(
+                    headerLines.isNotEmpty ? headerLines.join('\n') : 'Penandatangan',
+                    textAlign: pw.TextAlign.center,
+                    style: const pw.TextStyle(fontSize: 7.5),
+                  ),
+                  pw.SizedBox(height: 4),
+                  if (bytes != null)
+                    pw.Container(
+                      height: 34,
+                      alignment: pw.Alignment.center,
+                      child: pw.Image(
+                        pw.MemoryImage(bytes),
+                        fit: pw.BoxFit.contain,
+                      ),
+                    )
+                  else
+                    pw.SizedBox(height: 34),
+                  pw.Text(
+                    '_______________________',
+                    style: const pw.TextStyle(fontSize: 7.5),
+                  ),
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    nama.isNotEmpty ? nama : '( .................................... )',
+                    textAlign: pw.TextAlign.center,
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 7.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

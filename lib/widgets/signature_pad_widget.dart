@@ -7,15 +7,23 @@ import 'clean_text_form_field.dart';
 class SignaturePadWidget extends StatefulWidget {
   final TextEditingController nameController;
   final TextEditingController roleController;
+  final TextEditingController? dateController;
   final String? initialSignatureBase64;
   final ValueChanged<String?> onSignatureChanged;
+  final String nameLabel;
+  final String roleLabel;
+  final String dateLabel;
 
   const SignaturePadWidget({
     super.key,
     required this.nameController,
     required this.roleController,
+    this.dateController,
     this.initialSignatureBase64,
     required this.onSignatureChanged,
+    this.nameLabel = 'Nama Penandatangan *',
+    this.roleLabel = 'Posisi / Jabatan *',
+    this.dateLabel = 'Tanggal Tanda Tangan',
   });
 
   @override
@@ -107,14 +115,14 @@ class SignaturePadWidgetState extends State<SignaturePadWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 1. Data Penandatangan (Nama & Jabatan)
+        // 1. Data Penandatangan (Nama, Jabatan, & Tanggal)
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: CleanTextFormField(
                 controller: widget.nameController,
-                label: 'Nama Penandatangan *',
+                label: widget.nameLabel,
                 hintText: 'Contoh: MISWANTO',
                 isBold: true,
               ),
@@ -123,12 +131,20 @@ class SignaturePadWidgetState extends State<SignaturePadWidget> {
             Expanded(
               child: CleanTextFormField(
                 controller: widget.roleController,
-                label: 'Posisi / Jabatan *',
+                label: widget.roleLabel,
                 hintText: 'Contoh: Inspector',
               ),
             ),
           ],
         ),
+        if (widget.dateController != null) ...[
+          const SizedBox(height: 10),
+          CleanTextFormField(
+            controller: widget.dateController!,
+            label: widget.dateLabel,
+            hintText: 'Contoh: 30 Mei 2026',
+          ),
+        ],
         const SizedBox(height: 14),
 
         // 2. Kanvas Tanda Tangan

@@ -11,6 +11,7 @@ import 'package:tata_saka_app/utils/rupiah_input_formatter.dart';
 import 'package:tata_saka_app/widgets/lembar_laporan_mingguan_widget.dart';
 import 'package:tata_saka_app/widgets/lembar_boq_mingguan_widget.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
+import 'package:tata_saka_app/widgets/signature_pad_widget.dart';
 import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 
 /// Normalisasi status dokumen: nilai lama ('Normal', 'Rencana', dll)
@@ -48,6 +49,42 @@ class WeekDateRange {
     required this.elapsedDays,
     required this.remainingDays,
   });
+}
+
+class _TtdMingguanItem {
+  final TextEditingController peranController;
+  final TextEditingController instansiController;
+  final TextEditingController namaController;
+  final TextEditingController tanggalController;
+  String? signatureBase64;
+
+  _TtdMingguanItem({
+    required String peran,
+    required String instansi,
+    required String nama,
+    required String tanggal,
+    this.signatureBase64,
+  })  : peranController = TextEditingController(text: peran),
+        instansiController = TextEditingController(text: instansi),
+        namaController = TextEditingController(text: nama),
+        tanggalController = TextEditingController(text: tanggal);
+
+  void dispose() {
+    peranController.dispose();
+    instansiController.dispose();
+    namaController.dispose();
+    tanggalController.dispose();
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'peran': peranController.text.trim(),
+      'instansi': instansiController.text.trim(),
+      'nama': namaController.text.trim(),
+      'tanggal': tanggalController.text.trim(),
+      'signature': signatureBase64,
+    };
+  }
 }
 
 class BuatLaporanMingguanScreen extends StatefulWidget {
@@ -114,6 +151,45 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
   // Dynamic table of weeks
   List<WeeklyTableRow> _tabelMingguan = [];
 
+  // Tanda Tangan & Pengesahan Digital Multi-Pihak
+  final List<_TtdMingguanItem> _ttdList = [];
+
+  void _addTtdRow({
+    String peran = '',
+    String instansi = '',
+    String nama = '',
+    String tanggal = '',
+    String? signatureBase64,
+  }) {
+    setState(() {
+      _ttdList.add(
+        _TtdMingguanItem(
+          peran: peran,
+          instansi: instansi,
+          nama: nama,
+          tanggal: tanggal,
+          signatureBase64: signatureBase64,
+        ),
+      );
+    });
+  }
+
+  void _removeTtdRow(int index) {
+    if (_ttdList.length > 1) {
+      setState(() {
+        _ttdList[index].dispose();
+        _ttdList.removeAt(index);
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Minimal harus ada 1 penandatangan.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   Map<String, dynamic>? get _currentKegiatan {
     if (_selectedContract == null) return null;
     if (_selectedContract!.kegiatans.isEmpty) return null;
@@ -155,6 +231,10 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
     _waktuTerpakaiController.dispose();
     _sisaWaktuController.dispose();
     _akhirMasaKontrakController.dispose();
+    for (var item in _ttdList) {
+      item.dispose();
+    }
+    _ttdList.clear();
     super.dispose();
   }
 
@@ -198,6 +278,47 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
       orElse: () => WeeklyTableRow(status: 'Kontrak', mingguKe: _mingguKe, tglMulai: '', tglSelesai: ''),
     );
     _statusDokumen = _normalizeStatusDokumen(currentRow.status);
+
+    // Muat data penandatangan dari laporan tersimpan
+    for (var item in _ttdList) {
+      item.dispose();
+    }
+    _ttdList.clear();
+
+    final ttdRaw = r.ttdList;
+    if (ttdRaw != null && ttdRaw.isNotEmpty) {
+      for (var t in ttdRaw) {
+        _addTtdRow(
+          peran: t['peran']?.toString() ?? t['jabatan']?.toString() ?? '',
+          instansi: t['instansi']?.toString() ?? '',
+          nama: t['nama']?.toString() ?? '',
+          tanggal: t['tanggal']?.toString() ?? r.periodeAkhir,
+          signatureBase64: t['signature']?.toString(),
+        );
+      }
+    } else {
+      _addTtdRow(
+        peran: 'Kontraktor Pelaksana',
+        instansi: r.kontraktor,
+        nama: r.ttdKontraktorNama ?? '',
+        tanggal: r.ttdKontraktorTanggal ?? r.periodeAkhir,
+        signatureBase64: r.ttdKontraktorSignature,
+      );
+      _addTtdRow(
+        peran: 'Konsultan Supervisi',
+        instansi: 'CV. TATA SAKA CONSULTANT',
+        nama: r.ttdKonsultanNama ?? '',
+        tanggal: r.ttdKonsultanTanggal ?? r.periodeAkhir,
+        signatureBase64: r.ttdKonsultanSignature,
+      );
+      _addTtdRow(
+        peran: 'Pejabat Pembuat Komitmen (PPK)',
+        instansi: 'DPU-PR Kab. Purbalingga',
+        nama: r.ttdPpkNama ?? '',
+        tanggal: r.ttdPpkTanggal ?? r.periodeAkhir,
+        signatureBase64: r.ttdPpkSignature,
+      );
+    }
   }
 
   void _initFromSelectedKegiatanData() {
@@ -275,6 +396,31 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
       _totalMinggu = 13;
       _tabelMingguan = [];
     }
+
+    // Inisialisasi daftar penandatangan default (3 Pihak)
+    for (var item in _ttdList) {
+      item.dispose();
+    }
+    _ttdList.clear();
+
+    _addTtdRow(
+      peran: 'Kontraktor Pelaksana',
+      instansi: _kontraktorController.text.trim(),
+      nama: '',
+      tanggal: _periodeAkhirController.text.trim(),
+    );
+    _addTtdRow(
+      peran: 'Konsultan Supervisi',
+      instansi: 'CV. TATA SAKA CONSULTANT',
+      nama: '',
+      tanggal: _periodeAkhirController.text.trim(),
+    );
+    _addTtdRow(
+      peran: 'Pejabat Pembuat Komitmen (PPK)',
+      instansi: 'DPU-PR Kab. Purbalingga',
+      nama: '',
+      tanggal: _periodeAkhirController.text.trim(),
+    );
   }
 
   /// Kalkulasi rentang tanggal dan durasi hari per minggu kalender murni (tanpa hari libur).
@@ -752,6 +898,11 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
         ? _buildBoqProgressSnapshot(keg: keg, startDt: startDt, endDt: endDt)
         : null;
 
+    final cleanTtdList = _ttdList.map((item) => item.toMap()).toList();
+    final ttdKontraktor = _ttdList.isNotEmpty ? _ttdList[0] : null;
+    final ttdKonsultan = _ttdList.length > 1 ? _ttdList[1] : null;
+    final ttdPpk = _ttdList.length > 2 ? _ttdList[2] : null;
+
     return WeeklyReportModel(
       id: widget.editReport?.id ?? 'weekly-${DateTime.now().millisecondsSinceEpoch}',
       pekerjaan: _pekerjaanController.text.trim(),
@@ -782,6 +933,19 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
       akhirMasaKontrak: _akhirMasaKontrakController.text.trim(),
       tabelMingguan: _tabelMingguan,
       boqProgressList: boqSnapshot,
+      ttdList: cleanTtdList,
+      ttdKontraktorNama: ttdKontraktor?.namaController.text.trim(),
+      ttdKontraktorJabatan: ttdKontraktor?.peranController.text.trim(),
+      ttdKontraktorSignature: ttdKontraktor?.signatureBase64,
+      ttdKontraktorTanggal: ttdKontraktor?.tanggalController.text.trim(),
+      ttdKonsultanNama: ttdKonsultan?.namaController.text.trim(),
+      ttdKonsultanJabatan: ttdKonsultan?.peranController.text.trim(),
+      ttdKonsultanSignature: ttdKonsultan?.signatureBase64,
+      ttdKonsultanTanggal: ttdKonsultan?.tanggalController.text.trim(),
+      ttdPpkNama: ttdPpk?.namaController.text.trim(),
+      ttdPpkJabatan: ttdPpk?.peranController.text.trim(),
+      ttdPpkSignature: ttdPpk?.signatureBase64,
+      ttdPpkTanggal: ttdPpk?.tanggalController.text.trim(),
     );
   }
 
@@ -1038,6 +1202,10 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
 
           // 5. WAKTU PELAKSANAAN PROYEK (PURE LOGIC AUTO)
           _buildWaktuSection(),
+          const SizedBox(height: 24),
+
+          // 6. TANDA TANGAN & PENGESAHAN DOKUMEN (CANVAS MULTI-SIGNERS)
+          _buildTandaTanganSection(),
           const SizedBox(height: 24),
 
           // TOMBOL SIMPAN
@@ -1776,6 +1944,156 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
     );
   }
 
+
+  // ─── TANDA TANGAN & PENGESAHAN DOKUMEN DIGITAL (CANVAS MULTI-SIGNERS) ───
+  Widget _buildTandaTanganSection() {
+    return _buildCard(
+      title: 'Tanda Tangan & Pengesahan Digital',
+      badge: '${_ttdList.length} Penandatangan',
+      children: [
+        const Text(
+          'Input identitas penandatangan dan bubuhkan tanda tangan digital pada canvas di bawah. Dokumen cetak akan menampilkan tanda tangan yang sudah disimpan.',
+          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 16),
+
+        ..._ttdList.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final item = entry.value;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 20),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 12,
+                          backgroundColor: AppColors.primaryBlue,
+                          child: Text(
+                            '${idx + 1}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          item.peranController.text.isNotEmpty
+                              ? item.peranController.text
+                              : 'Penandatangan ${idx + 1}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_ttdList.length > 1)
+                      IconButton(
+                        tooltip: 'Hapus Penandatangan',
+                        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                        onPressed: () => _removeTtdRow(idx),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Baris 1: Peran & Instansi
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: item.peranController,
+                        decoration: InputDecoration(
+                          labelText: 'Peran / Jabatan',
+                          hintText: 'Misal: Kontraktor Pelaksana',
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                          ),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: item.instansiController,
+                        decoration: InputDecoration(
+                          labelText: 'Instansi / Perusahaan',
+                          hintText: 'Misal: CV. DIVAN INSAN CEMERLANG',
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                          ),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // SignaturePadWidget (Nama, Tanggal, Canvas)
+                SignaturePadWidget(
+                  nameController: item.namaController,
+                  roleController: item.instansiController,
+                  dateController: item.tanggalController,
+                  initialSignatureBase64: item.signatureBase64,
+                  nameLabel: 'Nama Lengkap Penandatangan',
+                  roleLabel: 'Instansi / Perusahaan',
+                  dateLabel: 'Tanggal Tanda Tangan',
+                  onSignatureChanged: (base64) {
+                    item.signatureBase64 = base64;
+                  },
+                ),
+              ],
+            ),
+          );
+        }),
+
+        // Tombol Tambah Penandatangan
+        OutlinedButton.icon(
+          onPressed: () => _addTtdRow(
+            peran: 'Pengawas Lapangan',
+            instansi: '',
+            nama: '',
+            tanggal: _periodeAkhirController.text.trim(),
+          ),
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text('Tambah Penandatangan'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.primaryBlue,
+            side: const BorderSide(color: AppColors.primaryBlue),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+      ],
+    );
+  }
 
   // Tombol Simpan Laporan
   Widget _buildSaveButton() {
