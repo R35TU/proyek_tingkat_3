@@ -280,12 +280,11 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                 var baseContracts = provider.contracts;
                 if (userProf.isDinas) {
                   baseContracts = baseContracts.where((c) {
-                    return c.instansiDinas.any((d) {
-                      final din = d.toUpperCase();
-                      return din.contains('DPU-PR') ||
-                          din.contains('DINAS') ||
-                          din.contains('PURBALINGGA');
-                    });
+                    return c.isOwnedByDinas(
+                      dinasUserUid: userProf.uid,
+                      companyOrAgency: userProf.companyOrAgency,
+                      userFullName: userProf.namaLengkap,
+                    );
                   }).toList();
                 } else if (userProf.isKontraktor) {
                   baseContracts = baseContracts.where((c) {

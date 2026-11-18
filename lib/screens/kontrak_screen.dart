@@ -343,13 +343,12 @@ class _KontrakScreenState extends State<KontrakScreen> {
 
     List<ContractModel> filteredContracts = allContracts;
     if (isDinas) {
-      final agency = userProf.companyOrAgency.toLowerCase();
       filteredContracts = filteredContracts.where((c) {
-        return c.instansiDinas.any((d) =>
-            d.toLowerCase().contains(agency) ||
-            agency.contains(d.toLowerCase()) ||
-            d.toLowerCase().contains('dpu') ||
-            agency.contains('dpu'));
+        return c.isOwnedByDinas(
+          dinasUserUid: userProf.uid,
+          companyOrAgency: userProf.companyOrAgency,
+          userFullName: userProf.namaLengkap,
+        );
       }).toList();
     }
 

@@ -305,14 +305,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Filter Kontrak untuk Dinas: hanya kontrak terkait dinas tersebut
     final List<ContractModel> contracts;
     if (safeUserProf.isDinas) {
-      final agency = safeUserProf.companyOrAgency.toLowerCase();
       contracts = allContracts.where((c) {
-        return c.instansiDinas.any(
-          (d) =>
-              d.toLowerCase().contains(agency) ||
-              agency.contains(d.toLowerCase()) ||
-              d.toLowerCase().contains('dpu') ||
-              agency.contains('dpu'),
+        return c.isOwnedByDinas(
+          dinasUserUid: safeUserProf.uid,
+          companyOrAgency: safeUserProf.companyOrAgency,
+          userFullName: safeUserProf.namaLengkap,
         );
       }).toList();
     } else {

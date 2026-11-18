@@ -247,26 +247,36 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
 
   Future<void> _loadKontraktorUsers() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('role', isEqualTo: 'Kontraktor')
-          .where('isActive', isEqualTo: true)
-          .get();
+      final snapshot = await FirebaseFirestore.instance.collection('users').get();
       if (mounted) {
         setState(() {
-          _kontraktorUsers = snapshot.docs.map((doc) {
-            final data = doc.data();
-            return {
-              'uid': doc.id,
-              'namaLengkap': data['namaLengkap'] ?? '',
-              'companyOrAgency': data['companyOrAgency'] ?? '',
-            };
-          }).toList();
+          _kontraktorUsers = snapshot.docs
+              .where((doc) {
+                final data = doc.data();
+                final role = (data['role'] ?? '').toString().toLowerCase();
+                final isActive = data['isActive'] ?? true;
+                return role == 'kontraktor' && isActive != false;
+              })
+              .map((doc) {
+                final data = doc.data();
+                return {
+                  'uid': doc.id,
+                  'namaLengkap': (data['namaLengkap'] ?? '').toString().trim(),
+                  'companyOrAgency': (data['companyOrAgency'] ?? '').toString().trim(),
+                };
+              })
+              .toList();
 
           // Auto-match if editing and UID was not previously saved but company name matches
           if (_selectedKontraktorUid == null && _kontraktorCtrl.text.isNotEmpty) {
+            final cleanCtrl = _kontraktorCtrl.text.trim().toLowerCase();
             final matched = _kontraktorUsers.cast<Map<String, dynamic>?>().firstWhere(
-              (u) => (u?['companyOrAgency'] ?? '').toString().toLowerCase() == _kontraktorCtrl.text.trim().toLowerCase(),
+              (u) {
+                final comp = (u?['companyOrAgency'] ?? '').toString().toLowerCase();
+                final name = (u?['namaLengkap'] ?? '').toString().toLowerCase();
+                return (comp.isNotEmpty && (cleanCtrl.contains(comp) || comp.contains(cleanCtrl))) ||
+                    (name.isNotEmpty && (cleanCtrl.contains(name) || name.contains(cleanCtrl)));
+              },
               orElse: () => null,
             );
             if (matched != null) {

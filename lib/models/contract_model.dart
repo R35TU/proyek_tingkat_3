@@ -16,6 +16,7 @@ class ContractModel {
   final String nilaiKontrak;
   
   final List<String> instansiDinas;
+  final String dinasUid;
   final String sumberDana;
   final String deskripsi;
   final double _storedProgressFisik;
@@ -62,6 +63,43 @@ class ContractModel {
 
   String get status => progressFisik >= 1.0 ? 'Selesai' : 'Aktif';
 
+  /// Memeriksa apakah kontrak ini milik akun Dinas yang sedang login.
+  /// Memprioritaskan pencocokan `dinasUid` (UID akun Firebase).
+  /// Fallback ke pencocokan nama instansi/dinas jika `dinasUid` belum terisi (kontrak lama).
+  bool isOwnedByDinas({
+    required String dinasUserUid,
+    String companyOrAgency = '',
+    String userFullName = '',
+  }) {
+    final cleanUid = dinasUserUid.trim();
+    // 1. Prioritas Utama: Pencocokan UID unik akun dinas
+    if (dinasUid.trim().isNotEmpty) {
+      return cleanUid.isNotEmpty && dinasUid.trim() == cleanUid;
+    }
+
+    // 2. Fallback untuk data lama tanpa dinasUid
+    if (instansiDinas.isNotEmpty) {
+      final agency = companyOrAgency.trim().toLowerCase();
+      final fullName = userFullName.trim().toLowerCase();
+
+      return instansiDinas.any((d) {
+        final dinasName = d.trim().toLowerCase();
+        if (dinasName.isEmpty) return false;
+
+        final matchAgency = agency.isNotEmpty &&
+            agency != 'tata saka' &&
+            (dinasName.contains(agency) || agency.contains(dinasName));
+        final matchFullName = fullName.isNotEmpty &&
+            fullName != 'tata saka' &&
+            (dinasName.contains(fullName) || fullName.contains(dinasName));
+
+        return matchAgency || matchFullName;
+      });
+    }
+
+    return false;
+  }
+
   ContractModel({
     required this.id,
     required this.jenisKegiatan,
@@ -74,6 +112,7 @@ class ContractModel {
     required this.hariKalender,
     required this.nilaiKontrak,
     required this.instansiDinas,
+    this.dinasUid = '',
     required this.sumberDana,
     required this.deskripsi,
     double progressFisik = 0.0,
@@ -121,6 +160,7 @@ class ContractModel {
       hariKalender: json['hariKalender'] ?? 0,
       nilaiKontrak: json['nilaiKontrak'] ?? '',
       instansiDinas: json['instansiDinas'] != null ? List<String>.from(json['instansiDinas']) : [],
+      dinasUid: json['dinasUid'] ?? '',
       sumberDana: json['sumberDana'] ?? '',
       deskripsi: json['deskripsi'] ?? '',
       progressFisik: (json['progressFisik'] ?? 0.0).toDouble(),
@@ -147,6 +187,7 @@ class ContractModel {
       'hariKalender': hariKalender,
       'nilaiKontrak': nilaiKontrak,
       'instansiDinas': instansiDinas,
+      'dinasUid': dinasUid,
       'sumberDana': sumberDana,
       'deskripsi': deskripsi,
       'progressFisik': progressFisik,
