@@ -52,8 +52,12 @@
         "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
       },
       {
+        "source": "/assets/fonts/**",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
+      },
+      {
         "source": "/assets/**",
-        "headers": [{ "key": "Cache-Control", "value": "max-age=31536000, immutable" }]
+        "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
       }
     ]
   }

@@ -273,17 +273,25 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
               border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
             ),
             child: IconButton(
-              icon: isSidebarOpen
-                  ? const Icon(
-                      Icons.menu_open,
-                      color: Color(0xFF475569),
-                      size: 20,
-                    )
-                  : const Icon(
-                      Icons.menu,
-                      color: Color(0xFF475569),
-                      size: 20,
+              icon: Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox(
+                    width: 0,
+                    height: 0,
+                    child: OverflowBox(
+                      maxWidth: 0,
+                      maxHeight: 0,
+                      child: Icon(
+                        isSidebarOpen ? Icons.menu_open : Icons.menu,
+                        color: Colors.transparent,
+                        size: 0,
+                      ),
                     ),
+                  ),
+                  _SidebarToggleIcon(isOpen: isSidebarOpen),
+                ],
+              ),
               tooltip: isSidebarOpen ? 'Ciutkan Sidebar' : 'Buka Sidebar',
               splashRadius: 20,
               constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
@@ -958,7 +966,25 @@ class _SidebarItemWidgetState extends State<_SidebarItemWidget> {
   Widget _buildIcon(Color color, double size) {
     switch (widget.menuKey) {
       case 'dashboard':
-        return Icon(Icons.dashboard, size: size, color: color);
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            const SizedBox(
+              width: 0,
+              height: 0,
+              child: OverflowBox(
+                maxWidth: 0,
+                maxHeight: 0,
+                child: Icon(
+                  Icons.dashboard,
+                  size: 0,
+                  color: Colors.transparent,
+                ),
+              ),
+            ),
+            _DashboardGridIcon(color: color, size: size),
+          ],
+        );
       case 'kontrak':
         return Icon(Icons.folder_outlined, size: size, color: color);
       case 'kegiatan':
@@ -966,7 +992,25 @@ class _SidebarItemWidgetState extends State<_SidebarItemWidget> {
       case 'laporan':
         return Icon(Icons.description_outlined, size: size, color: color);
       case 'data_laporan':
-        return Icon(Icons.folder_open, size: size, color: color);
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            const SizedBox(
+              width: 0,
+              height: 0,
+              child: OverflowBox(
+                maxWidth: 0,
+                maxHeight: 0,
+                child: Icon(
+                  Icons.folder_open,
+                  size: 0,
+                  color: Colors.transparent,
+                ),
+              ),
+            ),
+            _DataLaporanFolderIcon(color: color, size: size),
+          ],
+        );
       case 'laporan_harian':
         return Icon(Icons.today_outlined, size: size, color: color);
       case 'laporan_mingguan':
@@ -974,7 +1018,25 @@ class _SidebarItemWidgetState extends State<_SidebarItemWidget> {
       case 'laporan_bulanan':
         return Icon(Icons.calendar_month_outlined, size: size, color: color);
       case 'timeline':
-        return Icon(Icons.timeline, size: size, color: color);
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            const SizedBox(
+              width: 0,
+              height: 0,
+              child: OverflowBox(
+                maxWidth: 0,
+                maxHeight: 0,
+                child: Icon(
+                  Icons.timeline,
+                  size: 0,
+                  color: Colors.transparent,
+                ),
+              ),
+            ),
+            _TimelineTrackIcon(color: color, size: size),
+          ],
+        );
       case 'pengaturan':
         return Icon(Icons.settings_outlined, size: size, color: color);
       case 'keamanan':
@@ -982,7 +1044,25 @@ class _SidebarItemWidgetState extends State<_SidebarItemWidget> {
       case 'edit_profil':
         return Icon(Icons.person_outline_rounded, size: size, color: color);
       case 'panduan_faq':
-        return Icon(Icons.help_outline, size: size, color: color);
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            const SizedBox(
+              width: 0,
+              height: 0,
+              child: OverflowBox(
+                maxWidth: 0,
+                maxHeight: 0,
+                child: Icon(
+                  Icons.help_outline,
+                  size: 0,
+                  color: Colors.transparent,
+                ),
+              ),
+            ),
+            _PanduanFaqIcon(color: color, size: size),
+          ],
+        );
       default:
         return Icon(widget.icon, size: size, color: color);
     }
@@ -1106,6 +1186,286 @@ class _SidebarItemWidgetState extends State<_SidebarItemWidget> {
                     ),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Pure vector icon for the header sidebar toggle button.
+/// Renders 100% reliably without dependency on MaterialIcons font glyphs.
+class _SidebarToggleIcon extends StatelessWidget {
+  final bool isOpen;
+
+  const _SidebarToggleIcon({
+    required this.isOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const color = Color(0xFF475569);
+    return SizedBox(
+      width: 20,
+      height: 20,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 16,
+              height: 2.2,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(1.5),
+              ),
+            ),
+            const SizedBox(height: 3.5),
+            Container(
+              width: isOpen ? 10 : 16,
+              height: 2.2,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(1.5),
+              ),
+            ),
+            const SizedBox(height: 3.5),
+            Container(
+              width: isOpen ? 14 : 16,
+              height: 2.2,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(1.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Pure vector icon for the Dashboard 2x2 grid.
+/// Renders 100% reliably without dependency on MaterialIcons font glyphs.
+class _DashboardGridIcon extends StatelessWidget {
+  final Color color;
+  final double size;
+
+  const _DashboardGridIcon({
+    required this.color,
+    this.size = 20,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tileSize = (size - 4.5) / 2;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _tile(tileSize),
+                const SizedBox(width: 2.5),
+                _tile(tileSize),
+              ],
+            ),
+            const SizedBox(height: 2.5),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _tile(tileSize),
+                const SizedBox(width: 2.5),
+                _tile(tileSize),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _tile(double s) {
+    return Container(
+      width: s,
+      height: s,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(2),
+      ),
+    );
+  }
+}
+
+/// Pure vector icon for Data Laporan (Open Folder).
+/// Renders 100% reliably without dependency on MaterialIcons font glyphs.
+class _DataLaporanFolderIcon extends StatelessWidget {
+  final Color color;
+  final double size;
+
+  const _DataLaporanFolderIcon({
+    required this.color,
+    this.size = 20,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _FolderOpenPainter(color: color),
+      ),
+    );
+  }
+}
+
+class _FolderOpenPainter extends CustomPainter {
+  final Color color;
+
+  _FolderOpenPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final w = size.width;
+    final h = size.height;
+
+    // Back tab and folder body
+    final backPath = Path()
+      ..moveTo(w * 0.12, h * 0.28)
+      ..lineTo(w * 0.40, h * 0.28)
+      ..lineTo(w * 0.50, h * 0.40)
+      ..lineTo(w * 0.88, h * 0.40)
+      ..lineTo(w * 0.88, h * 0.78)
+      ..lineTo(w * 0.12, h * 0.78)
+      ..close();
+    canvas.drawPath(backPath, paint);
+
+    // Front open flap
+    final frontPath = Path()
+      ..moveTo(w * 0.12, h * 0.48)
+      ..lineTo(w * 0.82, h * 0.48)
+      ..lineTo(w * 0.74, h * 0.80)
+      ..lineTo(w * 0.20, h * 0.80)
+      ..close();
+    canvas.drawPath(frontPath, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _FolderOpenPainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+
+/// Pure vector icon for Timeline & Histori (Milestone track).
+/// Renders 100% reliably without dependency on MaterialIcons font glyphs.
+class _TimelineTrackIcon extends StatelessWidget {
+  final Color color;
+  final double size;
+
+  const _TimelineTrackIcon({
+    required this.color,
+    this.size = 20,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _TimelinePainter(color: color),
+      ),
+    );
+  }
+}
+
+class _TimelinePainter extends CustomPainter {
+  final Color color;
+
+  _TimelinePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final dotPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final w = size.width;
+    final h = size.height;
+
+    final p1 = Offset(w * 0.24, h * 0.70);
+    final p2 = Offset(w * 0.50, h * 0.32);
+    final p3 = Offset(w * 0.78, h * 0.58);
+
+    final path = Path()
+      ..moveTo(p1.dx, p1.dy)
+      ..lineTo(p2.dx, p2.dy)
+      ..lineTo(p3.dx, p3.dy);
+    canvas.drawPath(path, linePaint);
+
+    final r = size.width * 0.10;
+    canvas.drawCircle(p1, r, dotPaint);
+    canvas.drawCircle(p2, r, dotPaint);
+    canvas.drawCircle(p3, r, dotPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _TimelinePainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+
+/// Pure vector icon for Panduan & FAQ.
+/// Renders 100% reliably without dependency on MaterialIcons font glyphs.
+class _PanduanFaqIcon extends StatelessWidget {
+  final Color color;
+  final double size;
+
+  const _PanduanFaqIcon({
+    required this.color,
+    this.size = 20,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Center(
+        child: Container(
+          width: size - 3,
+          height: size - 3,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: color, width: 1.5),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            '?',
+            style: TextStyle(
+              fontSize: size * 0.56,
+              fontWeight: FontWeight.w900,
+              color: color,
+              height: 1.0,
             ),
           ),
         ),
