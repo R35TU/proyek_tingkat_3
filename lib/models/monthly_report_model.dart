@@ -92,6 +92,23 @@ class MonthlyReportModel {
   final String konsultanPengawas;
   final String noKontrakPengawas;
 
+  // Data Tanda Tangan & Pengesahan Digital (3 Pihak)
+  final List<Map<String, dynamic>>? ttdList;
+  final String? ttdKontraktorNama;
+  final String? ttdKontraktorJabatan;
+  final String? ttdKontraktorSignature;
+  final String? ttdKontraktorTanggal;
+
+  final String? ttdKonsultanNama;
+  final String? ttdKonsultanJabatan;
+  final String? ttdKonsultanSignature;
+  final String? ttdKonsultanTanggal;
+
+  final String? ttdPpkNama;
+  final String? ttdPpkJabatan;
+  final String? ttdPpkSignature;
+  final String? ttdPpkTanggal;
+
   MonthlyReportModel({
     required this.bulanKe,
     required this.bulanRomawi,
@@ -118,7 +135,131 @@ class MonthlyReportModel {
     required this.noKontrak,
     required this.konsultanPengawas,
     required this.noKontrakPengawas,
+    this.ttdList,
+    this.ttdKontraktorNama,
+    this.ttdKontraktorJabatan,
+    this.ttdKontraktorSignature,
+    this.ttdKontraktorTanggal,
+    this.ttdKonsultanNama,
+    this.ttdKonsultanJabatan,
+    this.ttdKonsultanSignature,
+    this.ttdKonsultanTanggal,
+    this.ttdPpkNama,
+    this.ttdPpkJabatan,
+    this.ttdPpkSignature,
+    this.ttdPpkTanggal,
   });
+
+  Map<String, dynamic> get ttdKontraktor {
+    if (ttdList != null && ttdList!.isNotEmpty) {
+      final f = ttdList!.firstWhere(
+        (t) =>
+            t['pihak'] == 'kontraktor' ||
+            (t['jabatan']?.toString().toLowerCase().contains('kontraktor') ?? false),
+        orElse: () => ttdList!.first,
+      );
+      if (f.isNotEmpty) return f;
+    }
+    return {
+      'nama': ttdKontraktorNama ?? '',
+      'jabatan': ttdKontraktorJabatan ?? 'Kontraktor Pelaksana',
+      'signature': ttdKontraktorSignature,
+      'tanggal': ttdKontraktorTanggal ?? '',
+    };
+  }
+
+  Map<String, dynamic> get ttdKonsultan {
+    if (ttdList != null && ttdList!.isNotEmpty) {
+      final f = ttdList!.firstWhere(
+        (t) =>
+            t['pihak'] == 'konsultan' ||
+            (t['jabatan']?.toString().toLowerCase().contains('konsultan') ?? false),
+        orElse: () => ttdList!.length > 1 ? ttdList![1] : {},
+      );
+      if (f.isNotEmpty) return f;
+    }
+    return {
+      'nama': ttdKonsultanNama ?? '',
+      'jabatan': ttdKonsultanJabatan ?? 'Konsultan Supervisi',
+      'signature': ttdKonsultanSignature,
+      'tanggal': ttdKonsultanTanggal ?? '',
+    };
+  }
+
+  Map<String, dynamic> get ttdPpk {
+    if (ttdList != null && ttdList!.isNotEmpty) {
+      final f = ttdList!.firstWhere(
+        (t) =>
+            t['pihak'] == 'ppk' ||
+            (t['jabatan']?.toString().toLowerCase().contains('ppk') ?? false),
+        orElse: () => ttdList!.length > 2 ? ttdList![2] : {},
+      );
+      if (f.isNotEmpty) return f;
+    }
+    return {
+      'nama': ttdPpkNama ?? '',
+      'jabatan': ttdPpkJabatan ?? 'Pejabat Pembuat Komitmen (PPK)',
+      'signature': ttdPpkSignature,
+      'tanggal': ttdPpkTanggal ?? '',
+    };
+  }
+
+  MonthlyReportModel copyWithSignatures({
+    List<Map<String, dynamic>>? ttdList,
+    String? ttdKontraktorNama,
+    String? ttdKontraktorJabatan,
+    String? ttdKontraktorSignature,
+    String? ttdKontraktorTanggal,
+    String? ttdKonsultanNama,
+    String? ttdKonsultanJabatan,
+    String? ttdKonsultanSignature,
+    String? ttdKonsultanTanggal,
+    String? ttdPpkNama,
+    String? ttdPpkJabatan,
+    String? ttdPpkSignature,
+    String? ttdPpkTanggal,
+  }) {
+    return MonthlyReportModel(
+      bulanKe: bulanKe,
+      bulanRomawi: bulanRomawi,
+      namaBulan: namaBulan,
+      periodeFormatted: periodeFormatted,
+      mingguMulai: mingguMulai,
+      mingguSelesai: mingguSelesai,
+      mingguTersedia: mingguTersedia,
+      status: status,
+      statusDetail: statusDetail,
+      divisions: divisions,
+      totalBobotCCO: totalBobotCCO,
+      totalBobotBulanLalu: totalBobotBulanLalu,
+      totalBobotBulanIni: totalBobotBulanIni,
+      totalBobotSdBulanIni: totalBobotSdBulanIni,
+      totalBobotSisa: totalBobotSisa,
+      rencanaFisikPersen: rencanaFisikPersen,
+      realisasiKumulatifPersen: realisasiKumulatifPersen,
+      deviasiPersen: deviasiPersen,
+      namaKegiatan: namaKegiatan,
+      lokasi: lokasi,
+      sumberDana: sumberDana,
+      pelaksanaKontraktor: pelaksanaKontraktor,
+      noKontrak: noKontrak,
+      konsultanPengawas: konsultanPengawas,
+      noKontrakPengawas: noKontrakPengawas,
+      ttdList: ttdList ?? this.ttdList,
+      ttdKontraktorNama: ttdKontraktorNama ?? this.ttdKontraktorNama,
+      ttdKontraktorJabatan: ttdKontraktorJabatan ?? this.ttdKontraktorJabatan,
+      ttdKontraktorSignature: ttdKontraktorSignature ?? this.ttdKontraktorSignature,
+      ttdKontraktorTanggal: ttdKontraktorTanggal ?? this.ttdKontraktorTanggal,
+      ttdKonsultanNama: ttdKonsultanNama ?? this.ttdKonsultanNama,
+      ttdKonsultanJabatan: ttdKonsultanJabatan ?? this.ttdKonsultanJabatan,
+      ttdKonsultanSignature: ttdKonsultanSignature ?? this.ttdKonsultanSignature,
+      ttdKonsultanTanggal: ttdKonsultanTanggal ?? this.ttdKonsultanTanggal,
+      ttdPpkNama: ttdPpkNama ?? this.ttdPpkNama,
+      ttdPpkJabatan: ttdPpkJabatan ?? this.ttdPpkJabatan,
+      ttdPpkSignature: ttdPpkSignature ?? this.ttdPpkSignature,
+      ttdPpkTanggal: ttdPpkTanggal ?? this.ttdPpkTanggal,
+    );
+  }
 
   static String toRoman(int number) {
     switch (number) {
@@ -466,6 +607,61 @@ class MonthlyReportModel {
         );
       }
 
+      // Tanda tangan tersimpan untuk bulan ini
+      final rawBulananList = (kegMap['laporanBulanan'] as List?) ?? [];
+      final savedBulanan = rawBulananList.cast<dynamic>().firstWhere(
+            (b) => b is Map && (b['bulanKe'] == monthIdx || b['bulanKe']?.toString() == '$monthIdx'),
+            orElse: () => null,
+          );
+
+      List<Map<String, dynamic>>? ttdList;
+      String? ttdKontraktorNama;
+      String? ttdKontraktorJabatan;
+      String? ttdKontraktorSignature;
+      String? ttdKontraktorTanggal;
+
+      String? ttdKonsultanNama;
+      String? ttdKonsultanJabatan;
+      String? ttdKonsultanSignature;
+      String? ttdKonsultanTanggal;
+
+      String? ttdPpkNama;
+      String? ttdPpkJabatan;
+      String? ttdPpkSignature;
+      String? ttdPpkTanggal;
+
+      if (savedBulanan != null) {
+        final Map<String, dynamic> bMap = Map<String, dynamic>.from(savedBulanan as Map);
+        if (bMap['ttdList'] != null) {
+          ttdList = List<Map<String, dynamic>>.from(
+              (bMap['ttdList'] as List).map((e) => Map<String, dynamic>.from(e)));
+        }
+        ttdKontraktorNama = bMap['ttdKontraktorNama']?.toString();
+        ttdKontraktorJabatan = bMap['ttdKontraktorJabatan']?.toString();
+        ttdKontraktorSignature = bMap['ttdKontraktorSignature']?.toString();
+        ttdKontraktorTanggal = bMap['ttdKontraktorTanggal']?.toString();
+
+        ttdKonsultanNama = bMap['ttdKonsultanNama']?.toString();
+        ttdKonsultanJabatan = bMap['ttdKonsultanJabatan']?.toString();
+        ttdKonsultanSignature = bMap['ttdKonsultanSignature']?.toString();
+        ttdKonsultanTanggal = bMap['ttdKonsultanTanggal']?.toString();
+
+        ttdPpkNama = bMap['ttdPpkNama']?.toString();
+        ttdPpkJabatan = bMap['ttdPpkJabatan']?.toString();
+        ttdPpkSignature = bMap['ttdPpkSignature']?.toString();
+        ttdPpkTanggal = bMap['ttdPpkTanggal']?.toString();
+      } else {
+        ttdKontraktorNama = pelaksanaKontraktor;
+        ttdKontraktorJabatan = 'Kontraktor Pelaksana';
+        ttdKonsultanNama = contract.siteEngineer;
+        ttdKonsultanJabatan = 'Konsultan Supervisi\nCV. TATA SAKA CONSULTANT';
+        ttdPpkNama = kegModel.penggunaAnggaran.isNotEmpty
+            ? kegModel.penggunaAnggaran
+            : (kegMap['penggunaAnggaran']?.toString() ?? '');
+        ttdPpkJabatan = 'Pejabat Pembuat Komitmen (PPK)\nDPU-PR Kab. Purbalingga';
+        ttdPpkTanggal = periodeFormatted.split('-').last.trim();
+      }
+
       monthlyReports.add(
         MonthlyReportModel(
           bulanKe: monthIdx,
@@ -495,6 +691,19 @@ class MonthlyReportModel {
           noKontrak: noKontrak,
           konsultanPengawas: konsultanPengawas,
           noKontrakPengawas: noKontrakPengawas,
+          ttdList: ttdList,
+          ttdKontraktorNama: ttdKontraktorNama,
+          ttdKontraktorJabatan: ttdKontraktorJabatan,
+          ttdKontraktorSignature: ttdKontraktorSignature,
+          ttdKontraktorTanggal: ttdKontraktorTanggal,
+          ttdKonsultanNama: ttdKonsultanNama,
+          ttdKonsultanJabatan: ttdKonsultanJabatan,
+          ttdKonsultanSignature: ttdKonsultanSignature,
+          ttdKonsultanTanggal: ttdKonsultanTanggal,
+          ttdPpkNama: ttdPpkNama,
+          ttdPpkJabatan: ttdPpkJabatan,
+          ttdPpkSignature: ttdPpkSignature,
+          ttdPpkTanggal: ttdPpkTanggal,
         ),
       );
     }

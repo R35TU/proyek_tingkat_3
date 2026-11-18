@@ -77,6 +77,23 @@ class WeeklyReportModel {
   List<Map<String, dynamic>>? boqProgressList;
   String createdAt;
 
+  // Data Tanda Tangan & Pengesahan Digital (3 Pihak)
+  List<Map<String, dynamic>>? ttdList;
+  String? ttdKontraktorNama;
+  String? ttdKontraktorJabatan;
+  String? ttdKontraktorSignature;
+  String? ttdKontraktorTanggal;
+
+  String? ttdKonsultanNama;
+  String? ttdKonsultanJabatan;
+  String? ttdKonsultanSignature;
+  String? ttdKonsultanTanggal;
+
+  String? ttdPpkNama;
+  String? ttdPpkJabatan;
+  String? ttdPpkSignature;
+  String? ttdPpkTanggal;
+
   WeeklyReportModel({
     required this.id,
     required this.pekerjaan,
@@ -104,7 +121,74 @@ class WeeklyReportModel {
     required this.tabelMingguan,
     this.boqProgressList,
     String? createdAt,
+    this.ttdList,
+    this.ttdKontraktorNama,
+    this.ttdKontraktorJabatan,
+    this.ttdKontraktorSignature,
+    this.ttdKontraktorTanggal,
+    this.ttdKonsultanNama,
+    this.ttdKonsultanJabatan,
+    this.ttdKonsultanSignature,
+    this.ttdKonsultanTanggal,
+    this.ttdPpkNama,
+    this.ttdPpkJabatan,
+    this.ttdPpkSignature,
+    this.ttdPpkTanggal,
   }) : createdAt = createdAt ?? DateTime.now().toIso8601String();
+
+  Map<String, dynamic> get ttdKontraktor {
+    if (ttdList != null && ttdList!.isNotEmpty) {
+      final f = ttdList!.firstWhere(
+        (t) =>
+            t['pihak'] == 'kontraktor' ||
+            (t['jabatan']?.toString().toLowerCase().contains('kontraktor') ?? false),
+        orElse: () => ttdList!.first,
+      );
+      if (f.isNotEmpty) return f;
+    }
+    return {
+      'nama': ttdKontraktorNama ?? '',
+      'jabatan': ttdKontraktorJabatan ?? 'Kontraktor Pelaksana',
+      'signature': ttdKontraktorSignature,
+      'tanggal': ttdKontraktorTanggal ?? '',
+    };
+  }
+
+  Map<String, dynamic> get ttdKonsultan {
+    if (ttdList != null && ttdList!.isNotEmpty) {
+      final f = ttdList!.firstWhere(
+        (t) =>
+            t['pihak'] == 'konsultan' ||
+            (t['jabatan']?.toString().toLowerCase().contains('konsultan') ?? false),
+        orElse: () => ttdList!.length > 1 ? ttdList![1] : {},
+      );
+      if (f.isNotEmpty) return f;
+    }
+    return {
+      'nama': ttdKonsultanNama ?? '',
+      'jabatan': ttdKonsultanJabatan ?? 'Konsultan Supervisi',
+      'signature': ttdKonsultanSignature,
+      'tanggal': ttdKonsultanTanggal ?? '',
+    };
+  }
+
+  Map<String, dynamic> get ttdPpk {
+    if (ttdList != null && ttdList!.isNotEmpty) {
+      final f = ttdList!.firstWhere(
+        (t) =>
+            t['pihak'] == 'ppk' ||
+            (t['jabatan']?.toString().toLowerCase().contains('ppk') ?? false),
+        orElse: () => ttdList!.length > 2 ? ttdList![2] : {},
+      );
+      if (f.isNotEmpty) return f;
+    }
+    return {
+      'nama': ttdPpkNama ?? '',
+      'jabatan': ttdPpkJabatan ?? 'Pejabat Pembuat Komitmen (PPK)',
+      'signature': ttdPpkSignature,
+      'tanggal': ttdPpkTanggal ?? '',
+    };
+  }
 
   factory WeeklyReportModel.fromJson(Map<String, dynamic> json) {
     return WeeklyReportModel(
@@ -140,6 +224,22 @@ class WeeklyReportModel {
               (json['boqProgressList'] as List).map((e) => Map<String, dynamic>.from(e)))
           : null,
       createdAt: json['createdAt'],
+      ttdList: json['ttdList'] != null
+          ? List<Map<String, dynamic>>.from(
+              (json['ttdList'] as List).map((e) => Map<String, dynamic>.from(e)))
+          : null,
+      ttdKontraktorNama: json['ttdKontraktorNama']?.toString(),
+      ttdKontraktorJabatan: json['ttdKontraktorJabatan']?.toString(),
+      ttdKontraktorSignature: json['ttdKontraktorSignature']?.toString(),
+      ttdKontraktorTanggal: json['ttdKontraktorTanggal']?.toString(),
+      ttdKonsultanNama: json['ttdKonsultanNama']?.toString(),
+      ttdKonsultanJabatan: json['ttdKonsultanJabatan']?.toString(),
+      ttdKonsultanSignature: json['ttdKonsultanSignature']?.toString(),
+      ttdKonsultanTanggal: json['ttdKonsultanTanggal']?.toString(),
+      ttdPpkNama: json['ttdPpkNama']?.toString(),
+      ttdPpkJabatan: json['ttdPpkJabatan']?.toString(),
+      ttdPpkSignature: json['ttdPpkSignature']?.toString(),
+      ttdPpkTanggal: json['ttdPpkTanggal']?.toString(),
     );
   }
 
@@ -171,6 +271,19 @@ class WeeklyReportModel {
       'tabelMingguan': tabelMingguan.map((e) => e.toJson()).toList(),
       'boqProgressList': boqProgressList,
       'createdAt': createdAt,
+      'ttdList': ttdList,
+      'ttdKontraktorNama': ttdKontraktorNama,
+      'ttdKontraktorJabatan': ttdKontraktorJabatan,
+      'ttdKontraktorSignature': ttdKontraktorSignature,
+      'ttdKontraktorTanggal': ttdKontraktorTanggal,
+      'ttdKonsultanNama': ttdKonsultanNama,
+      'ttdKonsultanJabatan': ttdKonsultanJabatan,
+      'ttdKonsultanSignature': ttdKonsultanSignature,
+      'ttdKonsultanTanggal': ttdKonsultanTanggal,
+      'ttdPpkNama': ttdPpkNama,
+      'ttdPpkJabatan': ttdPpkJabatan,
+      'ttdPpkSignature': ttdPpkSignature,
+      'ttdPpkTanggal': ttdPpkTanggal,
     };
   }
 
