@@ -487,23 +487,49 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                             child: OutlinedButton.icon(
                               onPressed: () async {
                                 try {
-                                  final picker = ImagePicker();
-                                  final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-                                  if (image != null) {
-                                    final fileObj = File(image.path);
-                                    final size = await fileObj.length();
-                                    if (size > 25 * 1024 * 1024) {
-                                      setModalState(() => uploadError = 'Ukuran gambar melebihi 25 MB.');
-                                      return;
+                                  if (kIsWeb) {
+                                    // Web: use FilePicker with image filter (ImagePicker uses dart:io internally)
+                                    final res = await FilePicker.pickFiles(
+                                      type: FileType.custom,
+                                      allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+                                    );
+                                    if (res.isNotEmpty) {
+                                      final f = res.first;
+                                      final fBytesData = await f.readAsBytes();
+                                      final fSize = fBytesData.length;
+                                      if (fSize > 25 * 1024 * 1024) {
+                                        setModalState(() => uploadError = 'Ukuran gambar melebihi 25 MB.');
+                                        return;
+                                      }
+                                      setModalState(() {
+                                        uploadError = null;
+                                        pickedFilePath = f.path;
+                                        pickedFileBytesData = fBytesData;
+                                        pickedFileName = f.name;
+                                        pickedFileBytes = fSize;
+                                        detectedType = 'IMG';
+                                        nameController.text = f.name.contains('.') ? f.name.substring(0, f.name.lastIndexOf('.')) : f.name;
+                                      });
                                     }
-                                    setModalState(() {
-                                      uploadError = null;
-                                      pickedFilePath = image.path;
-                                      pickedFileName = image.name;
-                                      pickedFileBytes = size;
-                                      detectedType = 'IMG';
-                                      nameController.text = image.name.contains('.') ? image.name.substring(0, image.name.lastIndexOf('.')) : image.name;
-                                    });
+                                  } else {
+                                    final picker = ImagePicker();
+                                    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+                                    if (image != null) {
+                                      final fileObj = File(image.path);
+                                      final size = await fileObj.length();
+                                      if (size > 25 * 1024 * 1024) {
+                                        setModalState(() => uploadError = 'Ukuran gambar melebihi 25 MB.');
+                                        return;
+                                      }
+                                      setModalState(() {
+                                        uploadError = null;
+                                        pickedFilePath = image.path;
+                                        pickedFileName = image.name;
+                                        pickedFileBytes = size;
+                                        detectedType = 'IMG';
+                                        nameController.text = image.name.contains('.') ? image.name.substring(0, image.name.lastIndexOf('.')) : image.name;
+                                      });
+                                    }
                                   }
                                 } catch (e) {
                                   setModalState(() => uploadError = 'Gagal memilih foto: $e');
