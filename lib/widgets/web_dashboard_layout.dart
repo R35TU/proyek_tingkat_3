@@ -29,6 +29,36 @@ class WebDashboardLayout extends StatefulWidget {
   static final ValueNotifier<String> activeWebMenu =
       ValueNotifier<String>('dashboard');
 
+  /// Daftar konstanta ikon eksplisit agar Flutter font tree-shaker tidak pernah
+  /// membuang glyph Material Icons yang digunakan di Web Dashboard saat release build.
+  static const List<Icon> retainedWebIcons = [
+    Icon(Icons.menu),
+    Icon(Icons.menu_open),
+    Icon(Icons.arrow_back),
+    Icon(Icons.dashboard),
+    Icon(Icons.folder_outlined),
+    Icon(Icons.assignment_outlined),
+    Icon(Icons.description_outlined),
+    Icon(Icons.folder_open),
+    Icon(Icons.today_outlined),
+    Icon(Icons.date_range_outlined),
+    Icon(Icons.calendar_month_outlined),
+    Icon(Icons.timeline),
+    Icon(Icons.settings_outlined),
+    Icon(Icons.security_outlined),
+    Icon(Icons.person_outline_rounded),
+    Icon(Icons.help_outline),
+    Icon(Icons.logout_rounded),
+    Icon(Icons.chevron_left),
+    Icon(Icons.chevron_right),
+    Icon(Icons.business_center_outlined),
+    Icon(Icons.alt_route_outlined),
+    Icon(Icons.table_chart_outlined),
+    Icon(Icons.difference_outlined),
+    Icon(Icons.folder_shared_outlined),
+    Icon(Icons.history_outlined),
+  ];
+
   const WebDashboardLayout({
     super.key,
     required this.child,
@@ -243,11 +273,17 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
               border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
             ),
             child: IconButton(
-              icon: Icon(
-                isSidebarOpen ? Icons.menu_open : Icons.menu,
-                color: const Color(0xFF475569),
-                size: 20,
-              ),
+              icon: isSidebarOpen
+                  ? const Icon(
+                      Icons.menu_open,
+                      color: Color(0xFF475569),
+                      size: 20,
+                    )
+                  : const Icon(
+                      Icons.menu,
+                      color: Color(0xFF475569),
+                      size: 20,
+                    ),
               tooltip: isSidebarOpen ? 'Ciutkan Sidebar' : 'Buka Sidebar',
               splashRadius: 20,
               constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
@@ -917,6 +953,41 @@ class _SidebarItemWidget extends StatefulWidget {
 class _SidebarItemWidgetState extends State<_SidebarItemWidget> {
   bool _isHovered = false;
 
+  /// Render ikon dengan mapping eksplisit konstanta agar Flutter web font
+  /// tree-shaker tidak pernah membuang glyph ikon sidebar pada release build.
+  Widget _buildIcon(Color color, double size) {
+    switch (widget.menuKey) {
+      case 'dashboard':
+        return Icon(Icons.dashboard, size: size, color: color);
+      case 'kontrak':
+        return Icon(Icons.folder_outlined, size: size, color: color);
+      case 'kegiatan':
+        return Icon(Icons.assignment_outlined, size: size, color: color);
+      case 'laporan':
+        return Icon(Icons.description_outlined, size: size, color: color);
+      case 'data_laporan':
+        return Icon(Icons.folder_open, size: size, color: color);
+      case 'laporan_harian':
+        return Icon(Icons.today_outlined, size: size, color: color);
+      case 'laporan_mingguan':
+        return Icon(Icons.date_range_outlined, size: size, color: color);
+      case 'laporan_bulanan':
+        return Icon(Icons.calendar_month_outlined, size: size, color: color);
+      case 'timeline':
+        return Icon(Icons.timeline, size: size, color: color);
+      case 'pengaturan':
+        return Icon(Icons.settings_outlined, size: size, color: color);
+      case 'keamanan':
+        return Icon(Icons.security_outlined, size: size, color: color);
+      case 'edit_profil':
+        return Icon(Icons.person_outline_rounded, size: size, color: color);
+      case 'panduan_faq':
+        return Icon(Icons.help_outline, size: size, color: color);
+      default:
+        return Icon(widget.icon, size: size, color: color);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final Color bgColor;
@@ -971,11 +1042,7 @@ class _SidebarItemWidgetState extends State<_SidebarItemWidget> {
                         ]
                       : null,
                 ),
-                child: Icon(
-                  widget.icon,
-                  size: 21,
-                  color: iconColor,
-                ),
+                child: _buildIcon(iconColor, 21),
               ),
             ),
           ),
@@ -1011,11 +1078,7 @@ class _SidebarItemWidgetState extends State<_SidebarItemWidget> {
             child: ClipRect(
               child: Row(
                 children: [
-                  Icon(
-                    widget.icon,
-                    size: 20,
-                    color: iconColor,
-                  ),
+                  _buildIcon(iconColor, 20),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
