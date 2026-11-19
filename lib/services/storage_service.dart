@@ -3,7 +3,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-/// Service Object Storage untuk Cloudflare R2 (S3-Compatible API).
+/// Service Object Storage untuk Sumopod/Cloudeka (S3-Compatible API).
 ///
 /// Digunakan untuk menyimpan:
 /// - Foto & tanda tangan laporan harian (`laporan-harian/{contractId}/{kegiatanId}/`)
@@ -18,7 +18,7 @@ class StorageService {
   // Jalankan build/run dengan:
   //   --dart-define=R2_ACCESS_KEY_ID=... --dart-define=R2_SECRET_ACCESS_KEY=...
   // atau pakai file config lokal (gitignored):
-  //   --dart-define-from-file=r2_local.json
+  //   --dart-define-from-file=sumopod_local.json
   //
   // Kredensial lama yang pernah di-commit sudah DI-ROTATE di Cloudflare —
   // kunci baru HANYA ada di GitHub Secrets (CI) & r2_local.json (lokal).
@@ -34,7 +34,7 @@ class StorageService {
   static String get _missingCredentialsMessage =>
       '[StorageService] Kredensial R2 belum dikonfigurasi. Jalankan build dengan '
       '--dart-define=R2_ACCESS_KEY_ID=... --dart-define=R2_SECRET_ACCESS_KEY=... '
-      '(lokal: gunakan --dart-define-from-file=r2_local.json; CI: GitHub Secrets '
+      '(lokal: gunakan --dart-define-from-file=sumopod_local.json; CI: GitHub Secrets '
       'R2_ACCESS_KEY_ID & R2_SECRET_ACCESS_KEY).';
 
   static const String endpoint =
