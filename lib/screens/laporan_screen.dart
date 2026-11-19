@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/screens/data_laporan_screen.dart';
 import 'package:tata_saka_app/screens/buat_laporan_screen.dart';
@@ -15,6 +17,8 @@ class LaporanScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isDesktop = ResponsiveBreakpoints.isDesktop(context);
+    final userProf = context.watch<UserProfileProvider>();
+    final bool isDinas = userProf.isDinas;
 
     final Widget mainBody = SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
@@ -36,6 +40,7 @@ class LaporanScreen extends StatelessWidget {
               );
             },
           ),
+          if (!isDinas) ...[
           const SizedBox(height: 16),
           _buildMenuCard(
             title: 'Buat Laporan Harian',
@@ -87,6 +92,10 @@ class LaporanScreen extends StatelessWidget {
               );
             },
           ),
+          ] else ...[
+            const SizedBox(height: 16),
+            _buildInfoCardDinas(),
+          ],
         ],
       ),
     );
@@ -209,3 +218,29 @@ class LaporanScreen extends StatelessWidget {
     );
   }
 }
+
+  /// Kartu info untuk role Dinas: akses terbatas pada pembacaan laporan.
+  Widget _buildInfoCardDinas() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.blueLight),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.visibility_outlined,
+              color: AppColors.primaryBlue, size: 24),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Role Dinas bersifat pemantau: Anda dapat melihat semua laporan '
+              '(harian, mingguan, bulanan) melalui menu Data Laporan.',
+              style: TextStyle(fontSize: 12.5, color: AppColors.textLight),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
