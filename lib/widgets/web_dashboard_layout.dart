@@ -643,45 +643,48 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                         _handleMenuClick('data_laporan');
                       },
                     ),
-                    _SidebarItemWidget(
-                      key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}laporan_harian'),
-                      isDrawer: isDrawer,
-                      menuKey: 'laporan_harian',
-                      label: 'Laporan Harian',
-                      icon: Icons.today_outlined,
-                      isActive: widget.activeMenu == 'laporan_harian',
-                      isCollapsed: isCollapsed,
-                      onTap: () {
-                        if (isDrawer) Navigator.pop(context);
-                        _handleMenuClick('laporan_harian');
-                      },
-                    ),
-                    _SidebarItemWidget(
-                      key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}laporan_mingguan'),
-                      isDrawer: isDrawer,
-                      menuKey: 'laporan_mingguan',
-                      label: 'Laporan Mingguan',
-                      icon: Icons.date_range_outlined,
-                      isActive: widget.activeMenu == 'laporan_mingguan',
-                      isCollapsed: isCollapsed,
-                      onTap: () {
-                        if (isDrawer) Navigator.pop(context);
-                        _handleMenuClick('laporan_mingguan');
-                      },
-                    ),
-                    _SidebarItemWidget(
-                      key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}laporan_bulanan'),
-                      isDrawer: isDrawer,
-                      menuKey: 'laporan_bulanan',
-                      label: 'Laporan Bulanan',
-                      icon: Icons.calendar_month_outlined,
-                      isActive: widget.activeMenu == 'laporan_bulanan',
-                      isCollapsed: isCollapsed,
-                      onTap: () {
-                        if (isDrawer) Navigator.pop(context);
-                        _handleMenuClick('laporan_bulanan');
-                      },
-                    ),
+                    // Menu pintas buat laporan disembunyikan untuk Dinas (view-only)
+                    if (!userProf.isDinas) ...[
+                      _SidebarItemWidget(
+                        key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}laporan_harian'),
+                        isDrawer: isDrawer,
+                        menuKey: 'laporan_harian',
+                        label: 'Laporan Harian',
+                        icon: Icons.today_outlined,
+                        isActive: widget.activeMenu == 'laporan_harian',
+                        isCollapsed: isCollapsed,
+                        onTap: () {
+                          if (isDrawer) Navigator.pop(context);
+                          _handleMenuClick('laporan_harian');
+                        },
+                      ),
+                      _SidebarItemWidget(
+                        key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}laporan_mingguan'),
+                        isDrawer: isDrawer,
+                        menuKey: 'laporan_mingguan',
+                        label: 'Laporan Mingguan',
+                        icon: Icons.date_range_outlined,
+                        isActive: widget.activeMenu == 'laporan_mingguan',
+                        isCollapsed: isCollapsed,
+                        onTap: () {
+                          if (isDrawer) Navigator.pop(context);
+                          _handleMenuClick('laporan_mingguan');
+                        },
+                      ),
+                      _SidebarItemWidget(
+                        key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}laporan_bulanan'),
+                        isDrawer: isDrawer,
+                        menuKey: 'laporan_bulanan',
+                        label: 'Laporan Bulanan',
+                        icon: Icons.calendar_month_outlined,
+                        isActive: widget.activeMenu == 'laporan_bulanan',
+                        isCollapsed: isCollapsed,
+                        onTap: () {
+                          if (isDrawer) Navigator.pop(context);
+                          _handleMenuClick('laporan_bulanan');
+                        },
+                      ),
+                    ],
                     const SizedBox(height: 12),
                   ],
 
