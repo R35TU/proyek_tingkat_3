@@ -72,3 +72,4 @@ app.*.map.json
 
 # Konfigurasi kredensial lokal (JANGAN pernah di-commit)
 r2_local.json
+sumopod_local.json
