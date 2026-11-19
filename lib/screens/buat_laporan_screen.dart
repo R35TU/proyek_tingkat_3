@@ -11,6 +11,7 @@ import 'package:flutter/cupertino.dart'
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/timeline_provider.dart';
@@ -1806,9 +1807,14 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Role Dinas: hanya pemantau — pembuatan/pengeditan laporan diblokir.
-    final userProf = Provider.of<UserProfileProvider>(context, listen: false);
-    if (userProf.isDinas) {
+    // Role Dinas: hanya pemantau (null-safe — provider bisa tak tersedia di test).
+    bool _isDinasHere = false;
+    try {
+      _isDinasHere = Provider.of<UserProfileProvider>(context, listen: false).isDinas;
+    } catch (_) {
+      _isDinasHere = false;
+    }
+    if (_isDinasHere) {
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(

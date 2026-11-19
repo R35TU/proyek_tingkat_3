@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
@@ -1054,9 +1055,14 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
 
   @override
   Widget build(BuildContext context) {
-    // Role Dinas: hanya pemantau — pembuatan/pengeditan laporan diblokir.
-    final userProf = Provider.of<UserProfileProvider>(context, listen: false);
-    if (userProf.isDinas) {
+    // Role Dinas: hanya pemantau (null-safe — provider bisa tak tersedia di test).
+    bool _isDinasHere = false;
+    try {
+      _isDinasHere = Provider.of<UserProfileProvider>(context, listen: false).isDinas;
+    } catch (_) {
+      _isDinasHere = false;
+    }
+    if (_isDinasHere) {
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
