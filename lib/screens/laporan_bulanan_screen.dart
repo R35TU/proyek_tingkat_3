@@ -1172,6 +1172,10 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
+                      // Role Dinas: tidak dapat menandatangani laporan.
+                      if (Provider.of<UserProfileProvider>(context, listen: false).isDinas)
+                        const SizedBox.shrink()
+                      else
                       OutlinedButton.icon(
                         onPressed: () => _openTandaTanganBulananModal(context, report),
                         icon: const Icon(Icons.draw_outlined, size: 13, color: AppColors.primaryBlue),

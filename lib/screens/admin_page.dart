@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/services/auth_service.dart';
 
 import 'login_screen.dart';
@@ -64,7 +66,17 @@ class _AdminPageState extends State<AdminPage> {
       if (!mounted) return;
       if (AuthService.currentUser == null) {
         Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+        return;
       }
+      // Hanya role Admin yang boleh mengelola akun — role lain ditolak.
+      try {
+        final role = Provider.of<UserProfileProvider>(context, listen: false)
+            .role
+            .toLowerCase();
+        if (role != 'admin') {
+          Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+        }
+      } catch (_) {}
     });
     try {
       _usersSub = FirebaseFirestore.instance
