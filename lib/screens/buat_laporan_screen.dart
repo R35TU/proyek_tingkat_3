@@ -11,6 +11,7 @@ import 'package:flutter/cupertino.dart'
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/timeline_provider.dart';
@@ -1803,6 +1804,62 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Role Dinas: hanya pemantau (null-safe — provider bisa tak tersedia di test).
+    bool _isDinasHere = false;
+    try {
+      _isDinasHere = Provider.of<UserProfileProvider>(context, listen: false).isDinas;
+    } catch (_) {
+      _isDinasHere = false;
+    }
+    if (_isDinasHere) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.visibility_outlined,
+                  color: AppColors.textLight, size: 56),
+              const SizedBox(height: 16),
+              const Text(
+                'Akses Dibatasi',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textDark),
+              ),
+              const SizedBox(height: 8),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  'Role Dinas bersifat pemantau. Pembuatan dan pengeditan '
+                  'laporan hanya dapat dilakukan oleh Konsultan.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13.5, color: AppColors.textLight),
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Kembali'),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryBlue,
+                    foregroundColor: Colors.white),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     final provider = Provider.of<ContractProvider>(context);
     final contracts = provider.contracts;
 
