@@ -1,6 +1,10 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/services/auth_service.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/utils/web_navigation.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -13,11 +17,42 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
+    // Jika di web, arahkan ke landing hanya jika route saat ini benar-benar splash ('/')
+    if (kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        // Jika route saat ini bukan splash (misal user sedang di /#/login), JANGAN interupsi!
+        if (ModalRoute.of(context)?.isCurrent != true) return;
+
+        final userProf = context.read<UserProfileProvider>();
+        final isAuth = AuthService.currentUser != null && userProf.username.isNotEmpty;
+        if (isAuth) {
+          if (userProf.role.toLowerCase() == 'admin') {
+            Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);
+          } else {
+            Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+          }
+          return;
+        }
+        navigateToWebLanding();
+      });
+      return;
+    }
+
     Future.delayed(const Duration(seconds: 2), () {
       if (!mounted) return;
-      // Jika route saat ini bukan splash (misal user langsung akses /#/login), jangan interupsi
       if (ModalRoute.of(context)?.isCurrent != true) return;
-      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      final userProf = context.read<UserProfileProvider>();
+      final isAuth = AuthService.currentUser != null && userProf.username.isNotEmpty;
+      if (isAuth) {
+        if (userProf.role.toLowerCase() == 'admin') {
+          Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);
+        } else {
+          Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+        }
+        return;
+      }
+      Navigator.pushNamedAndRemoveUntil(context, '/landing', (route) => false);
     });
   }
 

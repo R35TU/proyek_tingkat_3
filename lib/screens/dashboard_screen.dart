@@ -44,6 +44,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Timer? _timer;
   int _currentPage = 0;
   String _activeWebMenu = 'dashboard';
+  final List<String> _webMenuHistory = ['dashboard'];
+
+  void _onWebMenuSelected(String menuKey) {
+    if (_activeWebMenu == menuKey) return;
+    setState(() {
+      _webMenuHistory.add(menuKey);
+      _activeWebMenu = menuKey;
+      WebDashboardLayout.activeWebMenu.value = menuKey;
+    });
+  }
+
+  void _onWebBack() {
+    if (_webMenuHistory.length > 1) {
+      setState(() {
+        _webMenuHistory.removeLast();
+        _activeWebMenu = _webMenuHistory.last;
+        WebDashboardLayout.activeWebMenu.value = _activeWebMenu;
+      });
+    } else {
+      setState(() {
+        _activeWebMenu = 'dashboard';
+        WebDashboardLayout.activeWebMenu.value = 'dashboard';
+      });
+    }
+  }
 
   void _navigateFromSidebar(
     String menuKey,
@@ -231,9 +256,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _onWebDashboardMenuChanged() {
-    if (mounted && _activeWebMenu != WebDashboardLayout.activeWebMenu.value) {
+    final val = WebDashboardLayout.activeWebMenu.value;
+    if (mounted && _activeWebMenu != val) {
       setState(() {
-        _activeWebMenu = WebDashboardLayout.activeWebMenu.value;
+        if (!_webMenuHistory.contains(val)) {
+          _webMenuHistory.add(val);
+        }
+        _activeWebMenu = val;
       });
     }
   }
@@ -521,21 +550,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
 
     if (isWeb) {
-      return WebDashboardLayout(
-        title: _activeWebMenu != 'dashboard'
-            ? _getHeaderTitle(safeUserProf)
-            : safeUserProf.tr('nav_dashboard'),
-        activeMenu: _activeWebMenu,
-        onMenuSelected: (menuKey) {
-          setState(() {
-            _activeWebMenu = menuKey;
-          });
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+            return;
+          }
+          if (_webMenuHistory.length > 1) {
+            setState(() {
+              _webMenuHistory.removeLast();
+              _activeWebMenu = _webMenuHistory.last;
+              WebDashboardLayout.activeWebMenu.value = _activeWebMenu;
+            });
+          } else if (_activeWebMenu != 'dashboard') {
+            setState(() {
+              _activeWebMenu = 'dashboard';
+              WebDashboardLayout.activeWebMenu.value = 'dashboard';
+            });
+          }
         },
-        child: _buildActiveWebContent(
-          context,
-          safeUserProf,
-          contracts,
-          mainBody,
+        child: WebDashboardLayout(
+          title: _activeWebMenu != 'dashboard'
+              ? _getHeaderTitle(safeUserProf)
+              : safeUserProf.tr('nav_dashboard'),
+          activeMenu: _activeWebMenu,
+          showBackButton: _activeWebMenu != 'dashboard',
+          onBack: _onWebBack,
+          onMenuSelected: _onWebMenuSelected,
+          child: _buildActiveWebContent(
+            context,
+            safeUserProf,
+            contracts,
+            mainBody,
+          ),
         ),
       );
     }
