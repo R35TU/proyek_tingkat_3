@@ -34,11 +34,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    // Verify LoginScreen is displayed
     expect(find.byType(LoginScreen), findsOneWidget);
     expect(find.text('Masuk ke Sistem'), findsOneWidget);
-
-    // Verify Back button exists in AppBar
     expect(find.byTooltip('Kembali ke Landing Page'), findsOneWidget);
   });
 }

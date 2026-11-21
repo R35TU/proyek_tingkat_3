@@ -2,3 +2,6 @@
 void navigateToWebLandingImpl() {}
 
 void replaceWebUrlImpl(String path) {}
+
+void pushWebHistoryImpl(String path) {}
+

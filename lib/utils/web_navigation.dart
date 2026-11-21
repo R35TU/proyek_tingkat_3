@@ -16,3 +16,11 @@ void replaceWebUrl(String path) {
     replaceWebUrlImpl(path);
   }
 }
+
+/// Tambah entri riwayat browser agar event Back tertangkap di dalam aplikasi.
+void pushWebHistory(String path) {
+  if (kIsWeb) {
+    pushWebHistoryImpl(path);
+  }
+}
+
