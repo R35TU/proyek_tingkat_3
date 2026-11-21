@@ -2,9 +2,11 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
+import 'package:tata_saka_app/screens/admin_page.dart';
+import 'package:tata_saka_app/screens/landing_screen.dart';
+import 'package:tata_saka_app/screens/main_layout.dart';
 import 'package:tata_saka_app/services/auth_service.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
-import 'package:tata_saka_app/utils/web_navigation.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -17,27 +19,8 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // Jika di web, arahkan ke landing hanya jika route saat ini benar-benar splash ('/')
-    if (kIsWeb) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        // Jika route saat ini bukan splash (misal user sedang di /#/login), JANGAN interupsi!
-        if (ModalRoute.of(context)?.isCurrent != true) return;
-
-        final userProf = context.read<UserProfileProvider>();
-        final isAuth = AuthService.currentUser != null && userProf.username.isNotEmpty;
-        if (isAuth) {
-          if (userProf.role.toLowerCase() == 'admin') {
-            Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);
-          } else {
-            Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
-          }
-          return;
-        }
-        navigateToWebLanding();
-      });
-      return;
-    }
+    // Di web, rute '/' langsung di-render deklaratif oleh build()
+    if (kIsWeb) return;
 
     Future.delayed(const Duration(seconds: 2), () {
       if (!mounted) return;
@@ -58,6 +41,19 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Pada web, route '/' langsung tampilkan konten sebenarnya tanpa screen mati
+    if (kIsWeb) {
+      final userProf = context.watch<UserProfileProvider>();
+      final isAuth = AuthService.currentUser != null && userProf.username.isNotEmpty;
+      if (isAuth) {
+        if (userProf.role.toLowerCase() == 'admin') {
+          return const AdminPage();
+        }
+        return const MainLayout();
+      }
+      return const LandingScreen();
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(

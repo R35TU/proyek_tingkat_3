@@ -31,7 +31,6 @@ import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 import 'package:tata_saka_app/utils/progress_calculator.dart';
-import 'package:tata_saka_app/utils/web_navigation.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -54,7 +53,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _activeWebMenu = menuKey;
       WebDashboardLayout.activeWebMenu.value = menuKey;
     });
-    pushWebHistory('/#/main');
   }
 
   void _onWebBack() {
