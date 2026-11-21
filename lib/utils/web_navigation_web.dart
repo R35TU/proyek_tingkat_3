@@ -14,10 +14,4 @@ void replaceWebUrlImpl(String path) {
   } catch (_) {}
 }
 
-/// Tambah entri riwayat browser agar tombol Back browser/device memicu navigasi internal.
-void pushWebHistoryImpl(String path) {
-  try {
-    html.window.history.pushState({'route': path}, '', path);
-  } catch (_) {}
-}
 
