@@ -10,6 +10,7 @@ import 'package:tata_saka_app/screens/setting_screen.dart';
 import 'package:tata_saka_app/screens/timeline_screen.dart';
 import 'package:tata_saka_app/services/auth_service.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/utils/web_navigation.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 
 class MainLayout extends StatefulWidget {
@@ -29,6 +30,7 @@ class _MainLayoutState extends State<MainLayout> {
       _tabHistory.add(index);
       _currentIndex = index;
     });
+    pushWebHistory('/#/main');
   }
 
   Future<void> _handleDashboardBack() async {
@@ -49,6 +51,18 @@ class _MainLayoutState extends State<MainLayout> {
 
     // 3. Pengguna berada di halaman utama dashboard (index 0).
     // DILARANG mengembalikan pengguna yang sudah login ke Login / Landing Page!
+    if (kIsWeb) {
+      pushWebHistory('/#/main');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Anda berada di halaman utama Dashboard.'),
+          duration: Duration(milliseconds: 1200),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     if (!kIsWeb) {
       final exit = await showDialog<bool>(
         context: context,
@@ -86,6 +100,7 @@ class _MainLayoutState extends State<MainLayout> {
   @override
   void initState() {
     super.initState();
+    pushWebHistory('/#/main');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final userProf = context.read<UserProfileProvider>();
