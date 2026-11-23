@@ -48,6 +48,20 @@ class RupiahUtil {
     return 'Rp ${formatNumber(value)}';
   }
 
+  /// Membulatkan nilai nominal ke bawah ke kelipatan Rp 1.000 terdekat (floor to nearest thousand).
+  /// Sesuai format standar dokumen Dinas PU:
+  /// Contoh:
+  /// - 1234999.00 -> 1234000.0
+  /// - 1234500.00 -> 1234000.0
+  /// - 1234001.00 -> 1234000.0
+  /// - 1999999.00 -> 1999000.0
+  /// - 384550289.24 -> 384550000.0
+  /// - 288350703.03 -> 288350000.0
+  static double floorToNearestThousand(num value) {
+    if (value <= 0) return 0.0;
+    return (value / 1000.0).floorToDouble() * 1000.0;
+  }
+
   /// Parsing teks apa pun ke dalam double secara aman.
   /// Mengabaikan 'Rp', spasi, titik yang salah tempat, dan keterangan tambahan.
   static double parseToDouble(String? text) {

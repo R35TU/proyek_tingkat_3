@@ -1,3 +1,5 @@
+import 'package:tata_saka_app/utils/rupiah_input_formatter.dart';
+
 /// Model data untuk Addendum Kontrak (Contract Change Order / CCO)
 class AddendumModel {
   final String id;
@@ -203,6 +205,7 @@ class TambahKurangCalculator {
     required List<Map<String, dynamic>> baselineDivisiList,
     required List<Map<String, dynamic>> addendumDivisiList,
     double? customPaguDibulatkan,
+    double? customPaguBobot,
   }) {
     // 1. Hitung total nominal baseline (T0) dan addendum (T1)
     double t0 = 0.0;
@@ -229,9 +232,10 @@ class TambahKurangCalculator {
     }
     if (t1 == 0.0) t1 = t0; // fallback jika belum diinput
 
-    // Pagu pembagi bobot standar Dinas PU: menggunakan nilai kontrak dibulatkan jika tersedia
-    final double paguBobot = (customPaguDibulatkan != null && customPaguDibulatkan > 0)
-        ? customPaguDibulatkan
+    // Single source of truth: Pagu pembagi bobot SELALU menggunakan nilai nominal asli baseline (T0).
+    // Nilai pembulatan (customPaguDibulatkan) tidak boleh digunakan untuk perhitungan bobot.
+    final double paguBobot = (customPaguBobot != null && customPaguBobot > 0)
+        ? customPaguBobot
         : (t0 > 0 ? t0 : 1.0);
 
     // 2. Buat map lookup untuk baseline items: key = noMataPembayaran || uraian
@@ -379,10 +383,11 @@ class TambahKurangCalculator {
       grandKurangBobot += subKurangBobot;
     }
 
-    // Pembulatan resmi nilai kontrak sesuai dokumen sah Dinas PU
-    final double dibulatkan = (customPaguDibulatkan != null && customPaguDibulatkan > 0)
+    // Pembulatan resmi nilai kontrak sesuai dokumen sah Dinas PU (Floor kelipatan Rp 1.000)
+    final double rawPagu = (customPaguDibulatkan != null && customPaguDibulatkan > 0)
         ? customPaguDibulatkan
-        : grandAddendumHarga.roundToDouble();
+        : grandAddendumHarga;
+    final double dibulatkan = RupiahUtil.floorToNearestThousand(rawPagu);
 
     // Pastikan total bobot Baseline & Addendum menampilkan tepat 100.000% jika mendekati 100%
     final double baselineBobotFinal = (grandBaselineBobot - 100.0).abs() < 0.05
