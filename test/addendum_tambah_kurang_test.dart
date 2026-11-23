@@ -228,6 +228,7 @@ void main() {
         baselineDivisiList: baseline,
         addendumDivisiList: addendum,
         customPaguDibulatkan: 288350000.0,
+        customPaguBobot: 288350000.0,
       );
 
       // 1. Pembulatan resmi

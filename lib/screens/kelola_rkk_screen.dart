@@ -23,17 +23,18 @@ class KelolaRkkScreen extends StatefulWidget {
   });
 
   /// Format angka ke Rupiah dengan penanganan desimal sen (contoh: Rp 288.350.703,03)
-  static String formatRupiah(num value) {
-    if (value == 0) return 'Rp 0';
+  /// Jika [forceDecimals] bernilai true, nominal bulat tetap menyertakan ',00' (contoh: Rp 288.350.000,00)
+  static String formatRupiah(num value, {bool forceDecimals = false}) {
+    if (value == 0) return forceDecimals ? 'Rp 0,00' : 'Rp 0';
     final isNegative = value < 0;
     final absVal = value.abs();
     final parts = absVal.toStringAsFixed(2).split('.');
     final intPart = num.tryParse(parts[0]) ?? 0;
     final formattedInt = RupiahUtil.formatNumber(intPart);
-    final decPart = parts.length > 1 ? parts[1] : '';
+    final decPart = parts.length > 1 ? parts[1] : '00';
 
     String result;
-    if (decPart.isNotEmpty && decPart != '00') {
+    if (forceDecimals || (decPart.isNotEmpty && decPart != '00')) {
       result = 'Rp $formattedInt,$decPart';
     } else {
       result = 'Rp $formattedInt';
@@ -49,6 +50,7 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
   late List<Map<String, dynamic>> _rkkDivisiList;
   late String _namaKegiatan;
   late double _nilaiKontrakKegiatan;
+  String _dasarBobot = 'rab'; // 'rab' = Total Nilai RAB, 'kontrak' = Nilai Kontrak Acuan Tetap
   bool _isModified = false;
 
   static const List<String> _romanNumerals = [
@@ -183,13 +185,21 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
       _rkkDivisiList = [];
     }
 
+    // Inisialisasi fallback nilai kontrak jika belum pernah diinput sama sekali
     if (_nilaiKontrakKegiatan == 0 && _totalHargaRkk > 0) {
       _nilaiKontrakKegiatan = _totalHargaRkk;
+    }
+
+    // Otomatis hitung ulang seluruh bobot dengan presisi penuh saat data dimuat,
+    // sehingga data lama yang tersimpan dengan pembagi tidak konsisten langsung terkalibrasi
+    if (_totalHargaRkk > 0) {
+      _recalculateAllBobot(notify: false);
     }
   }
 
   /// Format angka ke Rupiah dengan penanganan desimal sen (contoh: Rp 288.350.703,03)
-  static String formatRupiah(num value) => KelolaRkkScreen.formatRupiah(value);
+  static String formatRupiah(num value, {bool forceDecimals = false}) =>
+      KelolaRkkScreen.formatRupiah(value, forceDecimals: forceDecimals);
 
   /// Parse input angka desimal atau nominal rupiah secara fleksibel
   static double parseNumberInput(String text) {
@@ -199,6 +209,20 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
       return double.tryParse(clean) ?? 0.0;
     }
     return RupiahUtil.parseToDouble(clean);
+  }
+
+  /// Nilai pembagi (denominator) yang konsisten untuk perhitungan bobot pekerjaan.
+  /// Rumus: Bobot Pekerjaan (%) = (Total Harga Item / Total Nilai RAB) * 100%
+  /// Nilai pembagi bersifat independen dan tidak dipengaruhi urutan input data.
+  double _getEffectiveDivisor() {
+    final totalRkk = _totalHargaRkk;
+    if (_dasarBobot == 'kontrak' && _nilaiKontrakKegiatan > 0) {
+      return _nilaiKontrakKegiatan;
+    }
+    // Default 'rab': Gunakan akumulasi Total Nilai RAB jika > 0, fallback ke nilai kontrak acuan
+    return totalRkk > 0
+        ? totalRkk
+        : (_nilaiKontrakKegiatan > 0 ? _nilaiKontrakKegiatan : 0.0);
   }
 
   double get _totalHargaRkk {
@@ -221,15 +245,13 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
   }
 
   double get _totalBobot {
-    double total = 0.0;
-    for (final div in _rkkDivisiList) {
-      final items = div['items'] as List? ?? [];
-      for (final item in items) {
-        final b = (item['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
-        total += b;
-      }
+    final divisor = _getEffectiveDivisor();
+    if (divisor <= 0) return 0.0;
+    final totalRkk = _totalHargaRkk;
+    if (_dasarBobot == 'rab' && totalRkk > 0) {
+      return 100.0;
     }
-    return total;
+    return (totalRkk / divisor) * 100.0;
   }
 
   int get _totalItems {
@@ -258,46 +280,48 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
   }
 
   double _getDivisiSubtotalBobot(Map<String, dynamic> div) {
-    double total = 0.0;
-    final items = div['items'] as List? ?? [];
-    for (final item in items) {
-      final b = (item['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
-      total += b;
-    }
-    return total;
+    final divisor = _getEffectiveDivisor();
+    if (divisor <= 0) return 0.0;
+    final subtotalHarga = _getDivisiSubtotalHarga(div);
+    return (subtotalHarga / divisor) * 100.0;
   }
 
   void _recalculateAllBobot({bool notify = true}) {
-    final totalRkk = _totalHargaRkk;
-    final divisor = totalRkk > 0
-        ? totalRkk
-        : (_nilaiKontrakKegiatan > 0 ? _nilaiKontrakKegiatan : 0.0);
+    final divisor = _getEffectiveDivisor();
 
     if (divisor > 0) {
       for (final div in _rkkDivisiList) {
-        final items = div['items'] as List<Map<String, dynamic>>? ?? [];
-        for (final item in items) {
-          final itemTotal = (item['totalHarga'] as num?)?.toDouble() ?? 0.0;
+        final rawItems = div['items'] as List? ?? [];
+        for (final item in rawItems) {
+          final itMap = item is Map<String, dynamic>
+              ? item
+              : Map<String, dynamic>.from(item as Map);
+          final hs = (itMap['hargaSatuan'] as num?)?.toDouble() ?? 0.0;
+          final vol =
+              (itMap['volume'] ?? itMap['volumeCCO'] as num?)?.toDouble() ??
+              0.0;
+          final itemTotal =
+              (itMap['totalHarga'] as num?)?.toDouble() ?? (hs * vol);
+
           if (itemTotal > 0) {
-            final calculatedBobot = (itemTotal / divisor) * 100.0;
-            item['nilaiBobot'] = double.parse(
-              calculatedBobot.toStringAsFixed(3),
-            );
+            // Perhitungan bobot presisi penuh (tanpa pembulatan awal)
+            itMap['nilaiBobot'] = (itemTotal / divisor) * 100.0;
           } else {
-            item['nilaiBobot'] = 0.0;
+            itMap['nilaiBobot'] = 0.0;
           }
         }
       }
     }
 
-    if (notify) {
+    if (notify && mounted) {
       setState(() {
         _isModified = true;
       });
+      final totalBobotStr = _totalBobot.toStringAsFixed(3);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text(
-            'Seluruh nilai bobot berhasil dihitung ulang otomatis (Total: 100.000%).',
+          content: Text(
+            'Seluruh nilai bobot berhasil dihitung ulang otomatis (Total: $totalBobotStr%).',
           ),
           backgroundColor: const Color(0xFF0F172A),
           behavior: SnackBarBehavior.floating,
@@ -313,24 +337,55 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
     final totalRkk = _totalHargaRkk;
     if (totalRkk <= 0) return;
 
-    setState(() {
-      _nilaiKontrakKegiatan = totalRkk;
-      _isModified = true;
-    });
-    _recalculateAllBobot(notify: false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Nilai Kegiatan diselaraskan: ${formatRupiah(totalRkk)}'),
-        backgroundColor: const Color(0xFF059669),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Selaraskan Nilai Kontrak Acuan?'),
+        content: Text(
+          'Nilai kontrak awal acuan saat ini: ${formatRupiah(_nilaiKontrakKegiatan)}.\n\n'
+          'Apakah Anda yakin ingin menyelaraskan nilai acuan kontrak menjadi sama dengan akumulasi Total RAB: ${formatRupiah(totalRkk)}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryBlue,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() {
+                _nilaiKontrakKegiatan = totalRkk;
+                final keg = widget.contract.kegiatans[widget.kegiatanIndex];
+                keg['nilaiKontrak'] = formatRupiah(totalRkk);
+                _isModified = true;
+              });
+              _recalculateAllBobot(notify: false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Nilai Kontrak acuan diselaraskan: ${formatRupiah(totalRkk)}'),
+                  backgroundColor: const Color(0xFF059669),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              );
+            },
+            child: const Text('Ya, Selaraskan'),
+          ),
+        ],
       ),
     );
   }
 
   void _saveRkk() {
     final keg = widget.contract.kegiatans[widget.kegiatanIndex];
+
+    // Hitung ulang seluruh bobot dengan presisi penuh sebelum disimpan
+    _recalculateAllBobot(notify: false);
 
     // 1. Simpan selalu ke rkkKontrakAwal sebagai Master Baseline
     keg['rkkKontrakAwal'] = _rkkDivisiList;
@@ -339,9 +394,16 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
     if (adds.isEmpty) {
       // Jika belum ada Addendum CCO, RKK operasional adalah Kontrak Awal
       keg['rkkDivisiList'] = _rkkDivisiList;
-      final totalRkk = _totalHargaRkk;
-      if (totalRkk > 0) {
-        keg['nilaiKontrak'] = formatRupiah(totalRkk);
+      // CATATAN PENTING: Nilai kontrak awal (keg['nilaiKontrak']) adalah acuan tetap,
+      // TIDAK BOLEH ditimpa secara otomatis oleh akumulasi RAB agar nilai awal tidak floating.
+      // Hanya diinisialisasi jika nilaiKontrak awal masih kosong sama sekali.
+      final currentNilaiStr = keg['nilaiKontrak']?.toString().trim() ?? '';
+      if (currentNilaiStr.isEmpty || currentNilaiStr == 'Rp 0' || currentNilaiStr == '0') {
+        final totalRkk = _totalHargaRkk;
+        if (totalRkk > 0) {
+          keg['nilaiKontrak'] = formatRupiah(totalRkk);
+          _nilaiKontrakKegiatan = totalRkk;
+        }
       }
     } else {
       // Jika sudah ada Addendum CCO, sinkronkan baseline baru ke seluruh Addendum tanpa menghapus Addendum
@@ -546,13 +608,12 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
         }
       }
 
-      // Pass 2: Hitung ulang nilaiBobot per item berdasarkan addendumGrandTotal
+      // Pass 2: Hitung ulang nilaiBobot per item berdasarkan addendumGrandTotal dengan presisi penuh
       final divisor = addendumGrandTotal > 0 ? addendumGrandTotal : 1.0;
       for (final div in syncedDivList) {
         for (final it in (div['items'] as List)) {
           final th = (it['totalHarga'] as num?)?.toDouble() ?? 0.0;
-          final bobot = (th / divisor) * 100.0;
-          it['nilaiBobot'] = double.parse(bobot.toStringAsFixed(3));
+          it['nilaiBobot'] = (th / divisor) * 100.0;
         }
       }
 
@@ -564,16 +625,7 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
     keg['addendums'] = adds;
     final latestAdd = adds.last;
     keg['rkkDivisiList'] = latestAdd['rkkDivisiList'];
-
-    double latestTot = 0.0;
-    for (final div in (latestAdd['rkkDivisiList'] as List? ?? [])) {
-      for (final it in (div['items'] as List? ?? [])) {
-        latestTot += (it['totalHarga'] as num?)?.toDouble() ?? 0.0;
-      }
-    }
-    if (latestTot > 0) {
-      keg['nilaiKontrak'] = formatRupiah(latestTot);
-    }
+    // JANGAN timpa keg['nilaiKontrak'] awal agar nilai kontrak awal tetap menjadi acuan tetap
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -956,9 +1008,18 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                 totalHargaCtrl.text = '0';
               }
 
-              final refTotal = _totalHargaRkk > 0
-                  ? _totalHargaRkk
-                  : _nilaiKontrakKegiatan;
+              // Hitung pembagi yang konsisten untuk live preview bobot
+              final double refTotal;
+              if (_dasarBobot == 'kontrak' && _nilaiKontrakKegiatan > 0) {
+                refTotal = _nilaiKontrakKegiatan;
+              } else {
+                // Dasar Total RAB: akumulasi item lain ditambah item ini
+                final projectedRab =
+                    (_totalHargaRkk - (isEdit ? initialTotal : 0.0)) + tot;
+                refTotal = projectedRab > 0
+                    ? projectedRab
+                    : (_nilaiKontrakKegiatan > 0 ? _nilaiKontrakKegiatan : 0.0);
+              }
               if (refTotal > 0 && tot > 0) {
                 final bbt = (tot / refTotal) * 100.0;
                 bobotCtrl.text = bbt.toStringAsFixed(3);
@@ -1456,20 +1517,12 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                           tot = hs * vol;
                         }
 
-                        var bbt =
-                            double.tryParse(
-                              bobotCtrl.text.trim().replaceAll(',', '.'),
-                            ) ??
-                            0.0;
-                        if (bbt == 0.0 && tot > 0) {
-                          final ref = _totalHargaRkk > 0
-                              ? _totalHargaRkk
-                              : _nilaiKontrakKegiatan;
-                          if (ref > 0) {
-                            bbt = double.parse(
-                              ((tot / ref) * 100.0).toStringAsFixed(3),
-                            );
-                          }
+                        var manualBbt = 0.0;
+                        if (isCustomOverride) {
+                          manualBbt = double.tryParse(
+                                bobotCtrl.text.trim().replaceAll(',', '.'),
+                              ) ??
+                              0.0;
                         }
 
                         setState(() {
@@ -1484,8 +1537,9 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                             'hargaSatuan': hs,
                             'volume': vol,
                             'totalHarga': tot,
-                            'nilaiBobot': bbt,
+                            'nilaiBobot': manualBbt,
                             'volumeCCO': vol,
+                            'isManualBobot': isCustomOverride,
                           };
 
                           if (isEdit) {
@@ -1494,6 +1548,8 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                             items.add(itemData);
                           }
                           _isModified = true;
+                          // Hitung ulang seluruh bobot secara konsisten dengan presisi penuh
+                          _recalculateAllBobot(notify: false);
                         });
 
                         Navigator.pop(ctx);
@@ -1841,6 +1897,7 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
               setState(() {
                 _rkkDivisiList.removeAt(index);
                 _isModified = true;
+                _recalculateAllBobot(notify: false);
               });
             },
             child: const Text('Hapus'),
@@ -1859,6 +1916,7 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
         items[i]['no'] = '${i + 1}';
       }
       _isModified = true;
+      _recalculateAllBobot(notify: false);
     });
   }
 
@@ -2081,18 +2139,41 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                                   color: Color(0xFF0F172A),
                                 ),
                               ),
-                              if (_nilaiKontrakKegiatan > 0 &&
-                                  (_nilaiKontrakKegiatan - totalRkkHarga)
-                                          .abs() >
-                                      1.0) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Target Kegiatan: ${formatRupiah(_nilaiKontrakKegiatan)}',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFFB45309),
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                              if (_nilaiKontrakKegiatan > 0) ...[
+                                const SizedBox(height: 5),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Nilai Kontrak: ${formatRupiah(_nilaiKontrakKegiatan)}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: (_nilaiKontrakKegiatan - totalRkkHarga).abs() > 1.0
+                                            ? const Color(0xFFB45309)
+                                            : const Color(0xFF059669),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    if ((_nilaiKontrakKegiatan - totalRkkHarga).abs() > 1.0)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFEF3C7),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: const Color(0xFFFDE68A)),
+                                        ),
+                                        child: Text(
+                                          'Selisih: ${formatRupiah((totalRkkHarga - _nilaiKontrakKegiatan).abs())}',
+                                          style: const TextStyle(
+                                            fontSize: 9.5,
+                                            color: Color(0xFFB45309),
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ],
                             ],
@@ -2267,6 +2348,59 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                               ),
                             ),
                           ),
+                          if (_nilaiKontrakKegiatan > 0 && totalRkkHarga > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFCBD5E1)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text(
+                                    'Dasar Bobot: ',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF475569),
+                                    ),
+                                  ),
+                                  DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: _dasarBobot,
+                                      isDense: true,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF0F172A),
+                                      ),
+                                      items: const [
+                                        DropdownMenuItem(
+                                          value: 'rab',
+                                          child: Text('Total Nilai RAB (100%)'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'kontrak',
+                                          child: Text('Nilai Kontrak Awal'),
+                                        ),
+                                      ],
+                                      onChanged: isReadOnly
+                                          ? null
+                                          : (val) {
+                                              if (val != null) {
+                                                setState(() {
+                                                  _dasarBobot = val;
+                                                  _recalculateAllBobot(notify: false);
+                                                });
+                                              }
+                                            },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           if (totalRkkHarga > 0 &&
                               (_nilaiKontrakKegiatan - totalRkkHarga).abs() >
                                   1.0)
