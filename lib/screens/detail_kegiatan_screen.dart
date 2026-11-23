@@ -24,6 +24,7 @@ import 'package:tata_saka_app/widgets/lembar_tambah_kurang_widget.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 import 'package:tata_saka_app/utils/progress_calculator.dart';
+import 'package:tata_saka_app/utils/rupiah_input_formatter.dart';
 
 class _DocData {
   String id;
@@ -106,6 +107,14 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void didUpdateWidget(covariant DetailKegiatanScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.contract != widget.contract || oldWidget.kegiatanIndex != widget.kegiatanIndex) {
+      _loadData();
+    }
   }
 
   void _loadData() {
@@ -2644,8 +2653,11 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                         for (final it in items) {
                           final hs = (it['hargaSatuan'] as num?)?.toDouble() ?? 0.0;
                           final vol = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
-                          divSubtotal += (it['totalHarga'] as num?)?.toDouble() ?? (hs * vol);
-                          divBobot += (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
+                          final th = (it['totalHarga'] as num?)?.toDouble() ?? (hs * vol);
+                          divSubtotal += th;
+                          divBobot += totalHarga > 0
+                              ? (th / totalHarga) * 100.0
+                              : ((it['nilaiBobot'] as num?)?.toDouble() ?? 0.0);
                         }
 
                         return [
@@ -2674,7 +2686,10 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                             final hs = (it['hargaSatuan'] as num?)?.toDouble() ?? 0.0;
                             final vol = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
                             final th = (it['totalHarga'] as num?)?.toDouble() ?? (hs * vol);
-                            final bbt = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
+                            // Rumus konsisten: Bobot Pekerjaan (%) = (Total Harga Item / Total Nilai RAB) * 100%
+                            final bbt = totalHarga > 0
+                                ? (th / totalHarga) * 100.0
+                                : ((it['nilaiBobot'] as num?)?.toDouble() ?? 0.0);
 
                             return TableRow(
                               children: [
@@ -2703,11 +2718,11 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                           _rabTd('', align: TextAlign.right),
                           _rabTd('', align: TextAlign.right),
                           _rabTd(KelolaRkkScreen.formatRupiah(totalHarga).replaceFirst('Rp ', ''), align: TextAlign.right, isBold: true),
-                          _rabTd('${totalBobot.toStringAsFixed(3)}%', align: TextAlign.right, isBold: true),
+                          _rabTd(totalHarga > 0 ? '100.000%' : '0.000%', align: TextAlign.right, isBold: true),
                         ],
                       ),
-                      // Baris Pembulatan Sesuai Format Dokumen Fisik Dinas PU
-                      if (_kegiatan.nilaiKontrak.isNotEmpty)
+                      // Baris Pembulatan Sesuai Format Dokumen Fisik Dinas PU (Floor kelipatan Rp 1.000)
+                      if (totalHarga > 0 || _kegiatan.nilaiKontrak.isNotEmpty)
                         TableRow(
                           decoration: const BoxDecoration(color: Color(0xFFF8FAFC)),
                           children: [
@@ -2717,7 +2732,18 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                             _rabTd('', align: TextAlign.center),
                             _rabTd('', align: TextAlign.right),
                             _rabTd('', align: TextAlign.right),
-                            _rabTd(_kegiatan.nilaiKontrak.replaceFirst('Rp ', ''), align: TextAlign.right, isBold: true),
+                            _rabTd(
+                              KelolaRkkScreen.formatRupiah(
+                                RupiahUtil.floorToNearestThousand(
+                                  totalHarga > 0
+                                      ? totalHarga
+                                      : RupiahUtil.parseToDouble(_kegiatan.nilaiKontrak),
+                                ),
+                                forceDecimals: true,
+                              ).replaceFirst('Rp ', ''),
+                              align: TextAlign.right,
+                              isBold: true,
+                            ),
                             _rabTd('100.000%', align: TextAlign.right, isBold: true),
                           ],
                         ),
