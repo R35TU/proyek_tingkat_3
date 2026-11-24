@@ -492,7 +492,9 @@ class PanduanFaqScreen extends StatelessWidget {
         isSub: true,
       ),
       _GuideStep(
-        'Nama Instansi / Perusahaan: masukkan nama CV, PT, atau Dinas terkait.',
+        'Nama Instansi / Perusahaan: masukkan nama CV, PT, atau Dinas terkait. '
+        'Khusus untuk peran Konsultan, kolom ini tidak perlu diisi karena secara otomatis '
+        'ditetapkan sebagai CV. Tata Saka Consultant.',
         isSub: true,
       ),
       _GuideStep(
