@@ -108,7 +108,12 @@ class UserProfileProvider with ChangeNotifier {
   String get namaLengkap => _namaLengkap;
   String get username => _username;
   String get role => _role;
-  String get companyOrAgency => _companyOrAgency;
+  String get companyOrAgency {
+    if (isKonsultan) {
+      return 'CV. Tata Saka Consultant';
+    }
+    return _companyOrAgency;
+  }
   String? get profileImagePath => _profileImagePath;
   String get currentPassword => _currentPassword;
 
@@ -159,7 +164,11 @@ class UserProfileProvider with ChangeNotifier {
         _namaLengkap = p['namaLengkap'] ?? _namaLengkap;
         _username = p['username'] ?? _username;
         _role = p['role'] ?? _role;
-        _companyOrAgency = p['companyOrAgency'] ?? _companyOrAgency;
+        if (_role.toLowerCase() == 'konsultan') {
+          _companyOrAgency = 'CV. Tata Saka Consultant';
+        } else {
+          _companyOrAgency = p['companyOrAgency'] ?? _companyOrAgency;
+        }
         _profileImagePath = p['profileImagePath'];
         _currentPassword = p['currentPassword'] ?? _currentPassword;
       }
@@ -237,7 +246,11 @@ class UserProfileProvider with ChangeNotifier {
       _username = (doc?['username'] ?? fallbackUsername).toString();
       _role = (doc?['role'] ?? roleHint ?? 'Konsultan').toString();
       _namaLengkap = (doc?['namaLengkap'] ?? fallbackUsername).toString();
-      _companyOrAgency = (doc?['companyOrAgency'] ?? 'Tata Saka').toString();
+      if (_role.toLowerCase() == 'konsultan') {
+        _companyOrAgency = 'CV. Tata Saka Consultant';
+      } else {
+        _companyOrAgency = (doc?['companyOrAgency'] ?? '').toString();
+      }
       _currentPassword = cleanPassword;
       _profileImagePath = null;
       notifyListeners();
@@ -261,7 +274,9 @@ class UserProfileProvider with ChangeNotifier {
     _username = user.username;
     _role = user.role;
     _namaLengkap = user.namaLengkap;
-    _companyOrAgency = user.companyOrAgency;
+    _companyOrAgency = user.role.toLowerCase() == 'konsultan'
+        ? 'CV. Tata Saka Consultant'
+        : user.companyOrAgency;
     _currentPassword = user.password;
     _profileImagePath = null;
 

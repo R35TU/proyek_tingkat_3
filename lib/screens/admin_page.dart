@@ -29,19 +29,24 @@ class UserAccount {
 
   factory UserAccount.fromDoc(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>? ?? {};
+    final role = (d['role'] ?? 'Konsultan').toString();
+    final instansi = role.toLowerCase() == 'konsultan'
+        ? 'CV. Tata Saka Consultant'
+        : (d['companyOrAgency'] ?? '-').toString();
     return UserAccount(
       id: doc.id,
       name: (d['namaLengkap'] ?? d['username'] ?? '-').toString(),
       email: (d['email'] ?? '-').toString(),
-      role: (d['role'] ?? 'Konsultan').toString(),
-      instansi: (d['companyOrAgency'] ?? '-').toString(),
+      role: role,
+      instansi: instansi,
       isActive: d['isActive'] ?? true,
     );
   }
 }
 
 class AdminPage extends StatefulWidget {
-  const AdminPage({super.key});
+  final bool bypassAuthCheck;
+  const AdminPage({super.key, this.bypassAuthCheck = false});
 
   @override
   State<AdminPage> createState() => _AdminPageState();
@@ -62,7 +67,7 @@ class _AdminPageState extends State<AdminPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (AuthService.currentUser == null) {
+      if (!widget.bypassAuthCheck && AuthService.currentUser == null) {
         Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
       }
     });
@@ -128,10 +133,12 @@ class _AdminPageState extends State<AdminPage> {
     final nameCtrl = TextEditingController(text: existingAccount?.name ?? '');
     final emailCtrl = TextEditingController(text: existingAccount?.email ?? '');
     final passCtrl = TextEditingController();
-    final instansiCtrl = TextEditingController(
-      text: existingAccount?.instansi ?? '',
-    );
     String selectedRole = existingAccount?.role ?? 'Konsultan';
+    final instansiCtrl = TextEditingController(
+      text: selectedRole == 'Konsultan'
+          ? 'CV. Tata Saka Consultant'
+          : (existingAccount?.instansi ?? ''),
+    );
     bool isActive = existingAccount?.isActive ?? true;
     bool isSaving = false;
     final formKey = GlobalKey<FormState>();
@@ -176,7 +183,14 @@ class _AdminPageState extends State<AdminPage> {
                               .toList(),
                           onChanged: (val) {
                             if (val != null) {
-                              setDialogState(() => selectedRole = val);
+                              setDialogState(() {
+                                selectedRole = val;
+                                if (selectedRole == 'Konsultan') {
+                                  instansiCtrl.text = 'CV. Tata Saka Consultant';
+                                } else if (instansiCtrl.text == 'CV. Tata Saka Consultant') {
+                                  instansiCtrl.clear();
+                                }
+                              });
                             }
                           },
                         ),
@@ -192,19 +206,24 @@ class _AdminPageState extends State<AdminPage> {
                               ? 'Nama wajib diisi'
                               : null,
                         ),
-                        const SizedBox(height: 14),
-                        TextFormField(
-                          controller: instansiCtrl,
-                          decoration: const InputDecoration(
-                            labelText:
-                                'Nama Instansi / Perusahaan (CV/PT/Dinas)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.business_outlined),
+                        // Field instansi/perusahaan hanya muncul untuk Kontraktor dan Dinas.
+                        // Khusus Konsultan, identitas perusahaan ditetapkan secara otomatis sebagai CV. Tata Saka Consultant.
+                        if (selectedRole != 'Konsultan') ...[
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: instansiCtrl,
+                            decoration: InputDecoration(
+                              labelText: selectedRole == 'Dinas'
+                                  ? 'Nama Dinas / Instansi Terkait'
+                                  : 'Nama Perusahaan Kontraktor (CV/PT)',
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.business_outlined),
+                            ),
+                            validator: (v) => v == null || v.trim().isEmpty
+                                ? 'Instansi / Perusahaan wajib diisi'
+                                : null,
                           ),
-                          validator: (v) => v == null || v.isEmpty
-                              ? 'Instansi wajib diisi'
-                              : null,
-                        ),
+                        ],
                         const SizedBox(height: 14),
                         TextFormField(
                           controller: emailCtrl,
@@ -275,13 +294,17 @@ class _AdminPageState extends State<AdminPage> {
                           if (!formKey.currentState!.validate()) return;
                           setDialogState(() => isSaving = true);
                           try {
+                            final String effectiveInstansi = selectedRole == 'Konsultan'
+                                ? 'CV. Tata Saka Consultant'
+                                : instansiCtrl.text.trim();
+
                             if (isEdit) {
                               await AuthService.updateUserDoc(
                                 existingAccount.id,
                                 {
                                   'namaLengkap': nameCtrl.text.trim(),
                                   'role': selectedRole,
-                                  'companyOrAgency': instansiCtrl.text.trim(),
+                                  'companyOrAgency': effectiveInstansi,
                                   'isActive': isActive,
                                 },
                               );
@@ -291,7 +314,7 @@ class _AdminPageState extends State<AdminPage> {
                                 password: passCtrl.text.trim(),
                                 role: selectedRole,
                                 namaLengkap: nameCtrl.text,
-                                instansi: instansiCtrl.text,
+                                instansi: effectiveInstansi,
                                 isActive: isActive,
                               );
                             }
@@ -440,23 +463,30 @@ class _AdminPageState extends State<AdminPage> {
               color: Colors.white,
             ),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Dashboard Admin',
-                  style: TextStyle(
-                    fontSize: isCompact ? 16 : 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white70,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Dashboard Admin',
+                    style: TextStyle(
+                      fontSize: isCompact ? 16 : 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white70,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                if (!isCompact)
-                  const Text(
-                    'Manajemen akun',
-                    style: TextStyle(fontSize: 12, color: Colors.white70),
-                  ),
-              ],
+                  if (!isCompact)
+                    const Text(
+                      'Manajemen akun',
+                      style: TextStyle(fontSize: 12, color: Colors.white70),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
             ),
           ],
         ),

@@ -94,6 +94,10 @@ class AuthService {
     required String instansi,
     required bool isActive,
   }) async {
+    final effectiveInstansi = role.trim().toLowerCase() == 'konsultan'
+        ? 'CV. Tata Saka Consultant'
+        : instansi.trim();
+
     final tempAppName = 'provision-${DateTime.now().millisecondsSinceEpoch}';
     final tempApp = await Firebase.initializeApp(
       name: tempAppName,
@@ -111,7 +115,7 @@ class AuthService {
         'username': email.split('@').first,
         'role': role,
         'namaLengkap': namaLengkap.trim(),
-        'companyOrAgency': instansi.trim(),
+        'companyOrAgency': effectiveInstansi,
         'isActive': isActive,
         'createdAt': DateTime.now().toIso8601String(),
       });
@@ -123,6 +127,9 @@ class AuthService {
 
   /// Perbarui profil user (role, nama, instansi, status aktif).
   static Future<void> updateUserDoc(String uid, Map<String, dynamic> data) async {
+    if (data['role']?.toString().trim().toLowerCase() == 'konsultan') {
+      data['companyOrAgency'] = 'CV. Tata Saka Consultant';
+    }
     await _db.collection('users').doc(uid).update(data);
   }
 
