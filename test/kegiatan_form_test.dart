@@ -90,7 +90,13 @@ void main() {
       );
 
       expect(keg.stafTeknisDisplay, 'MUBALLIGH, ST., M.Sc. & BILAL A.Md');
-      expect(keg.stafTeknisLabel, 'Staf Teknis 1 & 2 DPU-PR');
+      expect(keg.stafTeknisLabel, 'Staf Teknis 1 & 2');
+
+      // Test label jika hanya satu staf teknis yang terisi
+      final kegSingle1 = KegiatanModel(namaKegiatan: 'Jembatan A', stafTeknis1: 'MUBALLIGH');
+      expect(kegSingle1.stafTeknisLabel, 'Staf Teknis 1');
+      final kegSingle2 = KegiatanModel(namaKegiatan: 'Jembatan B', stafTeknis2: 'BILAL');
+      expect(kegSingle2.stafTeknisLabel, 'Staf Teknis 2');
 
       final json = keg.toJson();
       final fromJsonKeg = KegiatanModel.fromJson(json);
@@ -182,6 +188,12 @@ void main() {
       expect(find.text('CV. TATA SAKA CONSULTANT'), findsWidgets);
       expect(find.text('000.3.2/1280.1/WAS-17/SPK-BM/1.03.10.2.01.0056/2026'), findsOneWidget);
 
+      // Verifikasi Label Netral Staf Teknis (tanpa DPU-PR)
+      expect(find.text('Staf Teknis 1'), findsOneWidget);
+      expect(find.text('Staf Teknis 2'), findsOneWidget);
+      expect(find.text('Staf Teknis 1 DPU-PR'), findsNothing);
+      expect(find.text('Staf Teknis 2 DPU-PR'), findsNothing);
+
       // Verify Save Button is present
       expect(find.byType(ElevatedButton), findsWidgets);
     });
@@ -262,6 +274,9 @@ void main() {
       expect(find.text('STRUKTUR ORGANISASI KEGIATAN'), findsOneWidget);
       expect(find.text('DRAJAT UJI WAKHYONO, S.T., M.T.'), findsOneWidget);
       expect(find.text('MUBALLIGH, ST., M.Sc. & BILAL A.Md'), findsOneWidget);
+      expect(find.text('Staf Teknis 1 & 2'), findsOneWidget);
+      expect(find.text('Staf Teknis 1 & 2 DPU-PR'), findsNothing);
+      expect(find.text('Staf Teknis DPU-PR'), findsNothing);
       expect(find.text('Direktur Penyedia Jasa'), findsOneWidget);
 
       // Section STRUKTUR ORGANISASI PENYEDIA JASA

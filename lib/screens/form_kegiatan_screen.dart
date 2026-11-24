@@ -861,12 +861,12 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
         const SizedBox(height: 14),
         _buildField(
           controller: _stafTeknis1Ctrl,
-          label: 'Staf Teknis 1 DPU-PR',
+          label: 'Staf Teknis 1',
         ),
         const SizedBox(height: 14),
         _buildField(
           controller: _stafTeknis2Ctrl,
-          label: 'Staf Teknis 2 DPU-PR',
+          label: 'Staf Teknis 2',
         ),
       ],
     );
