@@ -528,7 +528,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'CV. TATA SAKA',
+                                'CV. TATA SAKA CONSULTANT',
                                 style: TextStyle(
                                   color: Color(0xFF0F172A),
                                   fontSize: 14,
@@ -547,7 +547,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                                 ),
                               ),
                               Text(
-                                'Consultant Engineer',
+                                'Engineering Consultant',
                                 style: TextStyle(
                                   color: Color(0xFF94A3B8),
                                   fontSize: 9.5,

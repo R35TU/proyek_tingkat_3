@@ -1807,7 +1807,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'CV. TATA SAKA',
+                                'CV. TATA SAKA CONSULTANT',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 14,
@@ -1817,7 +1817,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               SizedBox(height: 2),
                               Text(
-                                'Consultant Engineer',
+                                'Engineering Consultant',
                                 style: TextStyle(
                                   color: isDrawer
                                       ? const Color(0xFF38BDF8)
