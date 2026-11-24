@@ -227,7 +227,6 @@ class ContractProvider with ChangeNotifier {
         final List<dynamic> decoded = jsonDecode(contractsJson);
         _contracts = decoded
             .map((item) => ContractModel.fromJson(Map<String, dynamic>.from(item)))
-            .where((c) => c.id != 'kontrak-mt-haryono-demo') // saring sisa ID seed lama dari cache lokal
             .toList();
       } else {
         _contracts = [];
