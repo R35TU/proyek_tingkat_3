@@ -648,11 +648,14 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                                             bytes: uploadBytesData,
                                             remotePath: StorageService.safeObjectPath(
                                                 'dokumen/${widget.contract.namaKontrak}/${_folders[selectedFolderIdx].name}/${DateTime.now().millisecondsSinceEpoch}_$pickedFileName'),
-                                            contentType: detectedType == 'IMG'
-                                                ? 'image/jpeg'
-                                                : 'application/pdf',
+                                            contentType: StorageService.detectContentType(pickedFileName),
                                           );
-                                    } catch (_) {}
+                                    } catch (e) {
+                                      debugPrint('[Upload] Gagal unggah ke storage: $e');
+                                      if (kIsWeb) {
+                                        throw Exception('Gagal mengunggah berkas ke cloud storage: $e');
+                                      }
+                                    }
                                   }
 
                                   final formattedSize = _formatFileSize(pickedFileBytes > 0 ? pickedFileBytes : 1024 * 350);
@@ -866,11 +869,19 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                 leading: const Icon(Icons.storage_outlined, size: 20, color: AppColors.textLight),
                 title: const Text('Status File Fisik', style: TextStyle(fontSize: 13, color: AppColors.textLight)),
                 trailing: Text(
-                  doc.localPath != null && File(doc.localPath!).existsSync() ? 'Tersimpan Offline' : 'Tersimpan di Cloud',
+                  !kIsWeb && doc.localPath != null && File(doc.localPath!).existsSync()
+                      ? 'Tersimpan Offline'
+                      : ((doc.remoteUrl ?? '').isNotEmpty
+                          ? 'Tersimpan di Cloud'
+                          : 'Berkas Tidak Tersedia'),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: doc.localPath != null && File(doc.localPath!).existsSync() ? Colors.green : Colors.orange,
+                    color: !kIsWeb && doc.localPath != null && File(doc.localPath!).existsSync()
+                        ? Colors.green
+                        : ((doc.remoteUrl ?? '').isNotEmpty
+                            ? Colors.orange
+                            : Colors.red),
                   ),
                 ),
               ),
@@ -881,10 +892,21 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(ctx);
-                        // Web: buka langsung dari URL Cloudflare di tab baru
-                        // (PDF/gambar tampil di viewer bawaan browser).
+                        final resolvedName = resolveDocFileName(doc.name, doc.type, doc.remoteUrl ?? doc.localPath);
+                        // Web: buka PDF/gambar langsung di tab baru (viewer bawaan browser),
+                        // sedangkan file office/arsip (DOC, DOCX, XLS, XLSX, ZIP) langsung diunduh.
                         if (kIsWeb && (doc.remoteUrl ?? '').isNotEmpty) {
-                          openRemoteInNewTab(doc.remoteUrl!);
+                          if (isPreviewableInBrowser(doc.type, doc.remoteUrl)) {
+                            openRemoteInNewTab(doc.remoteUrl!);
+                          } else {
+                            downloadAndOpenRemote(doc.remoteUrl!, resolvedName).catchError((e) {
+                              if (!mounted) return null;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Gagal mengunduh dokumen: $e')),
+                              );
+                              return null;
+                            });
+                          }
                           return;
                         }
                         if (doc.type == 'IMG' && doc.localPath != null && File(doc.localPath!).existsSync()) {
@@ -919,7 +941,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                               duration: Duration(seconds: 2),
                             ),
                           );
-                          downloadAndOpenRemote(doc.remoteUrl!, doc.name).catchError((e) {
+                          downloadAndOpenRemote(doc.remoteUrl!, resolvedName).catchError((e) {
                             if (!mounted) return null;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Gagal membuka dokumen: $e')),
