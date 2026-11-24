@@ -159,7 +159,9 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
           ? init!['tglSpmkKontraktor']
           : c.tglMulaiSpmk,
     );
-    _nilaiKontrakCtrl = TextEditingController(text: RupiahUtil.formatString(init?['nilaiKontrak'] ?? ''));
+    _nilaiKontrakCtrl = TextEditingController(
+      text: RupiahUtil.formatString(init?['nilaiKontrak'] ?? '', allowDecimals: true),
+    );
     _jangkaWaktuCtrl = TextEditingController(
       text: (init?['jangkaWaktu']?.toString().isNotEmpty == true)
           ? init!['jangkaWaktu']
@@ -851,8 +853,8 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
           label: 'Nilai Kontrak Kegiatan *',
           isBold: true,
           prefixText: 'Rp ',
-          keyboardType: TextInputType.number,
-          inputFormatters: [RupiahInputFormatter()],
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [RupiahInputFormatter(allowDecimals: true)],
           validator: (val) => val == null || val.trim().isEmpty ? 'Nilai kontrak kegiatan wajib diisi' : null,
         ),
         const SizedBox(height: 16),

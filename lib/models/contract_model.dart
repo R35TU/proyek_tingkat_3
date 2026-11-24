@@ -1,4 +1,5 @@
 import 'package:tata_saka_app/utils/progress_calculator.dart';
+import 'package:tata_saka_app/utils/rupiah_input_formatter.dart';
 
 class ContractModel {
   String id;
@@ -14,6 +15,9 @@ class ContractModel {
   final int hariKalender;
   
   final String nilaiKontrak;
+
+  /// Nilai numerik kontrak (double) dengan presisi desimal penuh.
+  double get nilaiKontrakNumeric => RupiahUtil.parseToDouble(nilaiKontrak);
   
   final List<String> instansiDinas;
   final String dinasUid;
@@ -158,7 +162,11 @@ class ContractModel {
       tglMulaiSpmk: json['tglMulaiSpmk'] ?? '',
       tglSelesaiSpmk: json['tglSelesaiSpmk'] ?? '',
       hariKalender: json['hariKalender'] ?? 0,
-      nilaiKontrak: json['nilaiKontrak'] ?? '',
+      nilaiKontrak: json['nilaiKontrak'] != null
+          ? (json['nilaiKontrak'] is num
+              ? RupiahUtil.formatWithRp(json['nilaiKontrak'] as num, allowDecimals: true)
+              : json['nilaiKontrak'].toString())
+          : '',
       instansiDinas: json['instansiDinas'] != null ? List<String>.from(json['instansiDinas']) : [],
       dinasUid: json['dinasUid'] ?? '',
       sumberDana: json['sumberDana'] ?? '',
