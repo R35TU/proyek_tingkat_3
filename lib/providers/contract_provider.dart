@@ -161,7 +161,8 @@ class ContractProvider with ChangeNotifier {
     try {
       final snap = await _db.collection('contracts').get();
       if (snap.docs.isEmpty) {
-        await _seedDemoData();
+        // Jangan auto-seed: biarkan database bersih tanpa injeksi data dummy otomatis.
+        _contracts = [];
       } else {
         final list = <ContractModel>[];
         for (final doc in snap.docs) {
@@ -174,12 +175,12 @@ class ContractProvider with ChangeNotifier {
         }
         _contracts = list;
 
-        // Aplikasi = patokan: pastikan kontrak demo selalu versi terbaru.
-        final demoIdx = _contracts.indexWhere((c) => c.id == 'kontrak-mt-haryono-demo');
-        if (demoIdx < 0) {
-          await _seedDemoData(addToList: true);
-        } else if (_isOldDemoData(_contracts[demoIdx])) {
-          await _refreshDemoData();
+        // Pembersihan otomatis: Jika terdapat kontrak dummy MT Haryono yang tertinggal di cloud/lokal, hapus tuntas.
+        final dummyContracts = _contracts.where((c) =>
+            c.id == 'kontrak-mt-haryono-demo' ||
+            c.namaKontrak.trim().toUpperCase() == 'PEMELIHARAAN BERKALA JL. MT HARYONO').toList();
+        for (final dummy in dummyContracts) {
+          await deleteContract(dummy.id);
         }
       }
     } catch (e) {
@@ -234,12 +235,15 @@ class ContractProvider with ChangeNotifier {
         final List<dynamic> decoded = jsonDecode(contractsJson);
         _contracts = decoded
             .map((item) => ContractModel.fromJson(Map<String, dynamic>.from(item)))
+            .where((c) =>
+                c.id != 'kontrak-mt-haryono-demo' &&
+                c.namaKontrak.trim().toUpperCase() != 'PEMELIHARAAN BERKALA JL. MT HARYONO')
             .toList();
       } else {
-        _contracts = [SampleContractData.getDemoContract()];
+        _contracts = [];
       }
     } catch (_) {
-      _contracts = [SampleContractData.getDemoContract()];
+      _contracts = [];
     }
   }
 
