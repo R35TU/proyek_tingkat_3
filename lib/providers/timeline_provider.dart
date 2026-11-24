@@ -47,11 +47,8 @@ class TimelineProvider with ChangeNotifier {
             data['id'] = d.id;
             return TimelineEventModel.fromJson(data);
           }).toList();
-          if (!seedDefaultIfEmpty) {
-            cloudEvents = cloudEvents.where((e) =>
-                e.contractId != 'kontrak-mt-haryono-demo' &&
-                e.contractName.trim().toUpperCase() != 'PEMELIHARAAN BERKALA JL. MT HARYONO').toList();
-          }
+          // Cloud sudah bersih dari seed lama (seeder dinonaktifkan).
+          // Tidak ada filter di sini — tampilkan semua event dari Firestore apa adanya.
           if (cloudEvents.isNotEmpty || !seedDefaultIfEmpty) {
             _events = cloudEvents;
             _sortEvents();
@@ -85,11 +82,10 @@ class TimelineProvider with ChangeNotifier {
       var loaded = decoded
           .map((item) => TimelineEventModel.fromJson(Map<String, dynamic>.from(item)))
           .toList();
-      if (!seedDefaultIfEmpty) {
-        loaded = loaded.where((e) =>
-            e.contractId != 'kontrak-mt-haryono-demo' &&
-            e.contractName.trim().toUpperCase() != 'PEMELIHARAAN BERKALA JL. MT HARYONO').toList();
-      }
+      // Saring sisa event seed lama (ID dummy) dari cache SharedPreferences lokal.
+      // JANGAN filter berdasarkan nama kontrak agar event yang diinput manual pengguna tetap aman.
+      loaded = loaded.where((e) =>
+          e.contractId != 'kontrak-mt-haryono-demo').toList();
       if (loaded.isEmpty && seedDefaultIfEmpty) {
         _events = _generateInitialSeedEvents();
         await _saveEvents();
