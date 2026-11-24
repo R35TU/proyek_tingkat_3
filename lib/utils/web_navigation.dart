@@ -17,4 +17,12 @@ void replaceWebUrl(String path) {
   }
 }
 
+/// Ambil rute hash browser saat ini di web.
+String getInitialWebRoute() {
+  if (kIsWeb) {
+    return getInitialWebRouteImpl();
+  }
+  return '/';
+}
+
 

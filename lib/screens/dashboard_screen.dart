@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
@@ -31,9 +32,11 @@ import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 import 'package:tata_saka_app/utils/progress_calculator.dart';
+import 'package:tata_saka_app/utils/web_navigation.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final String? initialMenu;
+  const DashboardScreen({super.key, this.initialMenu});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -46,7 +49,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _activeWebMenu = 'dashboard';
   final List<String> _webMenuHistory = ['dashboard'];
 
+  static String? _normalizeMenuFromUrl(String route) {
+    final clean = route.replaceAll('#', '').trim();
+    final uri = Uri.tryParse(clean);
+    if (uri == null) return null;
+    final path = uri.path.replaceAll('/', '').trim();
+    if (path.isEmpty || path == 'main' || path == 'dashboard') return 'dashboard';
+    const validMenus = {
+      'kontrak', 'kegiatan', 'laporan', 'data_laporan', 'data-laporan',
+      'laporan_harian', 'laporan-harian', 'laporan_mingguan', 'laporan-mingguan',
+      'laporan_bulanan', 'laporan-bulanan', 'timeline', 'pengaturan',
+      'keamanan', 'edit_profil', 'edit-profil', 'panduan_faq', 'panduan-faq'
+    };
+    if (validMenus.contains(path)) {
+      return path.replaceAll('-', '_');
+    }
+    final qMenu = uri.queryParameters['menu'];
+    if (qMenu != null && validMenus.contains(qMenu)) {
+      return qMenu.replaceAll('-', '_');
+    }
+    return null;
+  }
+
   void _onWebMenuSelected(String menuKey) {
+    if (kIsWeb) {
+      replaceWebUrl('/#/$menuKey');
+    }
     if (_activeWebMenu == menuKey) return;
     setState(() {
       _webMenuHistory.add(menuKey);
@@ -61,11 +89,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _webMenuHistory.removeLast();
         _activeWebMenu = _webMenuHistory.last;
         WebDashboardLayout.activeWebMenu.value = _activeWebMenu;
+        if (kIsWeb) {
+          replaceWebUrl('/#/${_activeWebMenu}');
+        }
       });
     } else {
       setState(() {
         _activeWebMenu = 'dashboard';
         WebDashboardLayout.activeWebMenu.value = 'dashboard';
+        if (kIsWeb) {
+          replaceWebUrl('/#/dashboard');
+        }
       });
     }
   }
@@ -244,6 +278,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _startTimer();
+    final startMenu = widget.initialMenu ??
+        (kIsWeb ? _normalizeMenuFromUrl(getInitialWebRoute()) : null) ??
+        'dashboard';
+    _activeWebMenu = startMenu;
+    WebDashboardLayout.activeWebMenu.value = startMenu;
+    _webMenuHistory.clear();
+    _webMenuHistory.add(startMenu);
+    if (kIsWeb) {
+      replaceWebUrl('/#/$startMenu');
+    }
+
     WebDashboardLayout.activeWebMenu.addListener(_onWebDashboardMenuChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -257,6 +302,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _onWebDashboardMenuChanged() {
     final val = WebDashboardLayout.activeWebMenu.value;
+    if (kIsWeb) {
+      replaceWebUrl('/#/$val');
+    }
     if (mounted && _activeWebMenu != val) {
       setState(() {
         if (!_webMenuHistory.contains(val)) {
@@ -264,6 +312,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
         _activeWebMenu = val;
       });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant DashboardScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialMenu != null && widget.initialMenu != oldWidget.initialMenu) {
+      final newMenu = _normalizeMenuFromUrl(widget.initialMenu!) ?? 'dashboard';
+      if (_activeWebMenu != newMenu) {
+        setState(() {
+          _activeWebMenu = newMenu;
+          WebDashboardLayout.activeWebMenu.value = newMenu;
+          if (!_webMenuHistory.contains(newMenu)) {
+            _webMenuHistory.add(newMenu);
+          }
+        });
+        if (kIsWeb) {
+          replaceWebUrl('/#/$newMenu');
+        }
+      }
     }
   }
 
@@ -1682,11 +1750,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ? _getHeaderTitle(userProf)
             : 'Dashboard Kontraktor',
         activeMenu: _activeWebMenu,
-        onMenuSelected: (menuKey) {
-          setState(() {
-            _activeWebMenu = menuKey;
-          });
-        },
+        showBackButton: _activeWebMenu != 'dashboard',
+        onBack: _onWebBack,
+        onMenuSelected: _onWebMenuSelected,
         child: _buildActiveWebContent(
           context,
           userProf,

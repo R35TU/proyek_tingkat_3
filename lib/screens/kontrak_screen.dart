@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
@@ -9,6 +10,7 @@ import 'package:tata_saka_app/screens/detail_kontrak_screen.dart';
 import 'package:tata_saka_app/screens/tambah_kontrak_screen.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/utils/progress_calculator.dart';
+import 'package:tata_saka_app/utils/web_navigation.dart';
 
 class KontrakScreen extends StatefulWidget {
   final bool isEmbedded;
@@ -387,12 +389,22 @@ class _KontrakScreenState extends State<KontrakScreen> {
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
               onTap: () {
+                if (kIsWeb) {
+                  replaceWebUrl('/#/detail-kontrak?id=${contract.id}&tab=0');
+                }
                 Navigator.push(
                   context,
                   MaterialPageRoute(
+                    settings: RouteSettings(
+                      name: '/detail-kontrak?id=${contract.id}&tab=0',
+                    ),
                     builder: (context) => DetailKontrakScreen(contract: contract),
                   ),
-                );
+                ).then((_) {
+                  if (kIsWeb && mounted) {
+                    replaceWebUrl('/#/kontrak');
+                  }
+                });
               },
               onLongPress: isKonsultan ? () => _showContractOptions(context, contract) : null,
               child: Padding(

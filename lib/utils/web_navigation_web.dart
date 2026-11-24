@@ -14,4 +14,19 @@ void replaceWebUrlImpl(String path) {
   } catch (_) {}
 }
 
+/// Mengambil rute web saat ini dari window.location.hash.
+String getInitialWebRouteImpl() {
+  try {
+    final hash = html.window.location.hash; // misal "#/detail-kontrak?id=123&tab=1"
+    if (hash.startsWith('#/')) {
+      return hash.substring(1); // "/detail-kontrak?id=123&tab=1"
+    }
+    if (hash.startsWith('#')) {
+      final sub = hash.substring(1);
+      return sub.startsWith('/') ? sub : '/$sub';
+    }
+  } catch (_) {}
+  return '/';
+}
+
 
