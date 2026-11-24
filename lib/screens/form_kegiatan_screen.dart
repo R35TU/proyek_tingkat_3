@@ -54,6 +54,7 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
   late TextEditingController _tglSpmkKontraktorCtrl;
   late TextEditingController _nilaiKontrakCtrl;
   late TextEditingController _jangkaWaktuCtrl;
+  late TextEditingController _tglAkhirSpmkCtrl;
 
   // 4. STRUKTUR ORGANISASI KEGIATAN
   late TextEditingController _penggunaAnggaranCtrl;
@@ -164,6 +165,16 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
           ? init!['jangkaWaktu']
           : defaultDurasi,
     );
+    _tglAkhirSpmkCtrl = TextEditingController(
+      text: (init?['tglAkhirSpmkKontraktor']?.toString().isNotEmpty == true)
+          ? init!['tglAkhirSpmkKontraktor'].toString()
+          : KegiatanModel.calculateTanggalAkhirSpmk(
+              _tglSpmkKontraktorCtrl.text,
+              _jangkaWaktuCtrl.text,
+            ),
+    );
+    _jangkaWaktuCtrl.addListener(_updateTglAkhirSpmk);
+    _tglSpmkKontraktorCtrl.addListener(_updateTglAkhirSpmk);
 
     // 4. Struktur Organisasi Kegiatan
     _penggunaAnggaranCtrl = TextEditingController(
@@ -314,7 +325,10 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
     _noSpmkKontraktorCtrl.dispose();
     _tglSpmkKontraktorCtrl.dispose();
     _nilaiKontrakCtrl.dispose();
+    _jangkaWaktuCtrl.removeListener(_updateTglAkhirSpmk);
     _jangkaWaktuCtrl.dispose();
+    _tglSpmkKontraktorCtrl.removeListener(_updateTglAkhirSpmk);
+    _tglAkhirSpmkCtrl.dispose();
     _penggunaAnggaranCtrl.dispose();
     _stafTeknis1Ctrl.dispose();
     _stafTeknis2Ctrl.dispose();
@@ -363,7 +377,20 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
         if (updateWaktuBerjalan) {
           _waktuBerjalanCtrl.text = KegiatanModel.calculateWaktuBerjalan(formatted);
         }
+        if (controller == _tglSpmkKontraktorCtrl) {
+          _updateTglAkhirSpmk();
+        }
       });
+    }
+  }
+
+  void _updateTglAkhirSpmk() {
+    final calculated = KegiatanModel.calculateTanggalAkhirSpmk(
+      _tglSpmkKontraktorCtrl.text,
+      _jangkaWaktuCtrl.text,
+    );
+    if (_tglAkhirSpmkCtrl.text != calculated) {
+      _tglAkhirSpmkCtrl.text = calculated;
     }
   }
 
@@ -406,6 +433,12 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
           ? 'Rp ${_nilaiKontrakCtrl.text.trim()}'
           : '',
       'jangkaWaktu': _jangkaWaktuCtrl.text.trim(),
+      'tglAkhirSpmkKontraktor': _tglAkhirSpmkCtrl.text.trim().isNotEmpty
+          ? _tglAkhirSpmkCtrl.text.trim()
+          : KegiatanModel.calculateTanggalAkhirSpmk(
+              _tglSpmkKontraktorCtrl.text.trim(),
+              _jangkaWaktuCtrl.text.trim(),
+            ),
       'penggunaAnggaran': _penggunaAnggaranCtrl.text.trim(),
       'stafTeknis1': _stafTeknis1Ctrl.text.trim(),
       'stafTeknis2': _stafTeknis2Ctrl.text.trim(),
@@ -844,6 +877,15 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
         _buildField(
           controller: _jangkaWaktuCtrl,
           label: 'Jangka Waktu Pelaksanaan',
+        ),
+        const SizedBox(height: 14),
+
+        // Tanggal Akhir SPMK (Dihitung Otomatis)
+        _buildField(
+          controller: _tglAkhirSpmkCtrl,
+          label: 'Tanggal Akhir SPMK',
+          readOnly: true,
+          suffixIcon: const Icon(Icons.calendar_month, color: Color(0xFF6B7280), size: 18),
         ),
       ],
     );

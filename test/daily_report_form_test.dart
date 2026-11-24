@@ -6,6 +6,7 @@ import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/screens/buat_laporan_screen.dart';
 import 'package:tata_saka_app/screens/detail_data_laporan_screen.dart';
+import 'package:tata_saka_app/services/pdf_report_service.dart';
 import 'package:tata_saka_app/widgets/clean_text_form_field.dart';
 
 void main() {
@@ -652,6 +653,8 @@ void main() {
     expect(find.text('Batching Plant Ready Mix'), findsOneWidget);
     expect(find.text('Jam Berangkat dari Batching Plant'), findsOneWidget);
     expect(find.text('Jam Datang di Lapangan'), findsOneWidget);
+    expect(find.text('Jam Berangkat dari Lapangan'), findsOneWidget);
+    expect(find.text('Jam Tiba di Batching Plant'), findsOneWidget);
     expect(find.text('Slump Test'), findsOneWidget);
     expect(find.text('Volume Cor (m³ / Kubik)'), findsOneWidget);
   });
@@ -706,6 +709,8 @@ void main() {
                   'batchingPlant': 'PT. Varia Usaha Beton',
                   'jamBerangkat': '08:00:00',
                   'jamDatang': '09:15:00',
+                  'jamBerangkatLap': '10:15:00',
+                  'jamTibaPlant': '11:00:00',
                   'slumpTest': '10 ± 2 cm',
                   'volume': '7.0',
                   'volumeKumulatif': '7.0',
@@ -741,16 +746,53 @@ void main() {
     expect(find.text(':  Fc\' 25 MPa / K-300'), findsOneWidget);
     expect(find.text(':  PT. WIJAYA KARYA'), findsWidgets);
 
-    // Verify Table Content
+    // Verify Table Content including new time fields
     expect(find.text('B 9876 XYZ'), findsOneWidget);
     expect(find.text('PT. Varia Usaha Beton'), findsOneWidget);
     expect(find.text('08:00:00'), findsOneWidget);
     expect(find.text('09:15:00'), findsOneWidget);
+    expect(find.text('10:15:00'), findsOneWidget);
+    expect(find.text('11:00:00'), findsOneWidget);
     expect(find.text('10 ± 2 cm'), findsOneWidget);
     expect(find.text('7.0 m³'), findsWidgets);
 
     // Verify Total Volume
     expect(find.text('TOTAL VOLUME PENGECORAN BETON'), findsOneWidget);
+  });
+
+  test('PdfReportService generates valid PDF with 9-column Rekapitulasi Beton', () async {
+    final pdfBytes = await PdfReportService.generateLaporanHarianPdf(
+      report: {
+        'id': 'rep-01',
+        'tanggalFormatted': 'Rabu, 15 Juli 2026',
+        'namaKegiatan': 'Pengecoran Rigid Pavement',
+        'kontraktor': 'PT. WIJAYA KARYA',
+        'hasRekapBeton': true,
+        'jenisBeton': "Fc' 25 MPa",
+        'rekapPengecoranBetonList': [
+          {
+            'no': '1',
+            'nomorKendaraan': 'B 9876 XYZ',
+            'batchingPlant': 'PT. Varia Usaha Beton',
+            'jamBerangkat': '08:00:00',
+            'jamDatang': '09:15:00',
+            'jamBerangkatLap': '10:15:00',
+            'jamTibaPlant': '11:00:00',
+            'slumpTest': '10 ± 2 cm',
+            'volume': '7.0',
+            'volumeKumulatif': '7.0',
+          },
+        ],
+      },
+      namaKegiatan: 'Pengecoran Rigid Pavement Ruas 1',
+      lokasi: 'STA 0+000 - 0+400',
+      dana: 'APBD',
+      kontraktor: 'PT. WIJAYA KARYA',
+      konsultan: 'CV. Tata Saka Consultant',
+    );
+
+    expect(pdfBytes, isNotEmpty);
+    expect(pdfBytes.length, greaterThan(1000));
   });
 
   testWidgets('BuatLaporanScreen allows adding multiple pengawas signers and renders them in DetailDataLaporanScreen', (WidgetTester tester) async {

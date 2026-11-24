@@ -557,6 +557,12 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
           batchingPlant: item['batchingPlant']?.toString() ?? '',
           jamBerangkat: item['jamBerangkat']?.toString() ?? '',
           jamDatang: item['jamDatang']?.toString() ?? '',
+          jamBerangkatLap: item['jamBerangkatLap']?.toString() ??
+              item['jamBerangkatLapangan']?.toString() ??
+              '',
+          jamTibaPlant: item['jamTibaPlant']?.toString() ??
+              item['jamTibaBatchingPlant']?.toString() ??
+              '',
           slumpTest: item['slumpTest']?.toString() ?? '',
           volume: item['volume']?.toString() ?? '',
           volumeKumulatif: item['volumeKumulatif']?.toString() ?? '',
@@ -1074,6 +1080,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     String batchingPlant = '',
     String jamBerangkat = '',
     String jamDatang = '',
+    String jamBerangkatLap = '',
+    String jamTibaPlant = '',
     String slumpTest = '',
     String volume = '',
     String volumeKumulatif = '',
@@ -1097,6 +1105,12 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         ),
         'jamDatang': TextEditingController(
           text: PlatNomorUtil.normalizeTime(jamDatang),
+        ),
+        'jamBerangkatLap': TextEditingController(
+          text: PlatNomorUtil.normalizeTime(jamBerangkatLap),
+        ),
+        'jamTibaPlant': TextEditingController(
+          text: PlatNomorUtil.normalizeTime(jamTibaPlant),
         ),
         'slumpTest': TextEditingController(text: slumpTest),
         'volume': ctrlVolume,
@@ -1683,6 +1697,12 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         final jamDatang = PlatNomorUtil.normalizeTime(
           m['jamDatang']?.text.trim() ?? '',
         );
+        final jamBerangkatLap = PlatNomorUtil.normalizeTime(
+          m['jamBerangkatLap']?.text.trim() ?? '',
+        );
+        final jamTibaPlant = PlatNomorUtil.normalizeTime(
+          m['jamTibaPlant']?.text.trim() ?? '',
+        );
 
         cleanRekapPengecoranBeton.add({
           'no': '${i + 1}',
@@ -1690,6 +1710,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
           'batchingPlant': m['batchingPlant']?.text.trim() ?? '',
           'jamBerangkat': jamBerangkat,
           'jamDatang': jamDatang,
+          'jamBerangkatLap': jamBerangkatLap,
+          'jamTibaPlant': jamTibaPlant,
           'slumpTest': m['slumpTest']?.text.trim() ?? '',
           'volume': m['volume']?.text.trim() ?? '',
           'volumeKumulatif': m['volumeKumulatif']?.text.trim() ?? '',
@@ -4961,6 +4983,18 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                 _buildTimePickerField(
                   controller: m['jamDatang']!,
                   label: 'Jam Datang di Lapangan',
+                  hintText: 'Pilih jam (HH:mm:ss)',
+                ),
+                const SizedBox(height: 10),
+                _buildTimePickerField(
+                  controller: m['jamBerangkatLap']!,
+                  label: 'Jam Berangkat dari Lapangan',
+                  hintText: 'Pilih jam (HH:mm:ss)',
+                ),
+                const SizedBox(height: 10),
+                _buildTimePickerField(
+                  controller: m['jamTibaPlant']!,
+                  label: 'Jam Tiba di Batching Plant',
                   hintText: 'Pilih jam (HH:mm:ss)',
                 ),
                 const SizedBox(height: 10),

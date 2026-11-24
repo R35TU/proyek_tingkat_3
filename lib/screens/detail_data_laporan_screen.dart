@@ -2460,25 +2460,29 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
     required int totalPages,
   }) {
     const colWidths = <int, TableColumnWidth>{
-      0: FixedColumnWidth(28), // No [a]
-      1: FlexColumnWidth(2.6), // NOMOR KENDARAAN [b]
-      2: FlexColumnWidth(2.8), // BATCHING PLANT [c]
-      3: FlexColumnWidth(2.2), // JAM BERANGKAT [d]
-      4: FlexColumnWidth(2.2), // JAM DATANG DI LAPANGAN [e]
-      5: FlexColumnWidth(2.0), // SLUMP TEST [f]
-      6: FlexColumnWidth(2.0), // VOLUME [g]
+      0: FixedColumnWidth(26), // No [a]
+      1: FlexColumnWidth(2.3), // NOMOR KENDARAAN [b]
+      2: FlexColumnWidth(2.5), // BATCHING PLANT [c]
+      3: FlexColumnWidth(1.9), // JAM BERANGKAT DARI BP [d]
+      4: FlexColumnWidth(1.9), // JAM DATANG DI LAPANGAN [e]
+      5: FlexColumnWidth(1.9), // JAM BERANGKAT DARI LAPANGAN [f]
+      6: FlexColumnWidth(1.9), // JAM TIBA DI BATCHING PLANT [g]
+      7: FlexColumnWidth(1.6), // SLUMP TEST [h]
+      8: FlexColumnWidth(1.6), // VOLUME [i]
     };
 
     final headers = [
       'No',
       'NOMOR KENDARAAN\n(TRUCK MIXER)',
       'BATCHING PLANT\nREADY MIX',
-      'JAM\nBERANGKAT',
+      'JAM BERANGKAT\nDARI BP',
       'JAM DATANG\nDI LAPANGAN',
+      'JAM BERANGKAT\nDARI LAPANGAN',
+      'JAM TIBA DI\nBATCHING PLANT',
       'SLUMP TEST\n(CM)',
       'VOLUME\n(M³)',
     ];
-    final subLetters = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+    final subLetters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
 
     final double totalVolume = rows.fold(0.0, (sum, item) {
       if (item is Map) {
@@ -2496,18 +2500,28 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
         ? rows.asMap().entries.map((entry) {
             final item = entry.value as Map<String, dynamic>;
             final rawVol = item['volume']?.toString() ?? '-';
+            final jamBerangkat = item['jamBerangkat']?.toString() ?? '';
+            final jamDatang = item['jamDatang']?.toString() ?? '';
+            final jamBerangkatLap = item['jamBerangkatLap']?.toString() ??
+                item['jamBerangkatLapangan']?.toString() ??
+                '';
+            final jamTibaPlant = item['jamTibaPlant']?.toString() ??
+                item['jamTibaBatchingPlant']?.toString() ??
+                '';
             return [
               '${entry.key + 1}',
               PlatNomorUtil.normalize(item['nomorKendaraan']?.toString() ?? ''),
               item['batchingPlant']?.toString().isNotEmpty == true ? item['batchingPlant'].toString() : '-',
-              item['jamBerangkat']?.toString().isNotEmpty == true ? item['jamBerangkat'].toString() : '-',
-              item['jamDatang']?.toString().isNotEmpty == true ? item['jamDatang'].toString() : '-',
+              jamBerangkat.isNotEmpty ? jamBerangkat : '-',
+              jamDatang.isNotEmpty ? jamDatang : '-',
+              jamBerangkatLap.isNotEmpty ? jamBerangkatLap : '-',
+              jamTibaPlant.isNotEmpty ? jamTibaPlant : '-',
               item['slumpTest']?.toString().isNotEmpty == true ? item['slumpTest'].toString() : '-',
               rawVol.isNotEmpty ? (rawVol.endsWith('m³') ? rawVol : '$rawVol m³') : '-',
             ];
           }).toList()
         : [
-            ['1', '-', '-', '-', '-', '-', '-'],
+            ['1', '-', '-', '-', '-', '-', '-', '-', '-'],
           ];
 
     return Container(

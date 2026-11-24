@@ -1237,8 +1237,10 @@ class PdfReportService {
         'No',
         'NOMOR KENDARAAN\n(TRUCK MIXER)',
         'BATCHING PLANT\nREADY MIX',
-        'JAM\nBERANGKAT',
+        'JAM BERANGKAT\nDARI BP',
         'JAM DATANG\nDI LAPANGAN',
+        'JAM BERANGKAT\nDARI LAPANGAN',
+        'JAM TIBA DI\nBATCHING PLANT',
         'SLUMP TEST\n(CM)',
         'VOLUME\n(M³)',
       ];
@@ -1246,12 +1248,22 @@ class PdfReportService {
       final tableRows = rekapPengecoranBetonList.asMap().entries.map((entry) {
         final item = entry.value as Map<String, dynamic>;
         final rawVol = item['volume']?.toString() ?? '-';
+        final jamBerangkat = item['jamBerangkat']?.toString() ?? '';
+        final jamDatang = item['jamDatang']?.toString() ?? '';
+        final jamBerangkatLap = item['jamBerangkatLap']?.toString() ??
+            item['jamBerangkatLapangan']?.toString() ??
+            '';
+        final jamTibaPlant = item['jamTibaPlant']?.toString() ??
+            item['jamTibaBatchingPlant']?.toString() ??
+            '';
         return [
           '${entry.key + 1}',
           PlatNomorUtil.normalize(item['nomorKendaraan']?.toString() ?? ''),
           item['batchingPlant']?.toString().isNotEmpty == true ? item['batchingPlant'].toString() : '-',
-          item['jamBerangkat']?.toString() ?? '',
-          item['jamDatang']?.toString() ?? '',
+          jamBerangkat.isNotEmpty ? jamBerangkat : '-',
+          jamDatang.isNotEmpty ? jamDatang : '-',
+          jamBerangkatLap.isNotEmpty ? jamBerangkatLap : '-',
+          jamTibaPlant.isNotEmpty ? jamTibaPlant : '-',
           item['slumpTest']?.toString() ?? '',
           rawVol.endsWith('m³') ? rawVol : '$rawVol m³',
         ];
@@ -1282,13 +1294,15 @@ class PdfReportService {
                 pw.SizedBox(height: 8),
                 _buildPdfDocTable(
                   colWidths: const {
-                    0: pw.FixedColumnWidth(20),
-                    1: pw.FlexColumnWidth(2.6),
-                    2: pw.FlexColumnWidth(2.8),
-                    3: pw.FlexColumnWidth(2.0),
-                    4: pw.FlexColumnWidth(2.0),
+                    0: pw.FixedColumnWidth(16),
+                    1: pw.FlexColumnWidth(2.2),
+                    2: pw.FlexColumnWidth(2.4),
+                    3: pw.FlexColumnWidth(1.8),
+                    4: pw.FlexColumnWidth(1.8),
                     5: pw.FlexColumnWidth(1.8),
                     6: pw.FlexColumnWidth(1.8),
+                    7: pw.FlexColumnWidth(1.5),
+                    8: pw.FlexColumnWidth(1.5),
                   },
                   headers: headers,
                   rows: tableRows,
