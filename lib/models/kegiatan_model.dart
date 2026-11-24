@@ -28,6 +28,7 @@ class KegiatanModel {
   String tglSpmkKontraktor;
   String nilaiKontrak;
   String jangkaWaktu;
+  String tglAkhirSpmkKontraktor;
 
   // STRUKTUR ORGANISASI KEGIATAN
   String penggunaAnggaran;
@@ -100,6 +101,7 @@ class KegiatanModel {
     this.tglSpmkKontraktor = '',
     this.nilaiKontrak = '',
     this.jangkaWaktu = '',
+    this.tglAkhirSpmkKontraktor = '',
     this.penggunaAnggaran = '',
     this.stafTeknis1 = '',
     this.stafTeknis2 = '',
@@ -176,6 +178,34 @@ class KegiatanModel {
     final tglClean = tgl.toLowerCase().startsWith('tanggal ') ? tgl.substring(8).trim() : tgl;
     if (no.isEmpty) return 'Tanggal $tglClean';
     return '$no Tanggal $tglClean';
+  }
+
+  /// Tanggal akhir SPMK kontraktor dihitung otomatis dari tglSpmkKontraktor + jangkaWaktu hari kalender (- 1 hari)
+  static String calculateTanggalAkhirSpmk(String tglMulaiStr, String jangkaWaktuStr) {
+    if (tglMulaiStr.trim().isEmpty || jangkaWaktuStr.trim().isEmpty) return '';
+    final startDt = WeeklyReportModel.parseIndonesianDate(tglMulaiStr);
+    if (startDt == null) return '';
+
+    // Ekstrak angka hari kalender dari teks durasi (misal "90", "90 (Sembilan Puluh) hari kalender", "90 Hari")
+    final match = RegExp(r'\d+').firstMatch(jangkaWaktuStr);
+    if (match == null) return '';
+    final days = int.tryParse(match.group(0)!);
+    if (days == null || days <= 0) return '';
+
+    final endDt = DateTime(
+      startDt.year,
+      startDt.month,
+      startDt.day + days - 1,
+    );
+    return WeeklyReportModel.formatIndonesianDate(endDt);
+  }
+
+  /// Getter helper untuk tanggal akhir SPMK Kontraktor
+  String get tglAkhirSpmk {
+    if (tglAkhirSpmkKontraktor.trim().isNotEmpty) {
+      return tglAkhirSpmkKontraktor.trim();
+    }
+    return calculateTanggalAkhirSpmk(tglSpmkKontraktor, jangkaWaktu);
   }
 
   /// Format gabungan resmi SPMK Kontraktor: "000.3.3 / ... Tanggal 18 Juni 2026"
@@ -278,6 +308,10 @@ class KegiatanModel {
             ? IndonesianTerbilang.formatHariKalender(fallbackContract.hariKalender)
             : '');
 
+    final tglAkhirSpmkKontraktor = (json['tglAkhirSpmkKontraktor'] != null && json['tglAkhirSpmkKontraktor'].toString().isNotEmpty)
+        ? json['tglAkhirSpmkKontraktor'].toString()
+        : calculateTanggalAkhirSpmk(tglSpmkKontraktor, jangkaWaktu);
+
     // Struktur Organisasi Kegiatan
     final penggunaAnggaran = json['penggunaAnggaran'] ??
         json['strukturOrganisasiKegiatan']?['penggunaAnggaran'] ??
@@ -335,6 +369,7 @@ class KegiatanModel {
       tglSpmkKontraktor: tglSpmkKontraktor,
       nilaiKontrak: nilaiKontrak,
       jangkaWaktu: jangkaWaktu,
+      tglAkhirSpmkKontraktor: tglAkhirSpmkKontraktor,
       penggunaAnggaran: penggunaAnggaran,
       stafTeknis1: stafTeknis1,
       stafTeknis2: stafTeknis2,
@@ -382,6 +417,9 @@ class KegiatanModel {
       'tglSpmkKontraktor': tglSpmkKontraktor,
       'nilaiKontrak': nilaiKontrak,
       'jangkaWaktu': jangkaWaktu,
+      'tglAkhirSpmkKontraktor': tglAkhirSpmkKontraktor.isNotEmpty
+          ? tglAkhirSpmkKontraktor
+          : calculateTanggalAkhirSpmk(tglSpmkKontraktor, jangkaWaktu),
       'penggunaAnggaran': penggunaAnggaran,
       'stafTeknis1': stafTeknis1,
       'stafTeknis2': stafTeknis2,

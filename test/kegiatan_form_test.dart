@@ -76,6 +76,35 @@ void main() {
       );
     });
 
+    test('calculateTanggalAkhirSpmk calculates inclusive end date correctly', () {
+      // Skenario dari User: 20 April 2026 + 90 hari kalender -> 18 Juli 2026
+      expect(
+        KegiatanModel.calculateTanggalAkhirSpmk('20 April 2026', '90 (Sembilan Puluh) hari kalender'),
+        '18 Juli 2026',
+      );
+      expect(
+        KegiatanModel.calculateTanggalAkhirSpmk('20 April 2026', '90'),
+        '18 Juli 2026',
+      );
+      expect(
+        KegiatanModel.calculateTanggalAkhirSpmk('20 April 2026', '90 Hari'),
+        '18 Juli 2026',
+      );
+      expect(
+        KegiatanModel.calculateTanggalAkhirSpmk('Tanggal 20 April 2026', '90 hari kalender'),
+        '18 Juli 2026',
+      );
+      // Skenario 1 September 2026 + 90 hari kalender -> 29 November 2026
+      expect(
+        KegiatanModel.calculateTanggalAkhirSpmk('1 September 2026', '90 hari kalender'),
+        '29 November 2026',
+      );
+      // Skenario kosong / invalid
+      expect(KegiatanModel.calculateTanggalAkhirSpmk('', '90'), '');
+      expect(KegiatanModel.calculateTanggalAkhirSpmk('20 April 2026', ''), '');
+      expect(KegiatanModel.calculateTanggalAkhirSpmk('invalid date', '90'), '');
+    });
+
     test('Struktur organisasi getters and json serialization work properly', () {
       final keg = KegiatanModel(
         namaKegiatan: 'Pekerjaan Jembatan',
@@ -194,8 +223,39 @@ void main() {
       expect(find.text('Staf Teknis 1 DPU-PR'), findsNothing);
       expect(find.text('Staf Teknis 2 DPU-PR'), findsNothing);
 
+      // Verifikasi Field Tanggal Akhir SPMK (Dihitung Otomatis)
+      expect(find.text('Tanggal Akhir SPMK'), findsOneWidget);
+
       // Verify Save Button is present
       expect(find.byType(ElevatedButton), findsWidgets);
+    });
+
+    testWidgets('FormKegiatanScreen updates Tanggal Akhir SPMK automatically when Jangka Waktu or Tgl SPMK changes', (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 1400));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FormKegiatanScreen(
+            contract: mockContract,
+            initialKegiatan: {
+              'tglSpmkKontraktor': '20 April 2026',
+              'jangkaWaktu': '90 (Sembilan Puluh) hari kalender',
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Tanggal akhir terhitung otomatis 18 Juli 2026
+      expect(find.text('18 Juli 2026'), findsWidgets);
+
+      // Ubah jangka waktu jadi 60 hari
+      final jangkaWaktuFinder = find.widgetWithText(TextFormField, '90 (Sembilan Puluh) hari kalender');
+      await tester.enterText(jangkaWaktuFinder, '60 hari kalender');
+      await tester.pumpAndSettle();
+
+      // 20 April 2026 + 60 hari kalender = 18 Juni 2026
+      expect(find.text('18 Juni 2026'), findsWidgets);
     });
   });
 
@@ -224,6 +284,7 @@ void main() {
           'tglSuratPesanan': '18 Juni 2026',
           'noSpmkKontraktor': '000.3.3 / 1457 / SPMK / BM / VI / 2026',
           'tglSpmkKontraktor': '18 Juni 2026',
+          'jangkaWaktu': '60 (Enam Puluh) hari kalender',
           'waktuBerjalan': '4 (Empat) Minggu',
           'penggunaAnggaran': 'DRAJAT UJI WAKHYONO, S.T., M.T.',
           'stafTeknis1': 'MUBALLIGH, ST., M.Sc.',
@@ -268,6 +329,9 @@ void main() {
       expect(find.text('CV. SATYA WIGUNA'), findsOneWidget);
       expect(find.text('No. Surat Pesanan/tanggal'), findsOneWidget);
       expect(find.text('No. SPMK/tanggal'), findsWidgets);
+      expect(find.text('Jangka Waktu Pelaksanaan'), findsOneWidget);
+      expect(find.text('Tanggal Akhir SPMK'), findsOneWidget);
+      expect(find.text('16 Agustus 2026'), findsWidgets);
       expect(find.text('Rp 1.723.985.515,00 (Termasuk PPN+PPH)'), findsOneWidget);
 
       // Section STRUKTUR ORGANISASI KEGIATAN

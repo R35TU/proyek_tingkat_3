@@ -1912,6 +1912,8 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                   _buildDocRow('No. Surat Pesanan/tanggal', _kegiatan.suratPesananFull),
                   _buildDocRow('No. SPMK/tanggal', _kegiatan.spmkKontraktorFull),
                   _buildDocRow('Jangka Waktu Pelaksanaan', _kegiatan.jangkaWaktu),
+                  if (_kegiatan.tglAkhirSpmk.isNotEmpty)
+                    _buildDocRow('Tanggal Akhir SPMK', _kegiatan.tglAkhirSpmk),
                 ],
               ),
             ),

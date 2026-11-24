@@ -1896,6 +1896,8 @@ class SampleContractData {
                 'batchingPlant': 'PT. VARIA USAHA BETON',
                 'jamBerangkat': '09:15:00',
                 'jamDatang': '09:45:00',
+                'jamBerangkatLap': '10:30:00',
+                'jamTibaPlant': '11:00:00',
                 'slumpTest': '10 cm',
                 'volume': '2.50',
                 'volumeKumulatif': '2.50',
