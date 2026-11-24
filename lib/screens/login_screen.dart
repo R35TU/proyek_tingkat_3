@@ -38,6 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final userProf = context.read<UserProfileProvider>();
+      if (!userProf.isInitialized) return;
       final isAuth = AuthService.currentUser != null && userProf.username.isNotEmpty;
       if (isAuth) {
         if (userProf.role.toLowerCase() == 'admin') {
@@ -96,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoggingIn = false);
 
     if (success) {
-      replaceWebUrl(userProf.role.toLowerCase() == 'admin' ? '/#/admin' : '/#/main');
+      replaceWebUrl(userProf.role.toLowerCase() == 'admin' ? '/#/admin' : '/#/dashboard');
       // Admin (role Admin) masuk ke dashboard manajemen akun.
       if (userProf.role.toLowerCase() == 'admin') {
         Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);

@@ -13,7 +13,8 @@ import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 
 class MainLayout extends StatefulWidget {
-  const MainLayout({super.key});
+  final String? initialMenu;
+  const MainLayout({super.key, this.initialMenu});
 
   @override
   State<MainLayout> createState() => _MainLayoutState();
@@ -100,8 +101,8 @@ class _MainLayoutState extends State<MainLayout> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final userProf = context.read<UserProfileProvider>();
-      final isAuth = AuthService.currentUser != null && userProf.username.isNotEmpty;
-      if (!isAuth) {
+      if (!userProf.isInitialized) return;
+      if (!userProf.isAuthenticated) {
         Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
         return;
       }
@@ -138,7 +139,7 @@ class _MainLayoutState extends State<MainLayout> {
     if (isKontraktor) {
       // Role Kontraktor: 4 Tab (Tab Laporan DITUTUP TOTAL sesuai Opsi A)
       screens = [
-        const DashboardScreen(),
+        DashboardScreen(initialMenu: widget.initialMenu),
         const KontrakScreen(), // Beroperasi dalam mode 'Kegiatan Saya'
         const TimelineScreen(),
         const SettingScreen(),
@@ -166,7 +167,7 @@ class _MainLayoutState extends State<MainLayout> {
     } else {
       // Role Konsultan & Dinas: 5 Tab
       screens = [
-        const DashboardScreen(),
+        DashboardScreen(initialMenu: widget.initialMenu),
         const KontrakScreen(),
         const LaporanScreen(),
         const TimelineScreen(),

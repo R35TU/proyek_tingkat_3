@@ -20,6 +20,7 @@ import 'package:tata_saka_app/screens/tambah_kontrak_screen.dart';
 import 'package:tata_saka_app/screens/form_kegiatan_screen.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
+import 'package:tata_saka_app/utils/web_navigation.dart';
 
 class _DocumentData {
   String id;
@@ -104,12 +105,16 @@ class _KegiatanData {
 }
 
 class DetailKontrakScreen extends StatefulWidget {
-  final ContractModel contract;
+  final ContractModel? contract;
+  final String? contractId;
+  final int initialTabIndex;
   final bool isEmbedded;
 
   const DetailKontrakScreen({
     super.key,
-    required this.contract,
+    this.contract,
+    this.contractId,
+    this.initialTabIndex = 0,
     this.isEmbedded = false,
   });
 
@@ -118,16 +123,44 @@ class DetailKontrakScreen extends StatefulWidget {
 }
 
 class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTickerProviderStateMixin {
+  ContractModel? _contract;
+  ContractModel get contract => _contract ?? widget.contract!;
+  bool get _isContractAvailable => _contract != null || widget.contract != null;
+
   late TabController _tabController;
-  late List<_FolderData> _folders;
-  late List<_KegiatanData> _kegiatans;
+  List<_FolderData> _folders = [];
+  List<_KegiatanData> _kegiatans = [];
 
   @override
   void initState() {
     super.initState();
-    
-    // Load Folders
-    _folders = widget.contract.folders.map((f) {
+
+    if (widget.contract != null) {
+      _contract = widget.contract;
+      _initContractData();
+    }
+
+    final initTab = (widget.initialTabIndex >= 0 && widget.initialTabIndex < 2)
+        ? widget.initialTabIndex
+        : 0;
+    _tabController = TabController(length: 2, vsync: this, initialIndex: initTab);
+    _tabController.addListener(() {
+      setState(() {}); // Rebuild to update FAB visibility
+      if (kIsWeb && _isContractAvailable) {
+        replaceWebUrl('/#/detail-kontrak?id=${contract.id}&tab=${_tabController.index}');
+      }
+    });
+
+    if (kIsWeb && _isContractAvailable) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        replaceWebUrl('/#/detail-kontrak?id=${contract.id}&tab=${_tabController.index}');
+      });
+    }
+  }
+
+  void _initContractData() {
+    final c = contract;
+    _folders = c.folders.map((f) {
       return _FolderData(
         name: f['name'] ?? '',
         isExpanded: f['isExpanded'] ?? false,
@@ -137,15 +170,30 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
       );
     }).toList();
 
-    // Load Kegiatans directly from contract
-    _kegiatans = widget.contract.kegiatans.map((k) {
+    _kegiatans = c.kegiatans.map((k) {
       return _KegiatanData(data: Map<String, dynamic>.from(k));
     }).toList();
+  }
 
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      setState(() {}); // Rebuild to update FAB visibility
-    });
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_contract == null && widget.contractId != null) {
+      final provider = Provider.of<ContractProvider>(context);
+      final found = provider.contracts.cast<ContractModel?>().firstWhere(
+            (c) => c != null && c.id == widget.contractId,
+            orElse: () => null,
+          );
+      if (found != null) {
+        setState(() {
+          _contract = found;
+          _initContractData();
+        });
+        if (kIsWeb) {
+          replaceWebUrl('/#/detail-kontrak?id=${_contract!.id}&tab=${_tabController.index}');
+        }
+      }
+    }
   }
 
   String _formatFileSize(int bytes) {
@@ -155,15 +203,16 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
   }
 
   void _saveToProvider() {
-    widget.contract.folders = _folders.map((f) => {
+    final c = contract;
+    c.folders = _folders.map((f) => {
       'name': f.name,
       'isExpanded': f.isExpanded,
       'documents': f.documents.map((d) => d.toJson()).toList(),
     }).toList();
 
-    widget.contract.kegiatans = _kegiatans.map((k) => Map<String, dynamic>.from(k.data)).toList();
+    c.kegiatans = _kegiatans.map((k) => Map<String, dynamic>.from(k.data)).toList();
 
-    Provider.of<ContractProvider>(context, listen: false).updateContract(widget.contract);
+    Provider.of<ContractProvider>(context, listen: false).updateContract(c);
   }
 
   @override
@@ -293,10 +342,10 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                   actorName: 'CV. Tata Saka Consultant',
                   actionType: 'DELETE',
                   entityType: 'DOKUMEN',
-                  contractId: widget.contract.id,
-                  contractName: widget.contract.namaKontrak,
-                  dinasName: widget.contract.instansiDinas.isNotEmpty
-                      ? widget.contract.instansiDinas.first
+                  contractId: contract.id,
+                  contractName: contract.namaKontrak,
+                  dinasName: contract.instansiDinas.isNotEmpty
+                      ? contract.instansiDinas.first
                       : 'DPU-PR Kab. Purbalingga',
                   title: 'Penghapusan Folder Kontrak: $deletedName',
                   description: 'Folder administrasi kontrak "$deletedName" telah dihapus.',
@@ -647,7 +696,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                                           .uploadBytes(
                                             bytes: uploadBytesData,
                                             remotePath: StorageService.safeObjectPath(
-                                                'dokumen/${widget.contract.namaKontrak}/${_folders[selectedFolderIdx].name}/${DateTime.now().millisecondsSinceEpoch}_$pickedFileName'),
+                                                'dokumen/${contract.namaKontrak}/${_folders[selectedFolderIdx].name}/${DateTime.now().millisecondsSinceEpoch}_$pickedFileName'),
                                             contentType: StorageService.detectContentType(pickedFileName),
                                           );
                                     } catch (e) {
@@ -682,10 +731,10 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                                       actorName: 'CV. Tata Saka Consultant',
                                       actionType: 'UPLOAD',
                                       entityType: 'DOKUMEN',
-                                      contractId: widget.contract.id,
-                                      contractName: widget.contract.namaKontrak,
-                                      dinasName: widget.contract.instansiDinas.isNotEmpty
-                                          ? widget.contract.instansiDinas.first
+                                      contractId: contract.id,
+                                      contractName: contract.namaKontrak,
+                                      dinasName: contract.instansiDinas.isNotEmpty
+                                          ? contract.instansiDinas.first
                                           : 'DPU-PR Kab. Purbalingga',
                                       title: 'Unggah Dokumen Kontrak: $docTitle',
                                       description: 'Dokumen $docTitle ($detectedType, $formattedSize) berhasil diunggah ke folder "${targetFolder.name}".',
@@ -788,10 +837,10 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                   actorName: 'CV. Tata Saka Consultant',
                   actionType: 'DELETE',
                   entityType: 'DOKUMEN',
-                  contractId: widget.contract.id,
-                  contractName: widget.contract.namaKontrak,
-                  dinasName: widget.contract.instansiDinas.isNotEmpty
-                      ? widget.contract.instansiDinas.first
+                  contractId: contract.id,
+                  contractName: contract.namaKontrak,
+                  dinasName: contract.instansiDinas.isNotEmpty
+                      ? contract.instansiDinas.first
                       : 'DPU-PR Kab. Purbalingga',
                   title: 'Penghapusan Dokumen Kontrak: ${doc.name}',
                   description: 'Dokumen "${doc.name}" telah dihapus dari folder "${folder.name}".',
@@ -994,7 +1043,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
-        builder: (context) => FormKegiatanScreen(contract: widget.contract),
+        builder: (context) => FormKegiatanScreen(contract: contract),
       ),
     );
 
@@ -1009,15 +1058,15 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
           actorName: 'CV. Tata Saka Consultant',
           actionType: 'CREATE',
           entityType: 'KEGIATAN',
-          contractId: widget.contract.id,
-          contractName: widget.contract.namaKontrak,
+          contractId: contract.id,
+          contractName: contract.namaKontrak,
           kegiatanName: result['namaKegiatan'] ?? '',
           kontraktorName: result['kontraktor'] ?? '',
-          dinasName: widget.contract.instansiDinas.isNotEmpty
-              ? widget.contract.instansiDinas.first
+          dinasName: contract.instansiDinas.isNotEmpty
+              ? contract.instansiDinas.first
               : 'DPU-PR Kab. Purbalingga',
           title: 'Penetapan Kegiatan: ${result['namaKegiatan']}',
-          description: 'Kegiatan ${result['namaKegiatan']} ditambahkan pada kontrak ${widget.contract.namaKontrak}.',
+          description: 'Kegiatan ${result['namaKegiatan']} ditambahkan pada kontrak ${contract.namaKontrak}.',
         );
       } catch (_) {}
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1032,7 +1081,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
       context,
       MaterialPageRoute(
         builder: (context) => FormKegiatanScreen(
-          contract: widget.contract,
+          contract: contract,
           initialKegiatan: current.data,
           kegiatanIndex: index,
         ),
@@ -1053,12 +1102,12 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
           actorName: 'CV. Tata Saka Consultant',
           actionType: 'UPDATE',
           entityType: 'KEGIATAN',
-          contractId: widget.contract.id,
-          contractName: widget.contract.namaKontrak,
+          contractId: contract.id,
+          contractName: contract.namaKontrak,
           kegiatanName: result['namaKegiatan'] ?? '',
           kontraktorName: result['kontraktor'] ?? '',
-          dinasName: widget.contract.instansiDinas.isNotEmpty
-              ? widget.contract.instansiDinas.first
+          dinasName: contract.instansiDinas.isNotEmpty
+              ? contract.instansiDinas.first
               : 'DPU-PR Kab. Purbalingga',
           title: 'Pembaruan Data Kegiatan: ${result['namaKegiatan']}',
           description: 'Informasi umum kegiatan ${result['namaKegiatan']} diperbarui.',
@@ -1097,12 +1146,12 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                   actorName: 'CV. Tata Saka Consultant',
                   actionType: 'DELETE',
                   entityType: 'KEGIATAN',
-                  contractId: widget.contract.id,
-                  contractName: widget.contract.namaKontrak,
+                  contractId: contract.id,
+                  contractName: contract.namaKontrak,
                   kegiatanName: kegiatanName,
                   kontraktorName: kontraktor,
-                  dinasName: widget.contract.instansiDinas.isNotEmpty
-                      ? widget.contract.instansiDinas.first
+                  dinasName: contract.instansiDinas.isNotEmpty
+                      ? contract.instansiDinas.first
                       : 'DPU-PR Kab. Purbalingga',
                   title: 'Penghapusan Kegiatan: $kegiatanName',
                   description: 'Kegiatan $kegiatanName telah dihapus dari kontrak.',
@@ -1189,7 +1238,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Hapus Kontrak', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Text('Apakah Anda yakin ingin menghapus kontrak "${widget.contract.namaKontrak}"? Semua data kegiatan terkait akan dihapus.'),
+        content: Text('Apakah Anda yakin ingin menghapus kontrak "${contract.namaKontrak}"? Semua data kegiatan terkait akan dihapus.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -1198,7 +1247,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () {
-              Provider.of<ContractProvider>(context, listen: false).deleteContract(widget.contract.id);
+              Provider.of<ContractProvider>(context, listen: false).deleteContract(contract.id);
               Navigator.pop(ctx);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -1214,6 +1263,55 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
 
   @override
   Widget build(BuildContext context) {
+    final contractProvider = Provider.of<ContractProvider>(context);
+
+    if (!_isContractAvailable) {
+      if (contractProvider.isLoading) {
+        return const Scaffold(
+          backgroundColor: Colors.white,
+          body: Center(child: CircularProgressIndicator()),
+        );
+      }
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (kIsWeb) replaceWebUrl('/#/kontrak');
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              } else {
+                Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+              }
+            },
+          ),
+          title: const Text('Detail Kontrak'),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+              const SizedBox(height: 12),
+              const Text('Data kontrak tidak ditemukan atau belum dimuat.'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  if (kIsWeb) replaceWebUrl('/#/kontrak');
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  } else {
+                    Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+                  }
+                },
+                child: const Text('Kembali ke Daftar Kontrak'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     UserProfileProvider? userProf;
     try {
       userProf = Provider.of<UserProfileProvider>(context);
@@ -1233,7 +1331,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
               final updated = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => TambahKontrakScreen(contractToEdit: widget.contract),
+                  builder: (context) => TambahKontrakScreen(contractToEdit: contract),
                 ),
               );
               if (updated == true && mounted) {
@@ -1317,9 +1415,30 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
 
     if (isDesktop) {
       return WebDashboardLayout(
-        title: 'Detail Kontrak: ${widget.contract.namaKontrak}',
+        title: 'Detail Kontrak: ${contract.namaKontrak}',
         activeMenu: 'kontrak',
         showBackButton: true,
+        onBack: () {
+          if (kIsWeb) replaceWebUrl('/#/kontrak');
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+          }
+        },
+        onMenuSelected: (menuKey) {
+          if (kIsWeb) replaceWebUrl('/#/$menuKey');
+          WebDashboardLayout.activeWebMenu.value = menuKey;
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/$menuKey',
+              (route) => false,
+            );
+          }
+        },
         actions: headerActions,
         floatingActionButton: fab,
         child: mainBody,
@@ -1334,6 +1453,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
           onPressed: () {
+            if (kIsWeb) replaceWebUrl('/#/kontrak');
             if (Navigator.canPop(context)) {
               Navigator.pop(context);
             } else {
@@ -1385,10 +1505,11 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
     }
     final isKonsultan = userProf?.isKonsultan ?? true;
     final provider = Provider.of<ContractProvider>(context);
-    final contract = provider.contracts.firstWhere(
-      (c) => c.id == widget.contract.id,
-      orElse: () => widget.contract,
-    );
+    final fallbackContract = this.contract;
+    final contract = provider.contracts.cast<ContractModel?>().firstWhere(
+      (c) => c != null && c.id == fallbackContract.id,
+      orElse: () => fallbackContract,
+    )!;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
@@ -1697,16 +1818,16 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
               context,
               MaterialPageRoute(
                 builder: (context) => DetailKegiatanScreen(
-                  contract: widget.contract,
+                  contract: contract,
                   kegiatanIndex: index,
                 ),
               ),
             );
             // Refresh on return in case they edited anything inside
             setState(() {
-              if (index < widget.contract.kegiatans.length) {
+              if (index < contract.kegiatans.length) {
                 _kegiatans[index] = _KegiatanData(
-                  data: Map<String, dynamic>.from(widget.contract.kegiatans[index]),
+                  data: Map<String, dynamic>.from(contract.kegiatans[index]),
                 );
               }
             });
