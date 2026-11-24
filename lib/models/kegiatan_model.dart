@@ -206,9 +206,13 @@ class KegiatanModel {
     final s1 = stafTeknis1.trim();
     final s2 = stafTeknis2.trim();
     if (s1.isNotEmpty && s2.isNotEmpty) {
-      return 'Staf Teknis 1 & 2 DPU-PR';
+      return 'Staf Teknis 1 & 2';
+    } else if (s1.isNotEmpty) {
+      return 'Staf Teknis 1';
+    } else if (s2.isNotEmpty) {
+      return 'Staf Teknis 2';
     }
-    return 'Staf Teknis DPU-PR';
+    return 'Staf Teknis';
   }
 
   factory KegiatanModel.fromJson(Map<String, dynamic> json, {ContractModel? fallbackContract}) {
