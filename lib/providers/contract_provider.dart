@@ -176,15 +176,6 @@ class ContractProvider with ChangeNotifier {
           list.add(contract);
         }
         _contracts = list;
-        _saveLocalBackup();
-
-        // Pembersihan otomatis: Jika terdapat kontrak dummy MT Haryono yang tertinggal di cloud/lokal, hapus tuntas.
-        final dummyContracts = _contracts.where((c) =>
-            c.id == 'kontrak-mt-haryono-demo' ||
-            c.namaKontrak.trim().toUpperCase() == 'PEMELIHARAAN BERKALA JL. MT HARYONO').toList();
-        for (final dummy in dummyContracts) {
-          await deleteContract(dummy.id);
-        }
       }
     } catch (e) {
       debugPrint('[ContractProvider] Firestore gagal, pakai data lokal: $e');
@@ -238,9 +229,6 @@ class ContractProvider with ChangeNotifier {
         final List<dynamic> decoded = jsonDecode(contractsJson);
         _contracts = decoded
             .map((item) => ContractModel.fromJson(Map<String, dynamic>.from(item)))
-            .where((c) =>
-                c.id != 'kontrak-mt-haryono-demo' &&
-                c.namaKontrak.trim().toUpperCase() != 'PEMELIHARAAN BERKALA JL. MT HARYONO')
             .toList();
       } else {
         _contracts = [];
