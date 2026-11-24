@@ -81,19 +81,68 @@ class AuthService {
     return Map<String, dynamic>.from(snap.data() as Map);
   }
 
+  /// Mock untuk pengujian unit & widget tanpa emulator Firebase.
+  @visibleForTesting
+  static bool Function(String username, String? excludeUid)? mockIsUsernameTaken;
+
+  /// Memeriksa apakah username sudah digunakan di Firestore collection `users`.
+  /// Opsional [excludeUid] untuk mengabaikan akun sendiri saat proses update profil.
+  static Future<bool> isUsernameTaken(String username, {String? excludeUid}) async {
+    if (mockIsUsernameTaken != null) {
+      return mockIsUsernameTaken!(username, excludeUid);
+    }
+    final clean = username.trim().toLowerCase();
+    if (clean.isEmpty) return false;
+    try {
+      final snap = await _db
+          .collection('users')
+          .where('username', isEqualTo: clean)
+          .get();
+      if (excludeUid != null && excludeUid.isNotEmpty) {
+        return snap.docs.any((d) => d.id != excludeUid);
+      }
+      return snap.docs.isNotEmpty;
+    } catch (_) {
+      // Offline / unit test tanpa mock
+      return false;
+    }
+  }
+
   /// Buat akun baru ATAS PERINTAH ADMIN tanpa mengganggu sesi admin:
   /// memakai instance Firebase sekunder sementara.
   ///
+  /// Memerlukan [username] (identitas login unik) dan [namaLengkap] (identitas personal).
   /// Setelah uid diperoleh, profil ditulis ke Firestore `users`.
-  /// Melempar FirebaseAuthException jika email/password tidak valid.
+  /// Melempar Exception jika username duplikat, atau FirebaseAuthException jika email/password tidak valid.
   static Future<String> createAccount({
-    required String email,
+    required String username,
+    required String namaLengkap,
     required String password,
     required String role,
-    required String namaLengkap,
     required String instansi,
+    String? email,
     required bool isActive,
   }) async {
+    final cleanUsername = username.trim().toLowerCase();
+    final cleanNamaLengkap = namaLengkap.trim();
+
+    if (cleanUsername.isEmpty) {
+      throw Exception('Username wajib diisi.');
+    }
+    if (cleanNamaLengkap.isEmpty) {
+      throw Exception('Nama lengkap wajib diisi.');
+    }
+
+    final isTaken = await isUsernameTaken(cleanUsername);
+    if (isTaken) {
+      throw Exception('Username "$cleanUsername" sudah digunakan.');
+    }
+
+    final trimmedEmail = email?.trim().toLowerCase();
+    final authEmail = (trimmedEmail != null && trimmedEmail.contains('@'))
+        ? trimmedEmail
+        : '$cleanUsername@$_emailDomain';
+
     final effectiveInstansi = role.trim().toLowerCase() == 'konsultan'
         ? 'CV. Tata Saka Consultant'
         : instansi.trim();
@@ -106,15 +155,15 @@ class AuthService {
     try {
       final cred = await FirebaseAuth.instanceFor(app: tempApp)
           .createUserWithEmailAndPassword(
-        email: email.trim().toLowerCase(),
+        email: authEmail,
         password: password,
       );
       final uid = cred.user!.uid;
       await _db.collection('users').doc(uid).set({
-        'email': email.trim().toLowerCase(),
-        'username': email.split('@').first,
+        'username': cleanUsername,
+        'namaLengkap': cleanNamaLengkap,
+        'email': authEmail,
         'role': role,
-        'namaLengkap': namaLengkap.trim(),
         'companyOrAgency': effectiveInstansi,
         'isActive': isActive,
         'createdAt': DateTime.now().toIso8601String(),

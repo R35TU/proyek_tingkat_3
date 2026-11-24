@@ -245,7 +245,7 @@ class UserProfileProvider with ChangeNotifier {
       final fallbackUsername = cleanInput.contains('@') ? cleanInput.split('@').first : cleanInput;
       _username = (doc?['username'] ?? fallbackUsername).toString();
       _role = (doc?['role'] ?? roleHint ?? 'Konsultan').toString();
-      _namaLengkap = (doc?['namaLengkap'] ?? fallbackUsername).toString();
+      _namaLengkap = (doc?['namaLengkap'] ?? doc?['full_name'] ?? doc?['name'] ?? fallbackUsername).toString();
       if (_role.toLowerCase() == 'konsultan') {
         _companyOrAgency = 'CV. Tata Saka Consultant';
       } else {
@@ -290,6 +290,11 @@ class UserProfileProvider with ChangeNotifier {
       _namaLengkap = newName.trim();
       notifyListeners();
       _saveToPreferences();
+      if (_uid.isNotEmpty) {
+        try {
+          AuthService.updateUserDoc(_uid, {'namaLengkap': _namaLengkap});
+        } catch (_) {}
+      }
     }
   }
 
