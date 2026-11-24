@@ -71,7 +71,7 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
         _jangkaWaktuController.text = c.hariKalender.toString();
       }
       _tglSelesaiSpmkController.text = c.tglSelesaiSpmk;
-      _nilaiKontrakController.text = RupiahUtil.formatString(c.nilaiKontrak);
+      _nilaiKontrakController.text = RupiahUtil.formatString(c.nilaiKontrak, allowDecimals: true);
       _sumberDanaController.text = c.sumberDana;
       _deskripsiController.text = c.deskripsi;
 
@@ -450,8 +450,8 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
               icon: Icons.monetization_on_outlined,
               floatingLabel: true,
               prefixText: 'Rp ',
-              keyboardType: TextInputType.number,
-              inputFormatters: [RupiahInputFormatter()],
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [RupiahInputFormatter(allowDecimals: true)],
             ),
             const SizedBox(height: 24),
 
@@ -812,9 +812,7 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
                       tglMulaiSpmk: _tglMulaiSpmkController.text,
                       tglSelesaiSpmk: _tglSelesaiSpmkController.text,
                       hariKalender: _hariKalender,
-                      nilaiKontrak: _nilaiKontrakController.text.trim().isNotEmpty
-                          ? 'Rp ${_nilaiKontrakController.text.trim()}'
-                          : '',
+                      nilaiKontrak: _formatSavedNilaiKontrak(_nilaiKontrakController.text),
                       instansiDinas: dinasList,
                       dinasUid: effectiveDinasUid,
                       sumberDana: _sumberDanaController.text,
@@ -854,9 +852,7 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
                       tglMulaiSpmk: _tglMulaiSpmkController.text,
                       tglSelesaiSpmk: _tglSelesaiSpmkController.text,
                       hariKalender: _hariKalender,
-                      nilaiKontrak: _nilaiKontrakController.text.trim().isNotEmpty
-                          ? 'Rp ${_nilaiKontrakController.text.trim()}'
-                          : '',
+                      nilaiKontrak: _formatSavedNilaiKontrak(_nilaiKontrakController.text),
                       instansiDinas: dinasList,
                       dinasUid: effectiveDinasUid,
                       sumberDana: _sumberDanaController.text,
@@ -939,6 +935,14 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
       ),
       body: mainBody,
     );
+  }
+
+  String _formatSavedNilaiKontrak(String input) {
+    final clean = input.trim();
+    if (clean.isEmpty) return '';
+    final withoutRp = clean.replaceAll('Rp', '').replaceAll('rp', '').trim();
+    final formatted = RupiahUtil.formatString(withoutRp, allowDecimals: true);
+    return formatted.isNotEmpty ? 'Rp $formatted' : '';
   }
 
   Widget _buildTextField({

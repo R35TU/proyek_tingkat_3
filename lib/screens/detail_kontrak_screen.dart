@@ -1505,7 +1505,14 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                 const Divider(height: 1, color: AppColors.border),
                 _buildSpecItem('Instansi Jasa', contract.instansiDinas.isNotEmpty ? contract.instansiDinas.join(', ') : '-'),
                 const Divider(height: 1, color: AppColors.border),
-                _buildSpecItem('Nilai Kontrak', contract.nilaiKontrak.isNotEmpty ? contract.nilaiKontrak : '-'),
+                _buildSpecItem(
+                  'Nilai Kontrak',
+                  contract.nilaiKontrak.isNotEmpty
+                      ? (contract.nilaiKontrak.startsWith('Rp')
+                          ? contract.nilaiKontrak
+                          : 'Rp ${contract.nilaiKontrak}')
+                      : '-',
+                ),
                 const Divider(height: 1, color: AppColors.border),
                 _buildSpecItem('Masa Pelaksanaan', '${contract.hariKalender} Hari Kalender'),
                 const Divider(height: 1, color: AppColors.border),

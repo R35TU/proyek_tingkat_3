@@ -1951,7 +1951,11 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          _kegiatan.nilaiKontrak.isNotEmpty ? _kegiatan.nilaiKontrak : '-',
+                          _kegiatan.nilaiKontrak.isNotEmpty
+                              ? (_kegiatan.nilaiKontrak.startsWith('Rp')
+                                  ? _kegiatan.nilaiKontrak
+                                  : 'Rp ${_kegiatan.nilaiKontrak}')
+                              : '-',
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -2513,7 +2517,6 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
     final rawRkk = _kegiatan.activeRkkDivisiList;
     int totalItems = 0;
     double totalHarga = 0.0;
-    double totalBobot = 0.0;
 
     for (final div in rawRkk) {
       final items = (div['items'] as List? ?? []);
@@ -2523,9 +2526,12 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
         final vol = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
         final th = (it['totalHarga'] as num?)?.toDouble() ?? (hs * vol);
         totalHarga += th;
-        totalBobot += (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
       }
     }
+
+    final double nilaiKontrakKegiatan = RupiahUtil.parseToDouble(_kegiatan.nilaiKontrak);
+    final double divisor = nilaiKontrakKegiatan > 0 ? nilaiKontrakKegiatan : totalHarga;
+    final double totalBobot = divisor > 0 ? (totalHarga / divisor) * 100.0 : 0.0;
 
     final hasRkk = rawRkk.isNotEmpty && totalItems > 0;
 
@@ -2595,6 +2601,12 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
           ),
           const SizedBox(height: 12),
 
+          // Validasi Kesesuaian Total RAB terhadap Nilai Kontrak Kegiatan
+          _buildRabValidationStatus(
+            totalRab: totalHarga,
+            nilaiKontrak: nilaiKontrakKegiatan,
+          ),
+
           if (!hasRkk)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
@@ -2657,9 +2669,10 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                           final vol = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
                           final th = (it['totalHarga'] as num?)?.toDouble() ?? (hs * vol);
                           divSubtotal += th;
-                          divBobot += totalHarga > 0
-                              ? (th / totalHarga) * 100.0
+                          final bbtItem = divisor > 0
+                              ? (th / divisor) * 100.0
                               : ((it['nilaiBobot'] as num?)?.toDouble() ?? 0.0);
+                          divBobot += bbtItem;
                         }
 
                         return [
@@ -2688,9 +2701,9 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                             final hs = (it['hargaSatuan'] as num?)?.toDouble() ?? 0.0;
                             final vol = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
                             final th = (it['totalHarga'] as num?)?.toDouble() ?? (hs * vol);
-                            // Rumus konsisten: Bobot Pekerjaan (%) = (Total Harga Item / Total Nilai RAB) * 100%
-                            final bbt = totalHarga > 0
-                                ? (th / totalHarga) * 100.0
+                            // Rumus: Bobot Pekerjaan (%) = (Total Harga Item / Nilai Kontrak Kegiatan) * 100%
+                            final bbt = divisor > 0
+                                ? (th / divisor) * 100.0
                                 : ((it['nilaiBobot'] as num?)?.toDouble() ?? 0.0);
 
                             return TableRow(
@@ -2720,7 +2733,7 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                           _rabTd('', align: TextAlign.right),
                           _rabTd('', align: TextAlign.right),
                           _rabTd(KelolaRkkScreen.formatRupiah(totalHarga).replaceFirst('Rp ', ''), align: TextAlign.right, isBold: true),
-                          _rabTd(totalHarga > 0 ? '100.000%' : '0.000%', align: TextAlign.right, isBold: true),
+                          _rabTd(divisor > 0 ? '${totalBobot.toStringAsFixed(3)}%' : '0.000%', align: TextAlign.right, isBold: true),
                         ],
                       ),
                       // Baris Pembulatan Sesuai Format Dokumen Fisik Dinas PU (Floor kelipatan Rp 1.000)
@@ -2746,7 +2759,13 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                               align: TextAlign.right,
                               isBold: true,
                             ),
-                            _rabTd('100.000%', align: TextAlign.right, isBold: true),
+                            _rabTd(
+                              divisor > 0
+                                  ? '${((RupiahUtil.floorToNearestThousand(totalHarga > 0 ? totalHarga : nilaiKontrakKegiatan) / divisor) * 100.0).toStringAsFixed(3)}%'
+                                  : '0.000%',
+                              align: TextAlign.right,
+                              isBold: true,
+                            ),
                           ],
                         ),
                     ],
@@ -2788,6 +2807,165 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
           height: 1.25,
         ),
       ),
+    );
+  }
+
+  Widget _buildRabValidationStatus({
+    required double totalRab,
+    required double nilaiKontrak,
+  }) {
+    if (nilaiKontrak <= 0) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.info_outline, size: 16, color: Color(0xFF64748B)),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Nilai Kontrak Kegiatan belum ditentukan. Lengkapi nilai kontrak pada edit kegiatan agar validasi RAB aktif.',
+                style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final double diff = totalRab - nilaiKontrak;
+    final bool isSesuai = diff.abs() <= 0.005;
+    final bool isKurang = !isSesuai && diff < 0;
+    final bool isMelebihi = !isSesuai && diff > 0;
+
+    final double bobotAktual = (totalRab / nilaiKontrak) * 100.0;
+
+    final Color bgColor = isSesuai
+        ? const Color(0xFFECFDF5)
+        : (isKurang ? const Color(0xFFFFFBEB) : const Color(0xFFFFF1F2));
+    final Color borderColor = isSesuai
+        ? const Color(0xFFA7F3D0)
+        : (isKurang ? const Color(0xFFFDE68A) : const Color(0xFFFECDD3));
+    final Color badgeBg = isSesuai
+        ? const Color(0xFFD1FAE5)
+        : (isKurang ? const Color(0xFFFEF3C7) : const Color(0xFFFFE4E6));
+    final Color badgeTextColor = isSesuai
+        ? const Color(0xFF065F46)
+        : (isKurang ? const Color(0xFF92400E) : const Color(0xFF9F1239));
+    final Color iconColor = isSesuai
+        ? const Color(0xFF059669)
+        : (isKurang ? const Color(0xFFD97706) : const Color(0xFFE11D48));
+    final IconData icon = isSesuai
+        ? Icons.check_circle_outline
+        : (isKurang ? Icons.warning_amber_rounded : Icons.error_outline_rounded);
+
+    final String badgeLabel = isSesuai
+        ? 'Sesuai'
+        : (isKurang ? 'Belum Sesuai' : 'Melebihi');
+    final String statusTitle = isSesuai
+        ? 'Total RAB sudah sesuai dengan nilai kontrak kegiatan'
+        : (isKurang
+            ? 'Total RAB belum mencapai nilai kontrak kegiatan'
+            : 'Peringatan: Total RAB melebihi nilai kontrak kegiatan');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: iconColor),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: badgeBg,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  badgeLabel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: badgeTextColor,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  statusTitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: badgeTextColor,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 16,
+            runSpacing: 4,
+            children: [
+              _buildValidationSubInfo('Nilai Kontrak', KelolaRkkScreen.formatRupiah(nilaiKontrak)),
+              _buildValidationSubInfo('Total RAB', KelolaRkkScreen.formatRupiah(totalRab)),
+              _buildValidationSubInfo('Total Bobot', '${bobotAktual.toStringAsFixed(3)}%'),
+              if (isKurang)
+                _buildValidationSubInfo(
+                  'Kekurangan',
+                  KelolaRkkScreen.formatRupiah(diff.abs()),
+                  textColor: const Color(0xFFB45309),
+                ),
+              if (isMelebihi)
+                _buildValidationSubInfo(
+                  'Kelebihan',
+                  KelolaRkkScreen.formatRupiah(diff.abs()),
+                  textColor: const Color(0xFFBE123C),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildValidationSubInfo(String label, String value, {Color? textColor}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '$label: ',
+          style: const TextStyle(
+            fontSize: 10.5,
+            color: Color(0xFF64748B),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: textColor ?? const Color(0xFF0F172A),
+          ),
+        ),
+      ],
     );
   }
 }
