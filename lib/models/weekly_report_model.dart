@@ -317,6 +317,15 @@ class WeeklyReportModel {
     if (text.isEmpty) return null;
     try {
       String clean = text.trim();
+      // Bersihkan awalan hari jika ada koma, misal "Kamis, 23 April 2026"
+      if (clean.contains(',')) {
+        final commaIdx = clean.indexOf(',');
+        final prefix = clean.substring(0, commaIdx).trim().toLowerCase();
+        const daysPrefix = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu'];
+        if (daysPrefix.contains(prefix)) {
+          clean = clean.substring(commaIdx + 1).trim();
+        }
+      }
       // Bersihkan awalan kata "Tanggal" jika ada
       if (clean.toLowerCase().startsWith('tanggal ')) {
         clean = clean.substring(8).trim();
@@ -352,27 +361,35 @@ class WeeklyReportModel {
       if (clean.contains('/')) {
         final parts = clean.split('/');
         if (parts.length == 3) {
-          final day = int.tryParse(parts[0]) ?? 1;
-          final month = int.tryParse(parts[1]) ?? 1;
-          final year = int.tryParse(parts[2]) ?? 2026;
-          return DateTime(year, month, day);
+          final day = int.tryParse(parts[0]);
+          final month = int.tryParse(parts[1]);
+          final year = int.tryParse(parts[2]);
+          if (day != null && month != null && year != null) {
+            return DateTime(year, month, day);
+          }
         }
       }
 
       // Check "20 April 2026"
       final parts = clean.split(RegExp(r'\s+'));
       if (parts.length >= 3) {
-        final day = int.tryParse(parts[0]) ?? 1;
+        final day = int.tryParse(parts[0]);
         final monthName = parts[1].toLowerCase();
-        int month = 1;
-        for (int i = 0; i < namaBulan.length; i++) {
-          if (namaBulan[i].toLowerCase() == monthName) {
-            month = i + 1;
-            break;
+        int? month;
+        if (monthName == 'nopember') {
+          month = 11;
+        } else {
+          for (int i = 0; i < namaBulan.length; i++) {
+            if (namaBulan[i].toLowerCase() == monthName) {
+              month = i + 1;
+              break;
+            }
           }
         }
-        final year = int.tryParse(parts[2]) ?? 2026;
-        return DateTime(year, month, day);
+        final year = int.tryParse(parts[2]);
+        if (day != null && month != null && year != null) {
+          return DateTime(year, month, day);
+        }
       }
     } catch (_) {}
     return null;

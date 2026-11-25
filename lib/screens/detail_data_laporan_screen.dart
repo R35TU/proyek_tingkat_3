@@ -393,19 +393,28 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
   bool _matchReportDate(dynamic r, DateTime targetDate) {
     if (r == null) return false;
     final targetKey = _formatDateKey(targetDate);
-    final String? rawDate = r['tanggal']?.toString();
-    if (rawDate != null) {
+    final String? rawDate = r['tanggal'] != null ? r['tanggal'].toString().trim() : null;
+    if (rawDate != null && rawDate.isNotEmpty) {
       if (rawDate == targetKey || rawDate.startsWith(targetKey)) {
         return true;
       }
-      final parsed = DateTime.tryParse(rawDate);
+      final parsed = DateTime.tryParse(rawDate) ??
+          WeeklyReportModel.parseIndonesianDate(rawDate);
       if (parsed != null && _isSameDay(parsed, targetDate)) {
         return true;
       }
     }
-    final String? createdAt = r['createdAt']?.toString();
-    if (createdAt != null) {
-      final parsed = DateTime.tryParse(createdAt);
+    final String? formatted = r['tanggalFormatted'] != null ? r['tanggalFormatted'].toString().trim() : null;
+    if (formatted != null && formatted.isNotEmpty) {
+      final parsed = WeeklyReportModel.parseIndonesianDate(formatted);
+      if (parsed != null && _isSameDay(parsed, targetDate)) {
+        return true;
+      }
+    }
+    final String? createdAt = r['createdAt'] != null ? r['createdAt'].toString().trim() : null;
+    if (createdAt != null && createdAt.isNotEmpty) {
+      final parsed = DateTime.tryParse(createdAt) ??
+          WeeklyReportModel.parseIndonesianDate(createdAt);
       if (parsed != null && _isSameDay(parsed, targetDate)) {
         return true;
       }
@@ -4117,11 +4126,12 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
             onPressed: () {
               final keg = _currentKegiatan;
               if (keg != null) {
+                final live = _liveContract;
                 final List<dynamic> list = List.from(keg['laporanMingguan'] ?? []);
                 list.removeWhere((r) => r['id'] == reportId);
                 keg['laporanMingguan'] = list;
-                widget.contract.kegiatans[_currentKegiatanIndex] = keg;
-                Provider.of<ContractProvider>(context, listen: false).updateContract(widget.contract);
+                live.kegiatans[_currentKegiatanIndex] = keg;
+                Provider.of<ContractProvider>(context, listen: false).updateContract(live);
                 try {
                   final timeline = Provider.of<TimelineProvider>(context, listen: false);
                   final kName = keg['namaKegiatan']?.toString() ?? '';

@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:tata_saka_app/models/weekly_report_model.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
+import 'package:tata_saka_app/utils/execution_period_helper.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter/services.dart';
@@ -71,6 +73,11 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
         _jangkaWaktuController.text = c.hariKalender.toString();
       }
       _tglSelesaiSpmkController.text = c.tglSelesaiSpmk;
+      _tglMulaiSpmk = WeeklyReportModel.parseIndonesianDate(c.tglMulaiSpmk);
+      _tglSelesaiSpmk = WeeklyReportModel.parseIndonesianDate(c.tglSelesaiSpmk);
+      if (_tglMulaiSpmk != null && _jangkaWaktuController.text.trim().isNotEmpty) {
+        _updateEndDate();
+      }
       _nilaiKontrakController.text = RupiahUtil.formatString(c.nilaiKontrak, allowDecimals: true);
       _sumberDanaController.text = c.sumberDana;
       _deskripsiController.text = c.deskripsi;
@@ -200,7 +207,8 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
   Future<void> _selectDate(BuildContext context, TextEditingController controller, {bool isMulaiSpmk = false}) async {
     final firstDate = DateTime(2000);
     final lastDate = DateTime(2101);
-    DateTime initial = (isMulaiSpmk && _tglMulaiSpmk != null) ? _tglMulaiSpmk! : DateTime.now();
+    DateTime initial = WeeklyReportModel.parseIndonesianDate(controller.text) ??
+        ((isMulaiSpmk && _tglMulaiSpmk != null) ? _tglMulaiSpmk! : DateTime.now());
     if (initial.isBefore(firstDate)) initial = firstDate;
     if (initial.isAfter(lastDate)) initial = lastDate;
 
@@ -741,7 +749,7 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   final provider = Provider.of<ContractProvider>(context, listen: false);
                   
                   List<String> dinasList = _dinasControllers
@@ -802,8 +810,12 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
                   }
 
                   if (widget.contractToEdit != null) {
-                    final updatedContract = ContractModel(
-                      id: widget.contractToEdit!.id,
+                    final latestOld = provider.contracts.firstWhere(
+                      (c) => c.id == widget.contractToEdit!.id,
+                      orElse: () => widget.contractToEdit!,
+                    );
+                    final baseUpdatedContract = ContractModel(
+                      id: latestOld.id,
                       jenisKegiatan: _jenisKegiatan ?? 'Pengawasan Teknis',
                       namaKontrak: _namaController.text.isEmpty ? 'Proyek' : _namaController.text,
                       nomorSpk: _noSpkController.text,
@@ -817,29 +829,136 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
                       dinasUid: effectiveDinasUid,
                       sumberDana: _sumberDanaController.text,
                       deskripsi: _deskripsiController.text,
-                      progressFisik: widget.contractToEdit!.progressFisik,
-                      folders: widget.contractToEdit!.folders,
-                      kegiatans: widget.contractToEdit!.kegiatans,
+                      progressFisik: latestOld.progressFisik,
+                      folders: latestOld.folders,
+                      kegiatans: latestOld.kegiatans,
                       strukturOrganisasi: strukturMap,
                     );
-                    provider.updateContract(updatedContract);
+
+                    ContractModel finalContractToSave = baseUpdatedContract;
+                    bool syncedToKegiatan = false;
+
+                    final analysis = ExecutionPeriodHelper.analyzeContractDateChange(
+                      latestOld,
+                      baseUpdatedContract,
+                    );
+
+                    if (analysis.datesChanged && baseUpdatedContract.kegiatans.isNotEmpty) {
+                      final decision = await showDialog<String>(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (dlgCtx) => AlertDialog(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          title: const Row(
+                            children: [
+                              Icon(Icons.sync_alt_rounded, color: AppColors.primaryBlue, size: 24),
+                              SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Sinkronkan Tanggal ke Kegiatan?',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                ),
+                              ),
+                            ],
+                          ),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Periode pelaksanaan kontrak diubah:\n'
+                                '• Lama: ${analysis.oldPeriodLabel}\n'
+                                '• Baru: ${analysis.newPeriodLabel}',
+                                style: const TextStyle(fontSize: 13, height: 1.5, color: AppColors.textDark),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                'Apakah Anda ingin menyinkronkan tanggal pelaksanaan ini ke ${analysis.totalKegiatans} kegiatan di dalam kontrak?',
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textDark),
+                              ),
+                              if (analysis.hasHistoricalReportsOutside) ...[
+                                const SizedBox(height: 12),
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFF59E0B)),
+                                  ),
+                                  child: Text(
+                                    'Catatan: Ditemukan ${analysis.dailyReportsOutsideCount} Laporan Harian dan '
+                                    '${analysis.weeklyReportsOutsideCount} Laporan Mingguan historis di luar rentang baru. '
+                                    'Data laporan historis TIDAK akan dihapus dan tetap tersimpan aman.',
+                                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF92400E), height: 1.4),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dlgCtx, 'cancel'),
+                              child: const Text('Batal', style: TextStyle(color: AppColors.textLight)),
+                            ),
+                            OutlinedButton(
+                              onPressed: () => Navigator.pop(dlgCtx, 'contract_only'),
+                              child: const Text('Kontrak Saja'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(dlgCtx, 'sync'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryBlue,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Sinkronkan Kegiatan'),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (!context.mounted) return;
+                      if (decision == null || decision == 'cancel') {
+                        return;
+                      }
+                      if (decision == 'sync') {
+                        finalContractToSave = ExecutionPeriodHelper.syncContractDatesToKegiatans(
+                          oldContract: latestOld,
+                          newContract: baseUpdatedContract,
+                          forceSyncAll: true,
+                        );
+                        syncedToKegiatan = true;
+                      }
+                    }
+
+                    await provider.updateContract(finalContractToSave);
+                    if (!context.mounted) return;
                     try {
                       final timeline = Provider.of<TimelineProvider>(context, listen: false);
                       timeline.logEvent(
                         actorName: 'CV. Tata Saka Consultant',
                         actionType: 'UPDATE',
                         entityType: 'KONTRAK',
-                        contractId: updatedContract.id,
-                        contractName: updatedContract.namaKontrak,
-                        dinasName: updatedContract.instansiDinas.isNotEmpty
-                            ? updatedContract.instansiDinas.first
+                        contractId: finalContractToSave.id,
+                        contractName: finalContractToSave.namaKontrak,
+                        dinasName: finalContractToSave.instansiDinas.isNotEmpty
+                            ? finalContractToSave.instansiDinas.first
                             : 'DPU-PR Kab. Purbalingga',
-                        title: 'Pembaruan Kontrak: ${updatedContract.namaKontrak}',
-                        description: 'Data administrasi kontrak diperbarui (SPK: ${updatedContract.nomorSpk}).',
+                        title: 'Pembaruan Kontrak: ${finalContractToSave.namaKontrak}',
+                        description: syncedToKegiatan
+                            ? 'Data administrasi kontrak & tanggal ${finalContractToSave.kegiatans.length} kegiatan disinkronkan (${finalContractToSave.tglMulaiSpmk} - ${finalContractToSave.tglSelesaiSpmk}).'
+                            : 'Data administrasi kontrak diperbarui (SPK: ${finalContractToSave.nomorSpk}).',
                       );
                     } catch (_) {}
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Kontrak berhasil diperbarui')),
+                      SnackBar(
+                        content: Text(
+                          syncedToKegiatan
+                              ? 'Kontrak dan tanggal kegiatan berhasil disinkronkan'
+                              : 'Kontrak berhasil diperbarui',
+                        ),
+                      ),
                     );
                   } else {
                     final newContract = ContractModel(
@@ -860,7 +979,8 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
                       progressFisik: 0.0,
                       strukturOrganisasi: strukturMap,
                     );
-                    provider.addContract(newContract);
+                    await provider.addContract(newContract);
+                    if (!context.mounted) return;
                     try {
                       final timeline = Provider.of<TimelineProvider>(context, listen: false);
                       timeline.logEvent(
@@ -880,6 +1000,7 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
                       const SnackBar(content: Text('Kontrak berhasil ditambahkan')),
                     );
                   }
+                  if (!context.mounted) return;
                   Navigator.pop(context, true);
                 },
                 style: ElevatedButton.styleFrom(

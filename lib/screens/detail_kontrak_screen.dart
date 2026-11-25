@@ -121,13 +121,23 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
   late TabController _tabController;
   late List<_FolderData> _folders;
   late List<_KegiatanData> _kegiatans;
+  ContractModel? _syncedContractRef;
 
-  @override
-  void initState() {
-    super.initState();
-    
-    // Load Folders
-    _folders = widget.contract.folders.map((f) {
+  ContractModel _resolveLiveContract({bool listen = false}) {
+    try {
+      final prov = Provider.of<ContractProvider>(context, listen: listen);
+      return prov.contracts.firstWhere(
+        (c) => c.id == widget.contract.id,
+        orElse: () => widget.contract,
+      );
+    } catch (_) {
+      return widget.contract;
+    }
+  }
+
+  void _reloadFromContract(ContractModel c) {
+    _syncedContractRef = c;
+    _folders = c.folders.map((f) {
       return _FolderData(
         name: f['name'] ?? '',
         isExpanded: f['isExpanded'] ?? false,
@@ -137,10 +147,15 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
       );
     }).toList();
 
-    // Load Kegiatans directly from contract
-    _kegiatans = widget.contract.kegiatans.map((k) {
+    _kegiatans = c.kegiatans.map((k) {
       return _KegiatanData(data: Map<String, dynamic>.from(k));
     }).toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _reloadFromContract(_resolveLiveContract(listen: false));
 
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
@@ -155,15 +170,16 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
   }
 
   void _saveToProvider() {
-    widget.contract.folders = _folders.map((f) => {
+    final live = _resolveLiveContract(listen: false);
+    live.folders = _folders.map((f) => {
       'name': f.name,
       'isExpanded': f.isExpanded,
       'documents': f.documents.map((d) => d.toJson()).toList(),
     }).toList();
 
-    widget.contract.kegiatans = _kegiatans.map((k) => Map<String, dynamic>.from(k.data)).toList();
+    live.kegiatans = _kegiatans.map((k) => Map<String, dynamic>.from(k.data)).toList();
 
-    Provider.of<ContractProvider>(context, listen: false).updateContract(widget.contract);
+    Provider.of<ContractProvider>(context, listen: false).updateContract(live);
   }
 
   @override
@@ -969,10 +985,11 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
   }
 
   Future<void> _addKegiatan() async {
+    final live = _resolveLiveContract(listen: false);
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
-        builder: (context) => FormKegiatanScreen(contract: widget.contract),
+        builder: (context) => FormKegiatanScreen(contract: live),
       ),
     );
 
@@ -1005,12 +1022,13 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
   }
 
   Future<void> _editKegiatan(int index) async {
+    final live = _resolveLiveContract(listen: false);
     final current = _kegiatans[index];
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
         builder: (context) => FormKegiatanScreen(
-          contract: widget.contract,
+          contract: live,
           initialKegiatan: current.data,
           kegiatanIndex: index,
         ),
@@ -1208,14 +1226,17 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           onSelected: (value) async {
             if (value == 'edit') {
+              final live = _resolveLiveContract(listen: false);
               final updated = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => TambahKontrakScreen(contractToEdit: widget.contract),
+                  builder: (context) => TambahKontrakScreen(contractToEdit: live),
                 ),
               );
               if (updated == true && mounted) {
-                setState(() {});
+                setState(() {
+                  _reloadFromContract(_resolveLiveContract(listen: false));
+                });
               }
             } else if (value == 'delete') {
               _confirmDeleteContract();
@@ -1362,11 +1383,10 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
       userProf = null;
     }
     final isKonsultan = userProf?.isKonsultan ?? true;
-    final provider = Provider.of<ContractProvider>(context);
-    final contract = provider.contracts.firstWhere(
-      (c) => c.id == widget.contract.id,
-      orElse: () => widget.contract,
-    );
+    final contract = _resolveLiveContract(listen: true);
+    if (!identical(contract, _syncedContractRef)) {
+      _reloadFromContract(contract);
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
@@ -1678,23 +1698,22 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () async {
+            final live = _resolveLiveContract(listen: false);
             await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => DetailKegiatanScreen(
-                  contract: widget.contract,
+                  contract: live,
                   kegiatanIndex: index,
                 ),
               ),
             );
             // Refresh on return in case they edited anything inside
-            setState(() {
-              if (index < widget.contract.kegiatans.length) {
-                _kegiatans[index] = _KegiatanData(
-                  data: Map<String, dynamic>.from(widget.contract.kegiatans[index]),
-                );
-              }
-            });
+            if (mounted) {
+              setState(() {
+                _reloadFromContract(_resolveLiveContract(listen: false));
+              });
+            }
           },
           onLongPress: isKonsultan ? () => _showKegiatanOptions(index) : null,
           child: Padding(

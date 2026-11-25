@@ -15,6 +15,7 @@ import 'package:tata_saka_app/screens/laporan_screen.dart';
 import 'package:tata_saka_app/screens/login_screen.dart';
 
 import 'buat_laporan_mingguan_screen.dart';
+import 'laporan_mingguan_screen.dart';
 
 import 'package:tata_saka_app/screens/laporan_bulanan_screen.dart';
 import 'package:tata_saka_app/screens/timeline_screen.dart';
@@ -147,7 +148,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 'laporan_harian':
         return const BuatLaporanScreen(isEmbedded: true);
       case 'laporan_mingguan':
-        return const BuatLaporanMingguanScreen(isEmbedded: true);
+        return const LaporanMingguanScreen(isEmbedded: true);
       case 'laporan_bulanan':
         return const LaporanBulananScreen(isEmbedded: true);
       case 'timeline':
@@ -2063,7 +2064,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       isCollapsed: isCollapsed,
                       onTap: () => _navigateFromSidebar(
                         'laporan_mingguan',
-                        const BuatLaporanMingguanScreen(),
+                        const LaporanMingguanScreen(),
                         isDrawer: isDrawer,
                       ),
                     ),

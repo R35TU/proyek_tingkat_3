@@ -12,10 +12,13 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
+import 'package:tata_saka_app/models/kegiatan_model.dart';
+import 'package:tata_saka_app/models/weekly_report_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/services/storage_service.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/utils/execution_period_helper.dart';
 import 'package:tata_saka_app/utils/plat_nomor_util.dart';
 import 'package:tata_saka_app/widgets/clean_text_form_field.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
@@ -1140,9 +1143,36 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     }
   }
 
+  DateTime? get _kegiatanStartDate {
+    return ExecutionPeriodHelper.resolveExecutionPeriod(
+      _currentKegiatan,
+      contract: _selectedContract,
+    ).startDate;
+  }
+
+  DateTime? get _kegiatanEndDate {
+    return ExecutionPeriodHelper.resolveExecutionPeriod(
+      _currentKegiatan,
+      contract: _selectedContract,
+    ).endDate;
+  }
+
+  void _clampSelectedDateToPeriod() {
+    final start = _kegiatanStartDate;
+    final end = _kegiatanEndDate;
+    if (start != null && _selectedDate.isBefore(start)) {
+      _selectedDate = start;
+    } else if (end != null && _selectedDate.isAfter(end)) {
+      _selectedDate = end;
+    }
+  }
+
   Future<void> _pickDate() async {
-    final firstDate = DateTime(2015);
-    final lastDate = DateTime(2040);
+    final start = _kegiatanStartDate;
+    final end = _kegiatanEndDate;
+
+    final firstDate = start ?? DateTime(2015);
+    final lastDate = end ?? DateTime(2040);
     DateTime initial = _selectedDate;
     if (initial.isBefore(firstDate)) initial = firstDate;
     if (initial.isAfter(lastDate)) initial = lastDate;
@@ -1242,6 +1272,92 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     final String lokasiKegiatan = keg['lokasi'] ?? '-';
     final String sumberDanaKontrak = _selectedContract!.sumberDana;
     final String namaKontraktor = keg['kontraktor'] ?? '-';
+
+    // ─── VALIDASI PERIODE KONTRAK KEGIATAN (KASUS 1 & ATURAN PELAPORAN) ───
+    final start = _kegiatanStartDate;
+    final end = _kegiatanEndDate;
+    final repDateOnly =
+        DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+
+    if (start != null &&
+        repDateOnly.isBefore(DateTime(start.year, start.month, start.day))) {
+      final startStr = WeeklyReportModel.formatIndonesianDate(start);
+      final curStr = WeeklyReportModel.formatIndonesianDate(_selectedDate);
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: const [
+              Icon(Icons.block, color: Color(0xFFDC2626), size: 28),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Tanggal di Luar Periode',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'Tanggal laporan ($curStr) tidak boleh lebih awal dari tanggal mulai pelaksanaan kegiatan ($startStr).\n\nSilakan sesuaikan tanggal laporan dalam rentang periode kontrak kegiatan.',
+            style: const TextStyle(fontSize: 13, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(
+                'Tutup',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (end != null &&
+        repDateOnly.isAfter(DateTime(end.year, end.month, end.day))) {
+      final endStr = WeeklyReportModel.formatIndonesianDate(end);
+      final curStr = WeeklyReportModel.formatIndonesianDate(_selectedDate);
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: const [
+              Icon(Icons.block, color: Color(0xFFDC2626), size: 28),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Tanggal di Luar Periode',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'Tanggal laporan ($curStr) tidak boleh melewati tanggal akhir pelaksanaan kegiatan ($endStr).\n\nSilakan sesuaikan tanggal laporan dalam rentang periode kontrak kegiatan.',
+            style: const TextStyle(fontSize: 13, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(
+                'Tutup',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
 
     final rkkFlatItems = _getRkkFlatItems();
 
@@ -1575,13 +1691,17 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         .where((m) => m['jenisKejadian']!.isNotEmpty || m['cuaca']!.isNotEmpty)
         .toList();
 
-    // F. Clean Instruksi (Konsultan Supervisi CV. TATA SAKA CONSULTANT)
+    // F. Clean Instruksi (Konsultan Supervisi)
     final String instruksiText = _instruksiKonsultanController.text.trim();
+    final String namaKonsultan = _currentKegiatan?['konsultanPengawas']?.toString().trim() ?? '';
+    final String labelKonsultan = namaKonsultan.isNotEmpty
+        ? 'Konsultan Supervisi ($namaKonsultan)'
+        : 'Konsultan Supervisi';
     final cleanInstruksi = instruksiText.isNotEmpty
         ? [
             {
               'no': '1',
-              'pihak': 'Konsultan Supervisi (CV. TATA SAKA CONSULTANT)',
+              'pihak': labelKonsultan,
               'uraian': instruksiText,
             },
           ]
@@ -1730,6 +1850,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
 
     final Map<String, dynamic> reportData = {
       'id': reportId,
+      'kegiatanId': (keg['id'] ?? '').toString(),
+      'kegiatanNama': keg['namaKegiatan'] ?? '',
+      'contractId': _selectedContract!.id,
       'tanggal': dateKey,
       'tanggalFormatted': dateFormatted,
       'namaKontrak': _selectedContract!.namaKontrak,
@@ -1890,6 +2013,24 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       _selectedContract = contracts.first;
       if (_selectedContract!.kegiatans.isNotEmpty) {
         _selectedKegiatanIndex = 0;
+      }
+      if (widget.editReport == null && widget.initialDate == null) {
+        _clampSelectedDateToPeriod();
+      }
+    } else if (_selectedContract != null && contracts.isNotEmpty) {
+      final fresh = contracts.cast<ContractModel?>().firstWhere(
+        (c) => c?.id == _selectedContract!.id,
+        orElse: () => null,
+      );
+      if (fresh != null && !identical(fresh, _selectedContract)) {
+        _selectedContract = fresh;
+        if (_selectedKegiatanIndex != null &&
+            _selectedKegiatanIndex! >= fresh.kegiatans.length) {
+          _selectedKegiatanIndex = fresh.kegiatans.isNotEmpty ? 0 : null;
+        }
+        if (widget.editReport == null && widget.initialDate == null) {
+          _clampSelectedDateToPeriod();
+        }
       }
     }
 
@@ -2116,6 +2257,37 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             ),
           ],
         ),
+        if (_kegiatanStartDate != null || _kegiatanEndDate != null) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFBFDBFE)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.info_outline,
+                  size: 14,
+                  color: Color(0xFF1D4ED8),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Periode Pelaksanaan Kegiatan: ${_kegiatanStartDate != null ? WeeklyReportModel.formatIndonesianDate(_kegiatanStartDate!) : '-'} s/d ${_kegiatanEndDate != null ? WeeklyReportModel.formatIndonesianDate(_kegiatanEndDate!) : '-'}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF1E40AF),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -2141,7 +2313,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         ),
         const SizedBox(height: 6),
         DropdownButtonFormField<ContractModel>(
-          value: _selectedContract,
+          value: contracts.any((c) => identical(c, _selectedContract))
+              ? _selectedContract
+              : null,
           isExpanded: true,
           decoration: _cleanInputDec('Pilih Kontrak'),
           items: contracts
@@ -2162,6 +2336,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
               _selectedKegiatanIndex = (val?.kegiatans.isNotEmpty ?? false)
                   ? 0
                   : null;
+              _clampSelectedDateToPeriod();
             });
           },
         ),
@@ -2216,6 +2391,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             onChanged: (idx) {
               setState(() {
                 _selectedKegiatanIndex = idx;
+                _clampSelectedDateToPeriod();
               });
             },
           ),
