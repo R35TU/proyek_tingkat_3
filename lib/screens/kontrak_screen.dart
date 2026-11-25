@@ -590,7 +590,9 @@ class _KontrakScreenState extends State<KontrakScreen> {
                   title: 'Penghapusan Kontrak: ${contract.namaKontrak}',
                   description: 'Kontrak "${contract.namaKontrak}" beserta seluruh kegiatan dan laporannya telah dihapus dari sistem.',
                 );
-              } catch (_) {}
+              } catch (e) {
+                debugPrint('Gagal mencatat timeline penghapusan kontrak: $e');
+              }
               await contractProv.deleteContract(contract.id);
               messenger.showSnackBar(
                 const SnackBar(content: Text('Kontrak berhasil dihapus')),

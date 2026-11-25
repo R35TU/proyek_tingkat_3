@@ -1294,7 +1294,9 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                   title: 'Penghapusan Kontrak: ${deletedContract.namaKontrak}',
                   description: 'Kontrak "${deletedContract.namaKontrak}" beserta seluruh kegiatan dan laporannya telah dihapus dari sistem.',
                 );
-              } catch (_) {}
+              } catch (e) {
+                debugPrint('Gagal mencatat timeline penghapusan kontrak: $e');
+              }
               await contractProv.deleteContract(deletedContract.id);
               Navigator.pop(ctx);
               nav.pop();

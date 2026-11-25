@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
@@ -26,11 +28,42 @@ class TimelineProvider with ChangeNotifier {
   List<TimelineEventModel> _events = [];
   bool _isLoading = true;
 
+  /// Future pemuatan yang sedang berjalan (dipakai `ensureLoaded`).
+  Future<void>? _loadFuture;
+  StreamSubscription<User?>? _authSub;
+
   bool get isLoading => _isLoading;
   List<TimelineEventModel> get allEvents => List.unmodifiable(_events);
 
   TimelineProvider({bool seedDefaultIfEmpty = false}) {
-    loadEvents(seedDefaultIfEmpty: seedDefaultIfEmpty);
+    _loadFuture = loadEvents(seedDefaultIfEmpty: seedDefaultIfEmpty);
+    // Muat ulang dari Firestore begitu sesi login Firebase Auth tersedia
+    // (sebelum login, rules menolak baca → timeline hanya terisi lokal).
+    try {
+      _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
+        if (user != null) {
+          _loadFuture = loadEvents();
+        }
+      });
+    } catch (_) {
+      // Firebase belum init (test) → abaikan.
+    }
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
+  }
+
+  /// Menunggu pemuatan awal selesai agar hasil `syncWithContracts` tidak
+  /// tertimpa oleh respons Firestore yang datang terlambat.
+  Future<void> ensureLoaded() async {
+    final pending = _loadFuture;
+    if (pending == null) return;
+    try {
+      await pending;
+    } catch (_) {}
   }
 
   /// Memuat riwayat timeline: utama dari Firestore, fallback ke SharedPreferences
@@ -65,8 +98,15 @@ class TimelineProvider with ChangeNotifier {
         await _pushEventsToCloud(_events);
       }
     } catch (e) {
+      // Jangan kosongkan timeline hanya karena baca cloud gagal (offline /
+      // rules menolak sebelum login) — pakai mirror lokal sebagai fallback.
       debugPrint('Error loading timeline events: $e');
-      _events = seedDefaultIfEmpty ? _generateInitialSeedEvents() : [];
+      try {
+        await _loadFromLocal(seedDefaultIfEmpty: seedDefaultIfEmpty);
+      } catch (e2) {
+        debugPrint('Error loading timeline local mirror: $e2');
+        _events = seedDefaultIfEmpty ? _generateInitialSeedEvents() : [];
+      }
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -224,6 +264,7 @@ class TimelineProvider with ChangeNotifier {
   /// Memastikan seluruh laporan harian (misal tanggal 21, 22, 23), mingguan, addendum, dan dokumen
   /// terdaftar lengkap di Timeline dengan tanggal & waktu yang akurat.
   Future<void> syncWithContracts(List<ContractModel> contracts) async {
+    await ensureLoaded();
     bool hasNewEvents = false;
     final Set<String> existingIds = _events.map((e) => e.id).toSet();
     final Set<String> beforeIds = Set<String>.from(existingIds);
