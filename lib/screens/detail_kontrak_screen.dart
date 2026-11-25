@@ -1267,16 +1267,21 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () {
+            onPressed: () async {
               final deletedContract = contract;
+              final contractProv = Provider.of<ContractProvider>(context, listen: false);
+              final userProf = Provider.of<UserProfileProvider>(context, listen: false);
+              final timeline = Provider.of<TimelineProvider>(context, listen: false);
+              final nav = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
+
+              final actorName = userProf.namaLengkap.trim().isNotEmpty
+                  ? userProf.namaLengkap.trim()
+                  : 'CV. Tata Saka Consultant';
+              final actorRole = userProf.role.trim().isNotEmpty ? userProf.role.trim() : 'Konsultan';
+
               try {
-                final userProf = Provider.of<UserProfileProvider>(context, listen: false);
-                final actorName = userProf.namaLengkap.trim().isNotEmpty
-                    ? userProf.namaLengkap.trim()
-                    : 'CV. Tata Saka Consultant';
-                final actorRole = userProf.role.trim().isNotEmpty ? userProf.role.trim() : 'Konsultan';
-                final timeline = Provider.of<TimelineProvider>(context, listen: false);
-                timeline.logEvent(
+                await timeline.logEvent(
                   actorName: actorName,
                   actorRole: actorRole,
                   actionType: 'DELETE',
@@ -1285,15 +1290,15 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                   contractName: deletedContract.namaKontrak,
                   dinasName: deletedContract.instansiDinas.isNotEmpty
                       ? deletedContract.instansiDinas.first
-                      : 'DPU-PR Kab. Purbalingga',
+                      : null,
                   title: 'Penghapusan Kontrak: ${deletedContract.namaKontrak}',
                   description: 'Kontrak "${deletedContract.namaKontrak}" beserta seluruh kegiatan dan laporannya telah dihapus dari sistem.',
                 );
               } catch (_) {}
-              Provider.of<ContractProvider>(context, listen: false).deleteContract(deletedContract.id);
+              await contractProv.deleteContract(deletedContract.id);
               Navigator.pop(ctx);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
+              nav.pop();
+              messenger.showSnackBar(
                 const SnackBar(content: Text('Kontrak berhasil dihapus')),
               );
             },
