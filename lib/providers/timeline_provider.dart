@@ -31,18 +31,20 @@ class TimelineProvider with ChangeNotifier {
   /// Future pemuatan yang sedang berjalan (dipakai `ensureLoaded`).
   Future<void>? _loadFuture;
   StreamSubscription<User?>? _authSub;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _eventsSub;
 
   bool get isLoading => _isLoading;
   List<TimelineEventModel> get allEvents => List.unmodifiable(_events);
 
   TimelineProvider({bool seedDefaultIfEmpty = false}) {
     _loadFuture = loadEvents(seedDefaultIfEmpty: seedDefaultIfEmpty);
-    // Muat ulang dari Firestore begitu sesi login Firebase Auth tersedia
-    // (sebelum login, rules menolak baca → timeline hanya terisi lokal).
+    // Muat ulang & berlangganan realtime begitu sesi login Firebase Auth
+    // tersedia (sebelum login, rules menolak baca → timeline hanya terisi lokal).
     try {
       _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
         if (user != null) {
           _loadFuture = loadEvents();
+          _listenCloud();
         }
       });
     } catch (_) {
@@ -50,9 +52,49 @@ class TimelineProvider with ChangeNotifier {
     }
   }
 
+  /// Langganan realtime ke koleksi `timeline_events` supaya seluruh event yang
+  /// tersimpan di Firestore (termasuk hasil `logEvent`) langsung tampil, tanpa
+  /// bergantung pada timing baca saat aplikasi/login pertama kali dibuka.
+  void _listenCloud() {
+    if (_eventsSub != null) return;
+    final db = _db;
+    if (db == null) return;
+    try {
+      _eventsSub = db
+          .collection(_cloudCollection)
+          .snapshots()
+          .listen(_onCloudSnapshot, onError: (e) {
+        debugPrint('[TimelineProvider] Snapshot error: $e');
+        _eventsSub = null;
+      });
+    } catch (e) {
+      debugPrint('[TimelineProvider] Gagal berlangganan timeline: $e');
+    }
+  }
+
+  /// Gabungkan event dari cloud dengan yang sudah ada di memori (event lokal
+  /// yang belum sempat terkirim tidak ikut terhapus).
+  void _onCloudSnapshot(QuerySnapshot<Map<String, dynamic>> snap) {
+    if (snap.docs.isEmpty) return;
+    final merged = <String, TimelineEventModel>{
+      for (final e in _events) e.id: e,
+    };
+    for (final d in snap.docs) {
+      final data = Map<String, dynamic>.from(d.data());
+      data['id'] = d.id;
+      merged[d.id] = TimelineEventModel.fromJson(data);
+    }
+    _events = merged.values.toList();
+    _sortEvents();
+    _isLoading = false;
+    _saveEvents();
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _authSub?.cancel();
+    _eventsSub?.cancel();
     super.dispose();
   }
 
@@ -110,6 +152,8 @@ class TimelineProvider with ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+      // Setelah baca awal selesai, jaga data tetap sinkron secara realtime.
+      if (_eventsSub == null) _listenCloud();
     }
   }
 
