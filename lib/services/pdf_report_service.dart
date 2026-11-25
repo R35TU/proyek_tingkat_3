@@ -15,7 +15,9 @@ import 'package:tata_saka_app/models/weekly_report_model.dart';
 import 'package:tata_saka_app/services/pdf_saver_native.dart'
     if (dart.library.js_interop) 'package:tata_saka_app/services/pdf_saver_web.dart'
     if (dart.library.html) 'package:tata_saka_app/services/pdf_saver_web.dart';
+import 'package:tata_saka_app/utils/execution_period_helper.dart';
 import 'package:tata_saka_app/utils/plat_nomor_util.dart';
+import 'package:tata_saka_app/utils/progress_calculator.dart';
 import 'package:tata_saka_app/utils/rupiah_input_formatter.dart';
 
 class PdfReportService {
@@ -915,7 +917,7 @@ class PdfReportService {
                 pw.SizedBox(height: 10),
                 _buildDocMetaRow('KEGIATAN', ':  $namaKegiatan'),
                 _buildDocMetaRow('PENYEDIA JASA', ':  $kontraktor'),
-                _buildDocMetaRow('KONSULTAN PENGAWAS', ':  CV. Tata Saka Consultant'),
+                _buildDocMetaRow('KONSULTAN PENGAWAS', ':  ${konsultan.isNotEmpty ? konsultan : '-'}'),
                 pw.SizedBox(height: 8),
                 _buildPdfDocTable(
                   colWidths: const {
@@ -990,7 +992,7 @@ class PdfReportService {
                 pw.SizedBox(height: 10),
                 _buildDocMetaRow('KEGIATAN', ':  $namaKegiatan'),
                 _buildDocMetaRow('PENYEDIA JASA', ':  $kontraktor'),
-                _buildDocMetaRow('KONSULTAN PENGAWAS', ':  CV. Tata Saka Consultant'),
+                _buildDocMetaRow('KONSULTAN PENGAWAS', ':  ${konsultan.isNotEmpty ? konsultan : '-'}'),
                 pw.SizedBox(height: 8),
                 _buildPdfDocTable(
                   colWidths: const {
@@ -1059,7 +1061,7 @@ class PdfReportService {
                 pw.SizedBox(height: 10),
                 _buildDocMetaRow('KEGIATAN', ':  $namaKegiatan'),
                 _buildDocMetaRow('PENYEDIA JASA', ':  $kontraktor'),
-                _buildDocMetaRow('KONSULTAN PENGAWAS', ':  CV. Tata Saka Consultant'),
+                _buildDocMetaRow('KONSULTAN PENGAWAS', ':  ${konsultan.isNotEmpty ? konsultan : '-'}'),
                 pw.SizedBox(height: 8),
                 _buildPdfDocTable(
                   colWidths: const {
@@ -1290,7 +1292,7 @@ class PdfReportService {
                 pw.SizedBox(height: 10),
                 _buildDocMetaRow('KEGIATAN', ':  $namaKegiatan'),
                 _buildDocMetaRow('PENYEDIA JASA', ':  $kontraktor'),
-                _buildDocMetaRow('KONSULTAN PENGAWAS', ':  CV. Tata Saka Consultant'),
+                _buildDocMetaRow('KONSULTAN PENGAWAS', ':  ${konsultan.isNotEmpty ? konsultan : '-'}'),
                 pw.SizedBox(height: 8),
                 _buildPdfDocTable(
                   colWidths: const {
@@ -1375,14 +1377,14 @@ class PdfReportService {
         },
         {
           'peran': 'Konsultan Supervisi',
-          'instansi': 'CV. TATA SAKA CONSULTANT',
+          'instansi': (kegiatan['konsultanPengawas'] ?? '').toString(),
           'nama': report.ttdKonsultanNama ?? '',
           'tanggal': report.ttdKonsultanTanggal ?? '',
           'bytes': konsultanSig,
         },
         {
           'peran': 'Pejabat Pembuat Komitmen (PPK)',
-          'instansi': 'DPU-PR Kab. Purbalingga',
+          'instansi': contract.instansiDinas.isNotEmpty ? contract.instansiDinas.first : '',
           'nama': report.ttdPpkNama ?? '',
           'tanggal': report.ttdPpkTanggal ?? report.periodeAkhir,
           'bytes': ppkSig,
@@ -1573,9 +1575,9 @@ class PdfReportService {
       'pekerjaan': report.pekerjaan.isNotEmpty ? report.pekerjaan : (kegiatan['namaKegiatan'] ?? '-'),
       'lokasi': report.lokasiProyek.isNotEmpty ? report.lokasiProyek : (kegiatan['lokasi'] ?? 'Kab. Purbalingga'),
       'sumberDana': (kegiatan['sumberDana'] ?? contract.sumberDana).toString(),
-      'kontraktor': report.kontraktor.isNotEmpty ? report.kontraktor : (kegiatan['kontraktor'] ?? 'CV. DIVAN INSAN CEMERLANG'),
+      'kontraktor': report.kontraktor.isNotEmpty ? report.kontraktor : (kegiatan['kontraktor'] ?? '-'),
       'noKontrak': report.nomorKontrak.isNotEmpty ? report.nomorKontrak : (kegiatan['noSuratPesanan'] ?? kegiatan['noSpmkKontraktor'] ?? '-'),
-      'pengawas': (kegiatan['konsultanPengawas'] ?? 'CV. TATA SAKA CONSULTANT').toString(),
+      'pengawas': (kegiatan['konsultanPengawas'] ?? '-').toString(),
       'noKontrakPengawasan': (kegiatan['noSpkKonsultan'] ?? kegiatan['noSpmkKonsultan'] ?? '-').toString(),
     };
 
@@ -1612,14 +1614,14 @@ class PdfReportService {
         },
         {
           'peran': 'Konsultan Supervisi',
-          'instansi': (kegiatan['konsultanPengawas'] ?? 'CV. TATA SAKA CONSULTANT').toString(),
+          'instansi': (kegiatan['konsultanPengawas'] ?? '').toString(),
           'nama': report.ttdKonsultanNama ?? '',
           'tanggal': report.ttdKonsultanTanggal ?? '',
           'bytes': konsultanSig,
         },
         {
           'peran': 'Pejabat Pembuat Komitmen (PPK)',
-          'instansi': 'DPU-PR Kab. Purbalingga',
+          'instansi': contract.instansiDinas.isNotEmpty ? contract.instansiDinas.first : '',
           'nama': report.ttdPpkNama ?? '',
           'tanggal': report.ttdPpkTanggal ?? report.periodeAkhir,
           'bytes': ppkSig,
@@ -1627,109 +1629,18 @@ class PdfReportService {
       ]);
     }
 
-    List<Map<String, dynamic>> divisiList = [];
-    if (report.boqProgressList != null && report.boqProgressList!.isNotEmpty) {
-      divisiList = report.boqProgressList!;
-    } else {
-      List rawRkk = [];
-      final adds = (kegiatan['addendums'] as List?) ?? [];
-      if (adds.isNotEmpty) {
-        final latest = adds.last;
-        final divList = (latest['rkkDivisiList'] as List?);
-        if (divList != null && divList.isNotEmpty) {
-          rawRkk = divList;
-        }
-      }
-      if (rawRkk.isEmpty) {
-        rawRkk = (kegiatan['rkkDivisiList'] as List?) ?? [];
-      }
-
-      final dailyReports = (kegiatan['laporans'] as List?) ?? [];
-      final startDt = WeeklyReportModel.parseIndonesianDate(report.periodeAwal);
-      final endDt = WeeklyReportModel.parseIndonesianDate(report.periodeAkhir);
-
-      for (final rawDiv in rawRkk) {
-        final div = Map<String, dynamic>.from(rawDiv);
-        final rawItems = (div['items'] as List? ?? []);
-        final List<Map<String, dynamic>> computedItems = [];
-
-        for (final rawIt in rawItems) {
-          final it = Map<String, dynamic>.from(rawIt);
-          final noMata = (it['noMataPembayaran'] ?? '').toString();
-          final volKontrak = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
-          final bbtKontrak = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
-
-          double volMingguIni = 0.0;
-          double volMingguLalu = 0.0;
-
-          for (final rep in dailyReports) {
-            if (rep is Map) {
-              DateTime? repDate;
-              final repTglStr = rep['tanggal']?.toString() ?? '';
-              if (repTglStr.isNotEmpty) {
-                repDate = WeeklyReportModel.parseIndonesianDate(repTglStr) ?? DateTime.tryParse(repTglStr);
-              }
-
-              bool isMingguIni = false;
-              bool isMingguLalu = false;
-
-              if (startDt != null && endDt != null && repDate != null) {
-                final repDayOnly = DateTime(repDate.year, repDate.month, repDate.day);
-                final startDayOnly = DateTime(startDt.year, startDt.month, startDt.day);
-                final endDayOnly = DateTime(endDt.year, endDt.month, endDt.day);
-
-                if (repDayOnly.isBefore(startDayOnly)) {
-                  isMingguLalu = true;
-                } else if (!repDayOnly.isAfter(endDayOnly)) {
-                  isMingguIni = true;
-                }
-              } else {
-                isMingguIni = true;
-              }
-
-              final pList = (rep['pekerjaanList'] as List?) ?? [];
-              for (final p in pList) {
-                if (p is Map) {
-                  final matchNoMata = p['noMataPembayaran']?.toString().trim() == noMata.trim() && noMata.isNotEmpty;
-                  final matchUraian = p['jenis']?.toString().trim().toLowerCase() == it['uraian']?.toString().trim().toLowerCase() ||
-                      p['uraian']?.toString().trim().toLowerCase() == it['uraian']?.toString().trim().toLowerCase();
-                  if (matchNoMata || matchUraian) {
-                    final vStr = (p['volume'] ?? '').toString();
-                    final vNum = double.tryParse(vStr.split(' ').first.replaceAll(',', '.')) ?? 0.0;
-                    if (isMingguIni) {
-                      volMingguIni += vNum;
-                    } else if (isMingguLalu) {
-                      volMingguLalu += vNum;
-                    }
-                  }
-                }
-              }
-            }
-          }
-
-          final bbtMingguLalu = volKontrak > 0 ? (volMingguLalu / volKontrak) * bbtKontrak : 0.0;
-          final bbtMingguIni = volKontrak > 0 ? (volMingguIni / volKontrak) * bbtKontrak : 0.0;
-          final volSdMingguIni = volMingguLalu + volMingguIni;
-          final bbtSdMingguIni = bbtMingguLalu + bbtMingguIni;
-          final volSisa = (volKontrak - volSdMingguIni).clamp(0.0, volKontrak);
-          final bbtSisa = (bbtKontrak - bbtSdMingguIni).clamp(0.0, bbtKontrak);
-
-          it['mingguLaluVolume'] = volMingguLalu;
-          it['mingguLaluBobot'] = bbtMingguLalu;
-          it['mingguIniVolume'] = volMingguIni;
-          it['mingguIniBobot'] = bbtMingguIni;
-          it['sdMingguIniVolume'] = volSdMingguIni;
-          it['sdMingguIniBobot'] = bbtSdMingguIni;
-          it['sisaVolume'] = volSisa;
-          it['sisaBobot'] = bbtSisa;
-
-          computedItems.add(it);
-        }
-
-        div['items'] = computedItems;
-        divisiList.add(div);
-      }
-    }
+    final startDt = WeeklyReportModel.parseIndonesianDate(report.periodeAwal);
+    final endDt = WeeklyReportModel.parseIndonesianDate(report.periodeAkhir);
+    final period = ExecutionPeriodHelper.resolveExecutionPeriod(kegiatan, contract: contract);
+    final boqRes = ProgressCalculator.calculateBoqProgress(
+      kegMap: kegiatan,
+      startDt: startDt,
+      endDt: endDt,
+      minStartDt: period.startDate,
+    );
+    List<Map<String, dynamic>> divisiList = boqRes.divisiList.isNotEmpty
+        ? boqRes.divisiList
+        : (report.boqProgressList ?? []);
 
     // Totals
     double totalNilaiBobot = 0.0;
@@ -2014,14 +1925,14 @@ class PdfReportService {
         },
         {
           'peran': 'Konsultan Supervisi',
-          'instansi': 'CV. TATA SAKA CONSULTANT',
+          'instansi': report.konsultanPengawas,
           'nama': report.ttdKonsultanNama ?? '',
           'tanggal': report.ttdKonsultanTanggal ?? dateStr,
           'bytes': konsultanSig,
         },
         {
           'peran': 'Pejabat Pembuat Komitmen (PPK)',
-          'instansi': 'DPU-PR Kab. Purbalingga',
+          'instansi': contract.instansiDinas.isNotEmpty ? contract.instansiDinas.first : '',
           'nama': report.ttdPpkNama ?? '',
           'tanggal': report.ttdPpkTanggal ?? dateStr,
           'bytes': ppkSig,
@@ -2301,7 +2212,7 @@ class PdfReportService {
                     children: [
                       _buildMetaRowSimplePdf('Pelaksana Kontraktor', kegiatan.kontraktor.isNotEmpty ? kegiatan.kontraktor : '-'),
                       _buildMetaRowSimplePdf('No Kontrak', kegiatan.suratPesananFull.isNotEmpty ? kegiatan.suratPesananFull : '-'),
-                      _buildMetaRowSimplePdf('Pengawas', kegiatan.konsultanPengawas.isNotEmpty ? kegiatan.konsultanPengawas : 'CV. TATA SAKA CONSULTANT'),
+                      _buildMetaRowSimplePdf('Pengawas', kegiatan.konsultanPengawas.isNotEmpty ? kegiatan.konsultanPengawas : '-'),
                       _buildMetaRowSimplePdf('No Kontrak Pengawasan', kegiatan.spkKonsultanFull.isNotEmpty ? kegiatan.spkKonsultanFull : '-'),
                     ],
                   ),
@@ -2512,14 +2423,22 @@ class PdfReportService {
                     padding: const pw.EdgeInsets.only(left: 40),
                     child: pw.Column(
                       children: [
-                        pw.Text('Kepala DPU-PR Kabupaten Purbalingga', style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold)),
+                        pw.Text(
+                          contract.instansiDinas.isNotEmpty
+                              ? 'Kepala ${contract.instansiDinas.first}'
+                              : 'Pejabat Penandatanganan Kontrak',
+                          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                        ),
                         pw.Text('Selaku Pejabat Penandatanganan Kontrak', style: const pw.TextStyle(fontSize: 8)),
                         pw.SizedBox(height: 40),
                         pw.Text(
-                          kegiatan.penggunaAnggaran.isNotEmpty ? kegiatan.penggunaAnggaran : 'DRAJAT UJI WAKHYONO, S.T., M.T',
+                          kegiatan.penggunaAnggaran.isNotEmpty ? kegiatan.penggunaAnggaran : '( .................................... )',
                           style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, decoration: pw.TextDecoration.underline),
                         ),
-                        pw.Text('NIP. 19711111 199803 1 008', style: const pw.TextStyle(fontSize: 7.5)),
+                        if (kegiatan.penggunaAnggaran.isNotEmpty)
+                          pw.Text('NIP. -', style: const pw.TextStyle(fontSize: 7.5))
+                        else
+                          pw.SizedBox(height: 9),
                       ],
                     ),
                   ),
@@ -2529,12 +2448,12 @@ class PdfReportService {
                       children: [
                         pw.Text('Kontraktor Pelaksana', style: const pw.TextStyle(fontSize: 8.5)),
                         pw.Text(
-                          kegiatan.kontraktor.isNotEmpty ? kegiatan.kontraktor : 'CV. DIVAN INSAN CEMERLANG',
+                          kegiatan.kontraktor.isNotEmpty ? kegiatan.kontraktor : '',
                           style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
                         ),
                         pw.SizedBox(height: 40),
                         pw.Text(
-                          kegiatan.direkturPenyedia.isNotEmpty ? kegiatan.direkturPenyedia : 'NURKHOLIS WIDIANTO',
+                          kegiatan.direkturPenyedia.isNotEmpty ? kegiatan.direkturPenyedia : '( .................................... )',
                           style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, decoration: pw.TextDecoration.underline),
                         ),
                         pw.Text('Direktur', style: const pw.TextStyle(fontSize: 7.5)),

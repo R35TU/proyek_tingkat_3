@@ -1,3 +1,28 @@
+import 'package:tata_saka_app/models/weekly_report_model.dart';
+
+/// Hasil agregasi rekapitulasi BOQ (14 kolom) berbasis laporan harian.
+class BoqAggregationResult {
+  final List<Map<String, dynamic>> divisions;
+  final double totalBobotKontrak;
+  final double totalBobotPeriodeLalu;
+  final double totalBobotPeriodeIni;
+  final double totalBobotSdPeriodeIni;
+  final double totalBobotSisa;
+
+  BoqAggregationResult({
+    required this.divisions,
+    required this.totalBobotKontrak,
+    required this.totalBobotPeriodeLalu,
+    required this.totalBobotPeriodeIni,
+    required this.totalBobotSdPeriodeIni,
+    required this.totalBobotSisa,
+  });
+
+  List<Map<String, dynamic>> get divisiList => divisions;
+  double get totalBobotIni => totalBobotPeriodeIni;
+  double get totalBobotSdIni => totalBobotSdPeriodeIni;
+}
+
 /// Utility terpusat untuk audit dan perhitungan persentase progres fisik proyek.
 ///
 /// Memastikan rumus dan sumber data antara:
@@ -146,5 +171,184 @@ class ProgressCalculator {
   }) {
     final pct = calculateContractProgressPercent(kegiatans, fallbackProgress: fallbackProgress);
     return (pct / 100.0).clamp(0.0, 1.0);
+  }
+
+  /// Menghitung rekapitulasi BOQ (14 kolom) secara terpusat untuk periode tertentu (mingguan atau bulanan).
+  ///
+  /// Menghitung:
+  /// - Volume & Bobot Kontrak (dari RAB aktif)
+  /// - Volume & Bobot Periode Lalu (laporan harian sebelum startDt)
+  /// - Volume & Bobot Periode Berjalan (laporan harian dalam [startDt, endDt])
+  /// - Volume & Bobot s/d Periode Berjalan (lalu + berjalan)
+  /// - Sisa Volume & Sisa Bobot (kontrak - s/d berjalan)
+  static BoqAggregationResult calculateBoqProgress({
+    required Map<String, dynamic> kegMap,
+    required DateTime? startDt,
+    required DateTime? endDt,
+    DateTime? minStartDt,
+  }) {
+    final rawRkk = getActiveRkk(kegMap);
+    final dailyReports = (kegMap['laporans'] as List?) ?? [];
+
+    double totalBobotKontrak = 0.0;
+    double totalBobotPeriodeLalu = 0.0;
+    double totalBobotPeriodeIni = 0.0;
+    double totalBobotSdPeriodeIni = 0.0;
+    double totalBobotSisa = 0.0;
+
+    final startDayOnly = startDt != null
+        ? DateTime(startDt.year, startDt.month, startDt.day)
+        : null;
+    final endDayOnly = endDt != null
+        ? DateTime(endDt.year, endDt.month, endDt.day)
+        : null;
+    final minStartDayOnly = minStartDt != null
+        ? DateTime(minStartDt.year, minStartDt.month, minStartDt.day)
+        : null;
+
+    final List<Map<String, dynamic>> computedDivisions = [];
+
+    for (final rawDiv in rawRkk) {
+      final div = Map<String, dynamic>.from(rawDiv);
+      final rawItems = (div['items'] as List?) ?? [];
+      final romawi = (div['nomorRomawi'] ?? div['romawi'] ?? 'I').toString();
+      final List<Map<String, dynamic>> computedItems = [];
+
+      for (final rawIt in rawItems) {
+        if (rawIt is! Map) continue;
+        final it = Map<String, dynamic>.from(rawIt);
+        final noMata = (it['noMataPembayaran'] ?? '').toString().trim();
+        final uraian = (it['uraian'] ?? it['jenisPekerjaan'] ?? '').toString().trim().toLowerCase();
+        final rkkId = '${romawi}_${it['uraian']}';
+        final itId = (it['id'] ?? '').toString().trim();
+        final volKontrak = (it['volumeCCO'] ?? it['volume'] as num?)?.toDouble() ?? 0.0;
+        final bbtKontrak = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
+
+        double volLalu = 0.0;
+        double volIni = 0.0;
+
+        for (final rep in dailyReports) {
+          if (rep is! Map) continue;
+          DateTime? repDate;
+          final repTglStr = rep['tanggal']?.toString() ?? '';
+          if (repTglStr.isNotEmpty) {
+            repDate = DateTime.tryParse(repTglStr) ??
+                WeeklyReportModel.parseIndonesianDate(repTglStr);
+          }
+          if (repDate == null) {
+            final fStr = rep['tanggalFormatted']?.toString() ?? '';
+            if (fStr.isNotEmpty) {
+              repDate = WeeklyReportModel.parseIndonesianDate(fStr);
+            }
+          }
+          if (repDate == null) {
+            final cStr = rep['createdAt']?.toString() ?? '';
+            if (cStr.isNotEmpty) {
+              repDate = DateTime.tryParse(cStr) ??
+                  WeeklyReportModel.parseIndonesianDate(cStr);
+            }
+          }
+
+          bool isLalu = false;
+          bool isIni = false;
+
+          if (repDate != null) {
+            final repDay = DateTime(repDate.year, repDate.month, repDate.day);
+            // Abaikan laporan historis yang tanggalnya berada sebelum tanggal mulai pelaksanaan aktif
+            // agar tidak bocor sebagai 'Periode Lalu' saat tanggal kontrak/kegiatan dimajukan.
+            if (minStartDayOnly != null && repDay.isBefore(minStartDayOnly)) {
+              continue;
+            }
+            if (startDayOnly != null && endDayOnly != null) {
+              if (repDay.isBefore(startDayOnly)) {
+                isLalu = true;
+              } else if (!repDay.isAfter(endDayOnly)) {
+                isIni = true;
+              }
+            } else if (endDayOnly != null) {
+              if (!repDay.isAfter(endDayOnly)) {
+                isIni = true;
+              }
+            } else {
+              isIni = true;
+            }
+          } else if (startDayOnly == null && endDayOnly == null) {
+            isIni = true;
+          }
+
+          final pList = (rep['pekerjaanList'] as List?) ?? [];
+          for (final p in pList) {
+            if (p is! Map) continue;
+            final pId = (p['rkkItemId'] ?? '').toString().trim();
+            final pNoMata = (p['noMataPembayaran'] ?? '').toString().trim();
+            final pUraian = (p['uraian'] ?? p['jenis'] ?? p['jenisPekerjaan'])
+                    ?.toString()
+                    .trim()
+                    .toLowerCase() ??
+                '';
+
+            final matchId = pId.isNotEmpty && (pId == rkkId || (itId.isNotEmpty && pId == itId));
+            final matchNoMata = noMata.isNotEmpty && pNoMata.isNotEmpty && noMata == pNoMata;
+            final matchUraian = uraian.isNotEmpty &&
+                pUraian.isNotEmpty &&
+                (pUraian == uraian || uraian.contains(pUraian) || pUraian.contains(uraian));
+
+            if (matchId || matchNoMata || matchUraian) {
+              final vStr = (p['volume'] ?? '').toString();
+              final vNum = double.tryParse(vStr.split(' ').first.replaceAll(',', '.')) ?? 0.0;
+              if (isIni) {
+                volIni += vNum;
+              } else if (isLalu) {
+                volLalu += vNum;
+              }
+            }
+          }
+        }
+
+        final volSdIni = volLalu + volIni;
+        final bbtLalu = volKontrak > 0 ? (volLalu / volKontrak) * bbtKontrak : 0.0;
+        final bbtIni = volKontrak > 0 ? (volIni / volKontrak) * bbtKontrak : 0.0;
+        final bbtSdIni = bbtLalu + bbtIni;
+        final volSisa = (volKontrak - volSdIni).clamp(0.0, volKontrak);
+        final bbtSisa = (bbtKontrak - bbtSdIni).clamp(0.0, bbtKontrak);
+
+        it['mingguLaluVolume'] = volLalu;
+        it['mingguLaluBobot'] = bbtLalu;
+        it['mingguIniVolume'] = volIni;
+        it['mingguIniBobot'] = bbtIni;
+        it['sdMingguIniVolume'] = volSdIni;
+        it['sdMingguIniBobot'] = bbtSdIni;
+        it['sisaVolume'] = volSisa;
+        it['sisaBobot'] = bbtSisa;
+
+        // Kompatibilitas bulanan
+        it['bulanLaluVolume'] = volLalu;
+        it['bulanLaluBobot'] = bbtLalu;
+        it['bulanIniVolume'] = volIni;
+        it['bulanIniBobot'] = bbtIni;
+        it['sdBulanIniVolume'] = volSdIni;
+        it['sdBulanIniBobot'] = bbtSdIni;
+
+        computedItems.add(it);
+
+        totalBobotKontrak += bbtKontrak;
+        totalBobotPeriodeLalu += bbtLalu;
+        totalBobotPeriodeIni += bbtIni;
+        totalBobotSdPeriodeIni += bbtSdIni;
+        totalBobotSisa += bbtSisa;
+      }
+
+      div['items'] = computedItems;
+      computedDivisions.add(div);
+    }
+
+    return BoqAggregationResult(
+      divisions: computedDivisions,
+      totalBobotKontrak: totalBobotKontrak,
+      totalBobotPeriodeLalu: totalBobotPeriodeLalu,
+      totalBobotPeriodeIni: totalBobotPeriodeIni,
+      totalBobotSdPeriodeIni: totalBobotSdPeriodeIni,
+      totalBobotSisa: totalBobotSisa,
+    );
   }
 }

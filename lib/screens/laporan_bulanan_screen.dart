@@ -228,72 +228,85 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
                   border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          const Icon(Icons.calendar_month, color: AppColors.primaryBlue, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Lembar Laporan Bulanan (Bulan ${report.bulanRomawi})',
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textDark,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const Icon(Icons.calendar_month, color: AppColors.primaryBlue, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Lembar Laporan Bulanan (Bulan ${report.bulanRomawi})',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textDark,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: AppColors.textDark),
+                          onPressed: () => Navigator.pop(ctx),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _openTandaTanganBulananModal(context, report);
+                            },
+                            icon: const Icon(Icons.draw_outlined, size: 14, color: AppColors.primaryBlue),
+                            label: const Text('Tanda Tangan', style: TextStyle(fontSize: 12, color: AppColors.primaryBlue)),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: AppColors.primaryBlue),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => PdfViewerScreen(
+                                    title: 'Laporan Bulanan - Bulan ${report.bulanRomawi}',
+                                    fileName: 'Laporan_Bulanan_Bulan_${report.bulanRomawi}.pdf',
+                                    pageFormat: PdfPageFormat.a4.landscape,
+                                    buildPdf: () => PdfReportService.generateLaporanBulananPdf(
+                                      report: report,
+                                      contract: _selectedContract!,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.picture_as_pdf, size: 14, color: Colors.white),
+                            label: const Text('Export PDF', style: TextStyle(fontSize: 12, color: Colors.white)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryBlue,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        _openTandaTanganBulananModal(context, report);
-                      },
-                      icon: const Icon(Icons.draw_outlined, size: 14, color: AppColors.primaryBlue),
-                      label: const Text('Tanda Tangan', style: TextStyle(fontSize: 12, color: AppColors.primaryBlue)),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.primaryBlue),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PdfViewerScreen(
-                              title: 'Laporan Bulanan - Bulan ${report.bulanRomawi}',
-                              fileName: 'Laporan_Bulanan_Bulan_${report.bulanRomawi}.pdf',
-                              pageFormat: PdfPageFormat.a4.landscape,
-                              buildPdf: () => PdfReportService.generateLaporanBulananPdf(
-                                report: report,
-                                contract: _selectedContract!,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.picture_as_pdf, size: 14, color: Colors.white),
-                      label: const Text('Export PDF', style: TextStyle(fontSize: 12, color: Colors.white)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryBlue,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: AppColors.textDark),
-                      onPressed: () => Navigator.pop(ctx),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
                     ),
                   ],
                 ),
@@ -375,16 +388,19 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
       items.add(
         _TtdBulananDraftItem(
           peran: 'Konsultan Supervisi',
-          instansi: 'CV. TATA SAKA CONSULTANT',
+          instansi: report.konsultanPengawas,
           nama: report.ttdKonsultanNama ?? '',
           tanggal: report.ttdKonsultanTanggal ?? dateStr,
           signatureBase64: report.ttdKonsultanSignature,
         ),
       );
+      final dinasDefault = _selectedContract!.instansiDinas.isNotEmpty
+          ? _selectedContract!.instansiDinas.first
+          : '';
       items.add(
         _TtdBulananDraftItem(
           peran: 'Pejabat Pembuat Komitmen (PPK)',
-          instansi: 'DPU-PR Kab. Purbalingga',
+          instansi: dinasDefault,
           nama: report.ttdPpkNama ?? '',
           tanggal: report.ttdPpkTanggal ?? dateStr,
           signatureBase64: report.ttdPpkSignature,
@@ -688,17 +704,25 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
     );
   }
 
+  UserProfileProvider? _tryReadUserProfile(BuildContext context) {
+    try {
+      return Provider.of<UserProfileProvider>(context, listen: false);
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final contractProvider = Provider.of<ContractProvider>(context);
-    final userProf = Provider.of<UserProfileProvider>(context, listen: false);
+    final activeUserProf = _tryReadUserProfile(context);
     List<ContractModel> contracts = contractProvider.contracts;
-    if (userProf.isDinas) {
+    if (activeUserProf != null && activeUserProf.isDinas) {
       contracts = contracts.where((c) {
         return c.isOwnedByDinas(
-          dinasUserUid: userProf.uid,
-          companyOrAgency: userProf.companyOrAgency,
-          userFullName: userProf.namaLengkap,
+          dinasUserUid: activeUserProf.uid,
+          companyOrAgency: activeUserProf.companyOrAgency,
+          userFullName: activeUserProf.namaLengkap,
         );
       }).toList();
     }
@@ -729,15 +753,27 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
       );
     }
 
-    // Utamakan kontrak yang memiliki kegiatan
-    if (_selectedContract == null ||
-        !contracts.any((c) => c.id == _selectedContract!.id) ||
-        _selectedContract!.kegiatans.isEmpty) {
+    // Selalu sinkronkan dengan instansi kontrak terbaru dari ContractProvider,
+    // serta utamakan kontrak yang memiliki kegiatan bila belum dipilih/kosong.
+    if (_selectedContract != null &&
+        contracts.any((c) => c.id == _selectedContract!.id)) {
+      _selectedContract = contracts.firstWhere(
+        (c) => c.id == _selectedContract!.id,
+      );
+    } else {
       _selectedContract = contracts.firstWhere(
         (c) => c.kegiatans.isNotEmpty,
         orElse: () => contracts.first,
       );
       _selectedKegiatanIndex = 0;
+    }
+
+    if (_selectedContract!.kegiatans.isEmpty) {
+      final nonEmptyContracts = contracts.where((c) => c.kegiatans.isNotEmpty);
+      if (nonEmptyContracts.isNotEmpty) {
+        _selectedContract = nonEmptyContracts.first;
+        _selectedKegiatanIndex = 0;
+      }
     }
 
     if (_selectedContract!.kegiatans.isEmpty) {
@@ -1013,7 +1049,7 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
                     const Text('Pelaksana Kontraktor', style: TextStyle(fontSize: 11, color: AppColors.textLight)),
                     const SizedBox(height: 2),
                     Text(
-                      kegModel.kontraktor.isNotEmpty ? kegModel.kontraktor : 'CV. DIVAN INSAN CEMERLANG',
+                      kegModel.kontraktor.isNotEmpty ? kegModel.kontraktor : '-',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textDark),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1066,7 +1102,7 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
       statusIcon = Icons.hourglass_empty;
     }
 
-    final hasData = report.status != 'Belum Ada Data';
+    final hasData = report.status != 'Belum Ada Data' || report.totalBobotBulanIni > 0;
 
     return Container(
       decoration: BoxDecoration(
@@ -1232,10 +1268,10 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
                       ),
                       const SizedBox(width: 8),
                       // Role Dinas: tidak dapat menandatangani laporan.
-                      if (Provider.of<UserProfileProvider>(context, listen: false).isDinas)
+                      if (_tryReadUserProfile(context)?.isDinas ?? false)
                         const SizedBox.shrink()
                       else
-                      OutlinedButton.icon(
+                        OutlinedButton.icon(
                         onPressed: () => _openTandaTanganBulananModal(context, report),
                         icon: const Icon(Icons.draw_outlined, size: 13, color: AppColors.primaryBlue),
                         label: const Text('Tanda Tangan', style: TextStyle(fontSize: 11, color: AppColors.primaryBlue)),

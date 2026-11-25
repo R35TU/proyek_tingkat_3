@@ -130,6 +130,40 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
   late TabController _tabController;
   List<_FolderData> _folders = [];
   List<_KegiatanData> _kegiatans = [];
+  ContractModel? _syncedContractRef;
+
+  ContractModel? _resolveLiveContract({bool listen = false}) {
+    final fallback = _contract ?? widget.contract;
+    final targetId = fallback?.id ?? widget.contractId;
+    if (targetId == null) return fallback;
+    try {
+      final prov = Provider.of<ContractProvider>(context, listen: listen);
+      return prov.contracts.cast<ContractModel?>().firstWhere(
+            (c) => c != null && c.id == targetId,
+            orElse: () => fallback,
+          );
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  void _reloadFromContract(ContractModel c) {
+    _contract = c;
+    _syncedContractRef = c;
+    _folders = c.folders.map((f) {
+      return _FolderData(
+        name: f['name'] ?? '',
+        isExpanded: f['isExpanded'] ?? false,
+        documents: (f['documents'] as List<dynamic>?)?.map((d) {
+          return _DocumentData.fromJson(Map<String, dynamic>.from(d));
+        }).toList() ?? [],
+      );
+    }).toList();
+
+    _kegiatans = c.kegiatans.map((k) {
+      return _KegiatanData(data: Map<String, dynamic>.from(k));
+    }).toList();
+  }
 
   @override
   void initState() {
@@ -137,7 +171,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
 
     if (widget.contract != null) {
       _contract = widget.contract;
-      _initContractData();
+      _reloadFromContract(_resolveLiveContract(listen: false) ?? widget.contract!);
     }
 
     final initTab = (widget.initialTabIndex >= 0 && widget.initialTabIndex < 2)
@@ -158,23 +192,6 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
     }
   }
 
-  void _initContractData() {
-    final c = contract;
-    _folders = c.folders.map((f) {
-      return _FolderData(
-        name: f['name'] ?? '',
-        isExpanded: f['isExpanded'] ?? false,
-        documents: (f['documents'] as List<dynamic>?)?.map((d) {
-          return _DocumentData.fromJson(Map<String, dynamic>.from(d));
-        }).toList() ?? [],
-      );
-    }).toList();
-
-    _kegiatans = c.kegiatans.map((k) {
-      return _KegiatanData(data: Map<String, dynamic>.from(k));
-    }).toList();
-  }
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -186,8 +203,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
           );
       if (found != null) {
         setState(() {
-          _contract = found;
-          _initContractData();
+          _reloadFromContract(found);
         });
         if (kIsWeb) {
           replaceWebUrl('/#/detail-kontrak?id=${_contract!.id}&tab=${_tabController.index}');
@@ -203,16 +219,18 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
   }
 
   void _saveToProvider() {
-    final c = contract;
-    c.folders = _folders.map((f) => {
+    final live = _resolveLiveContract(listen: false) ?? contract;
+    live.folders = _folders.map((f) => {
       'name': f.name,
       'isExpanded': f.isExpanded,
       'documents': f.documents.map((d) => d.toJson()).toList(),
     }).toList();
 
-    c.kegiatans = _kegiatans.map((k) => Map<String, dynamic>.from(k.data)).toList();
+    live.kegiatans = _kegiatans.map((k) => Map<String, dynamic>.from(k.data)).toList();
+    _contract = live;
+    _syncedContractRef = live;
 
-    Provider.of<ContractProvider>(context, listen: false).updateContract(c);
+    Provider.of<ContractProvider>(context, listen: false).updateContract(live);
   }
 
   @override
@@ -1040,10 +1058,11 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
   }
 
   Future<void> _addKegiatan() async {
+    final live = _resolveLiveContract(listen: false) ?? contract;
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
-        builder: (context) => FormKegiatanScreen(contract: contract),
+        builder: (context) => FormKegiatanScreen(contract: live),
       ),
     );
 
@@ -1076,12 +1095,13 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
   }
 
   Future<void> _editKegiatan(int index) async {
+    final live = _resolveLiveContract(listen: false) ?? contract;
     final current = _kegiatans[index];
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
         builder: (context) => FormKegiatanScreen(
-          contract: contract,
+          contract: live,
           initialKegiatan: current.data,
           kegiatanIndex: index,
         ),
@@ -1328,14 +1348,17 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           onSelected: (value) async {
             if (value == 'edit') {
+              final live = _resolveLiveContract(listen: false) ?? contract;
               final updated = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => TambahKontrakScreen(contractToEdit: contract),
+                  builder: (context) => TambahKontrakScreen(contractToEdit: live),
                 ),
               );
               if (updated == true && mounted) {
-                setState(() {});
+                setState(() {
+                  _reloadFromContract(_resolveLiveContract(listen: false) ?? contract);
+                });
               }
             } else if (value == 'delete') {
               _confirmDeleteContract();
@@ -1504,12 +1527,10 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
       userProf = null;
     }
     final isKonsultan = userProf?.isKonsultan ?? true;
-    final provider = Provider.of<ContractProvider>(context);
-    final fallbackContract = this.contract;
-    final contract = provider.contracts.cast<ContractModel?>().firstWhere(
-      (c) => c != null && c.id == fallbackContract.id,
-      orElse: () => fallbackContract,
-    )!;
+    final contract = _resolveLiveContract(listen: true) ?? this.contract;
+    if (!identical(contract, _syncedContractRef)) {
+      _reloadFromContract(contract);
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
@@ -1821,23 +1842,22 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () async {
+            final live = _resolveLiveContract(listen: false) ?? contract;
             await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => DetailKegiatanScreen(
-                  contract: contract,
+                  contract: live,
                   kegiatanIndex: index,
                 ),
               ),
             );
             // Refresh on return in case they edited anything inside
-            setState(() {
-              if (index < contract.kegiatans.length) {
-                _kegiatans[index] = _KegiatanData(
-                  data: Map<String, dynamic>.from(contract.kegiatans[index]),
-                );
-              }
-            });
+            if (mounted) {
+              setState(() {
+                _reloadFromContract(_resolveLiveContract(listen: false) ?? contract);
+              });
+            }
           },
           onLongPress: isKonsultan ? () => _showKegiatanOptions(index) : null,
           child: Padding(

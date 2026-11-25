@@ -4,7 +4,7 @@ import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/screens/data_laporan_screen.dart';
 import 'package:tata_saka_app/screens/buat_laporan_screen.dart';
-import 'package:tata_saka_app/screens/buat_laporan_mingguan_screen.dart';
+import 'package:tata_saka_app/screens/laporan_mingguan_screen.dart';
 import 'package:tata_saka_app/screens/laporan_bulanan_screen.dart';
 import 'package:tata_saka_app/screens/dashboard_screen.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
@@ -60,9 +60,9 @@ class LaporanScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _buildMenuCard(
-            title: 'Buat Laporan Mingguan',
+            title: 'Laporan Mingguan',
             description:
-                'Ringkasan Kegiatan Mingguan (bobot rencana,\nrealisasi fisik, deviasi, & tabel mingguan)',
+                'Daftar Periode Mingguan (status berjalan, realisasi\nharian otomatis, bobot BoQ 14 kolom & tanda tangan)',
             icon: Icons.analytics_outlined,
             iconBgColor: const Color(0xFFFEF3C7),
             iconColor: const Color(0xFFD97706),
@@ -70,7 +70,7 @@ class LaporanScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const BuatLaporanMingguanScreen(),
+                  builder: (context) => const LaporanMingguanScreen(),
                 ),
               );
             },

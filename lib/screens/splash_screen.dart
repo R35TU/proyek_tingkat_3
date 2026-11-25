@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -18,13 +20,15 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  Timer? _navTimer;
+
   @override
   void initState() {
     super.initState();
     // Di web, rute '/' langsung di-render deklaratif oleh build()
     if (kIsWeb) return;
 
-    Future.delayed(const Duration(seconds: 2), () {
+    _navTimer = Timer(const Duration(seconds: 2), () {
       if (!mounted) return;
       if (ModalRoute.of(context)?.isCurrent != true) return;
       final userProf = context.read<UserProfileProvider>();
@@ -39,6 +43,13 @@ class _SplashScreenState extends State<SplashScreen> {
       }
       Navigator.pushNamedAndRemoveUntil(context, '/landing', (route) => false);
     });
+  }
+
+  @override
+  void dispose() {
+    _navTimer?.cancel();
+    _navTimer = null;
+    super.dispose();
   }
 
   Widget _buildSplashBody() {

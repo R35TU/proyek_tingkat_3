@@ -88,7 +88,7 @@ void main() {
 
       // Assert persistent WebDashboardLayout and WebSidebar are present
       expect(find.byType(WebDashboardLayout), findsOneWidget);
-      expect(find.text('CV. TATA SAKA'), findsOneWidget);
+      expect(find.text('CV. TATA SAKA CONSULTANT'), findsOneWidget);
       expect(find.byType(VerticalDivider), findsOneWidget);
 
       // Assert Back Button is rendered in Web Heading
@@ -112,7 +112,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(WebDashboardLayout), findsOneWidget);
-      expect(find.text('CV. TATA SAKA'), findsOneWidget);
+      expect(find.text('CV. TATA SAKA CONSULTANT'), findsWidgets);
+      expect(find.text('Engineering Consultant'), findsOneWidget);
       expect(find.byTooltip('Kembali'), findsOneWidget);
     });
 
@@ -129,7 +130,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(WebDashboardLayout), findsOneWidget);
-      expect(find.text('CV. TATA SAKA'), findsOneWidget);
+      expect(find.text('CV. TATA SAKA CONSULTANT'), findsOneWidget);
       expect(find.text('Umum'), findsWidgets);
       expect(find.text('Administrasi'), findsWidgets);
       expect(find.byTooltip('Kembali'), findsOneWidget);
@@ -152,7 +153,7 @@ void main() {
       await tester.pump();
 
       expect(find.byType(WebDashboardLayout), findsOneWidget);
-      expect(find.text('CV. TATA SAKA'), findsOneWidget);
+      expect(find.text('CV. TATA SAKA CONSULTANT'), findsOneWidget);
       expect(find.byTooltip('Simpan / Buka File PDF'), findsOneWidget);
       expect(find.byTooltip('Kembali'), findsOneWidget);
     });
@@ -174,7 +175,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // On mobile, persistent WebSidebar and VerticalDivider should NOT exist
-      expect(find.text('CV. TATA SAKA'), findsNothing);
+      expect(find.text('CV. TATA SAKA CONSULTANT'), findsNothing);
       expect(find.byType(VerticalDivider), findsNothing);
     });
   });

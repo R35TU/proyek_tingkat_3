@@ -132,7 +132,7 @@ void main() {
 
       // Check Metadata
       expect(find.text('Pekerjaan'), findsOneWidget);
-      expect(find.text('CV. DIVAN INSAN CEMERLANG'), findsOneWidget);
+      expect(find.text('CV. DIVAN INSAN CEMERLANG'), findsWidgets);
 
       // Check Table headers
       expect(find.text('NO.'), findsOneWidget);

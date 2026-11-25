@@ -125,7 +125,7 @@ class LembarTambahKurangWidget extends StatelessWidget {
               children: [
                 _buildMetaRow('Pelaksana Kontraktor', kegiatan.kontraktor.isNotEmpty ? kegiatan.kontraktor : '-'),
                 _buildMetaRow('No Kontrak', kegiatan.suratPesananFull.isNotEmpty ? kegiatan.suratPesananFull : '-'),
-                _buildMetaRow('Pengawas', kegiatan.konsultanPengawas.isNotEmpty ? kegiatan.konsultanPengawas : 'CV. TATA SAKA CONSULTANT'),
+                _buildMetaRow('Pengawas', kegiatan.konsultanPengawas.isNotEmpty ? kegiatan.konsultanPengawas : '-'),
                 _buildMetaRow('No Kontrak Pengawasan', kegiatan.spkKonsultanFull.isNotEmpty ? kegiatan.spkKonsultanFull : '-'),
               ],
             ),
@@ -407,14 +407,20 @@ class LembarTambahKurangWidget extends StatelessWidget {
               padding: const EdgeInsets.only(left: 40),
               child: Column(
                 children: [
-                  const Text('Kepala DPU-PR Kabupaten Purbalingga', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Pejabat Penandatanganan Kontrak',
+                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
+                  ),
                   const Text('Selaku Pejabat Penandatanganan Kontrak', style: TextStyle(fontSize: 10, color: Colors.black87)),
                   const SizedBox(height: 54),
                   Text(
-                    kegiatan.penggunaAnggaran.isNotEmpty ? kegiatan.penggunaAnggaran : 'DRAJAT UJI WAKHYONO, S.T., M.T',
+                    kegiatan.penggunaAnggaran.isNotEmpty ? kegiatan.penggunaAnggaran : '( .................................... )',
                     style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, decoration: TextDecoration.underline),
                   ),
-                  const Text('NIP. 19711111 199803 1 008', style: TextStyle(fontSize: 9.5)),
+                  if (kegiatan.penggunaAnggaran.isNotEmpty)
+                    const Text('NIP. -', style: TextStyle(fontSize: 9.5))
+                  else
+                    const SizedBox(height: 14),
                 ],
               ),
             ),
@@ -426,12 +432,12 @@ class LembarTambahKurangWidget extends StatelessWidget {
                 children: [
                   const Text('Kontraktor Pelaksana', style: TextStyle(fontSize: 10.5, color: Colors.black87)),
                   Text(
-                    kegiatan.kontraktor.isNotEmpty ? kegiatan.kontraktor : 'CV. DIVAN INSAN CEMERLANG',
+                    kegiatan.kontraktor.isNotEmpty ? kegiatan.kontraktor : '',
                     style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 54),
                   Text(
-                    kegiatan.direkturPenyedia.isNotEmpty ? kegiatan.direkturPenyedia : 'NURKHOLIS WIDIANTO',
+                    kegiatan.direkturPenyedia.isNotEmpty ? kegiatan.direkturPenyedia : '( .................................... )',
                     style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, decoration: TextDecoration.underline),
                   ),
                   const Text('Direktur', style: TextStyle(fontSize: 9.5)),

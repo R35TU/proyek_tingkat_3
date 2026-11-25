@@ -102,6 +102,19 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
   late String _lokasi;
   late List<_FolderData> _folders;
   bool _isExecutiveInfoExpanded = true;
+  ContractModel? _syncedContractRef;
+
+  ContractModel _resolveLiveContract({bool listen = false}) {
+    try {
+      final prov = Provider.of<ContractProvider>(context, listen: listen);
+      return prov.contracts.firstWhere(
+        (c) => c.id == widget.contract.id,
+        orElse: () => widget.contract,
+      );
+    } catch (_) {
+      return widget.contract;
+    }
+  }
 
   @override
   void initState() {
@@ -117,9 +130,12 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
     }
   }
 
-  void _loadData() {
-    _kegiatanMap = Map<String, dynamic>.from(widget.contract.kegiatans[widget.kegiatanIndex]);
-    _kegiatan = KegiatanModel.fromJson(_kegiatanMap, fallbackContract: widget.contract);
+  void _loadData([ContractModel? explicitContract]) {
+    final live = explicitContract ?? _resolveLiveContract(listen: false);
+    _syncedContractRef = live;
+    if (widget.kegiatanIndex >= live.kegiatans.length) return;
+    _kegiatanMap = Map<String, dynamic>.from(live.kegiatans[widget.kegiatanIndex]);
+    _kegiatan = KegiatanModel.fromJson(_kegiatanMap, fallbackContract: live);
     _namaKegiatan = _kegiatan.namaKegiatan;
     _lokasi = _kegiatan.lokasi;
     
@@ -152,8 +168,11 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
       'documents': f.documents.map((d) => d.toJson()).toList(),
     }).toList();
 
-    widget.contract.kegiatans[widget.kegiatanIndex] = _kegiatanMap;
-    Provider.of<ContractProvider>(context, listen: false).updateContract(widget.contract);
+    final live = _resolveLiveContract(listen: false);
+    if (widget.kegiatanIndex < live.kegiatans.length) {
+      live.kegiatans[widget.kegiatanIndex] = _kegiatanMap;
+      Provider.of<ContractProvider>(context, listen: false).updateContract(live);
+    }
   }
 
   void _addFolder() {
@@ -1028,11 +1047,12 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
   }
 
   Future<void> _editKegiatanSelf() async {
+    final live = _resolveLiveContract(listen: false);
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
         builder: (context) => FormKegiatanScreen(
-          contract: widget.contract,
+          contract: live,
           initialKegiatan: _kegiatanMap,
           kegiatanIndex: widget.kegiatanIndex,
         ),
@@ -1043,14 +1063,17 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
       if (_kegiatanMap.containsKey('folders')) {
         result['folders'] = _kegiatanMap['folders'];
       }
+      final updatedLive = _resolveLiveContract(listen: false);
       setState(() {
         _kegiatanMap = result;
-        _kegiatan = KegiatanModel.fromJson(_kegiatanMap, fallbackContract: widget.contract);
+        _kegiatan = KegiatanModel.fromJson(_kegiatanMap, fallbackContract: updatedLive);
         _namaKegiatan = _kegiatan.namaKegiatan;
         _lokasi = _kegiatan.lokasi;
-        widget.contract.kegiatans[widget.kegiatanIndex] = _kegiatanMap;
+        if (widget.kegiatanIndex < updatedLive.kegiatans.length) {
+          updatedLive.kegiatans[widget.kegiatanIndex] = _kegiatanMap;
+        }
       });
-      Provider.of<ContractProvider>(context, listen: false).updateContract(widget.contract);
+      Provider.of<ContractProvider>(context, listen: false).updateContract(updatedLive);
       try {
         final timeline = Provider.of<TimelineProvider>(context, listen: false);
         timeline.logEvent(
@@ -1125,6 +1148,10 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final live = _resolveLiveContract(listen: true);
+    if (!identical(live, _syncedContractRef)) {
+      _loadData(live);
+    }
     UserProfileProvider? userProf;
     try {
       userProf = Provider.of<UserProfileProvider>(context);
@@ -1512,7 +1539,7 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => DetailDataLaporanScreen(
-                                contract: widget.contract,
+                                contract: _resolveLiveContract(listen: false),
                                 kegiatanIndex: widget.kegiatanIndex,
                                 initialTab: 1,
                               ),
@@ -1536,7 +1563,7 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => DetailDataLaporanScreen(
-                                contract: widget.contract,
+                                contract: _resolveLiveContract(listen: false),
                                 kegiatanIndex: widget.kegiatanIndex,
                                 initialTab: 0,
                               ),
@@ -2419,7 +2446,7 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => KelolaRkkScreen(
-                          contract: widget.contract,
+                          contract: _resolveLiveContract(listen: false),
                           kegiatanIndex: widget.kegiatanIndex,
                           readOnly: !isKonsultan,
                         ),
@@ -2458,7 +2485,7 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (_) => KelolaAddendumScreen(
-                            contract: widget.contract,
+                            contract: _resolveLiveContract(listen: false),
                             kegiatanIndex: widget.kegiatanIndex,
                             readOnly: !isKonsultan,
                           ),
@@ -2968,26 +2995,25 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
   }
 
   Widget _buildValidationSubInfo(String label, String value, {Color? textColor}) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          '$label: ',
-          style: const TextStyle(
-            fontSize: 10.5,
-            color: Color(0xFF64748B),
-            fontWeight: FontWeight.w500,
-          ),
+    return Text.rich(
+      TextSpan(
+        text: '$label: ',
+        style: const TextStyle(
+          fontSize: 10.5,
+          color: Color(0xFF64748B),
+          fontWeight: FontWeight.w500,
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: textColor ?? const Color(0xFF0F172A),
+        children: [
+          TextSpan(
+            text: value,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: textColor ?? const Color(0xFF0F172A),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

@@ -133,6 +133,24 @@ class ContractProvider with ChangeNotifier {
         await _hydrateDokumen(c);
         final idx = _contracts.indexWhere((x) => x.id == id);
         if (idx >= 0) {
+          // Lindungi laporan di memori jika hydrated snapshot sementara kosong
+          final old = _contracts[idx];
+          for (int ki = 0; ki < c.kegiatans.length; ki++) {
+            if (ki < old.kegiatans.length) {
+              final oldKeg = old.kegiatans[ki];
+              final newKeg = c.kegiatans[ki];
+              final oldLaps = (oldKeg['laporans'] as List?) ?? [];
+              final newLaps = (newKeg['laporans'] as List?) ?? [];
+              if (newLaps.isEmpty && oldLaps.isNotEmpty) {
+                newKeg['laporans'] = oldLaps;
+              }
+              final oldWeek = (oldKeg['laporanMingguan'] as List?) ?? [];
+              final newWeek = (newKeg['laporanMingguan'] as List?) ?? [];
+              if (newWeek.isEmpty && oldWeek.isNotEmpty) {
+                newKeg['laporanMingguan'] = oldWeek;
+              }
+            }
+          }
           _contracts[idx] = c;
         } else {
           _contracts.add(c);
@@ -171,6 +189,7 @@ class ContractProvider with ChangeNotifier {
           final data = Map<String, dynamic>.from(doc.data());
           data['id'] = doc.id;
           final contract = ContractModel.fromJson(data);
+          _ensureKegiatanIds(contract);
           await _hydrateReports(contract);
           await _hydrateDokumen(contract);
           list.add(contract);
@@ -385,6 +404,7 @@ class ContractProvider with ChangeNotifier {
     ContractModel c,
     String key,
   ) {
+    _ensureKegiatanIds(c);
     final out = <String, List<Map<String, dynamic>>>{};
     for (final keg in c.kegiatans) {
       final kegId = (keg['id'] ?? '').toString();
@@ -394,12 +414,14 @@ class ContractProvider with ChangeNotifier {
           .toList();
       for (final r in list) {
         if ((r['id'] ?? '').toString().isEmpty) r['id'] = generateId();
-        r['kegiatanId'] = kegId;
+        r['kegiatanId'] = kegId.isNotEmpty ? kegId : kegName;
         r['kegiatanNama'] = kegName;
+        r['namaKegiatan'] = kegName;
         r['contractId'] = c.id;
       }
       keg[key] = list;
-      out[kegId] = list;
+      final outKey = kegId.isNotEmpty ? kegId : kegName;
+      out[outKey] = list;
     }
     return out;
   }
@@ -530,23 +552,45 @@ class ContractProvider with ChangeNotifier {
       for (final d in dailySnap.docs) {
         final r = Map<String, dynamic>.from(d.data());
         r['id'] = d.id;
-        final key = (r['kegiatanId'] ?? r['kegiatanNama'] ?? '').toString();
-        dailyByKeg.putIfAbsent(key, () => []).add(r);
+        final kId = (r['kegiatanId'] ?? '').toString().trim();
+        final kNama = (r['kegiatanNama'] ?? r['namaKegiatan'] ?? '').toString().trim();
+        if (kId.isNotEmpty) {
+          dailyByKeg.putIfAbsent(kId, () => []).add(r);
+        }
+        if (kNama.isNotEmpty && kNama != kId) {
+          dailyByKeg.putIfAbsent(kNama, () => []).add(r);
+        }
+        if (kId.isEmpty && kNama.isEmpty) {
+          dailyByKeg.putIfAbsent('', () => []).add(r);
+        }
         reportCache[d.id] = jsonEncode(r);
       }
       for (final d in weeklySnap.docs) {
         final r = Map<String, dynamic>.from(d.data());
         r['id'] = d.id;
-        final key = (r['kegiatanId'] ?? r['kegiatanNama'] ?? '').toString();
-        weeklyByKeg.putIfAbsent(key, () => []).add(r);
+        final kId = (r['kegiatanId'] ?? '').toString().trim();
+        final kNama = (r['kegiatanNama'] ?? r['namaKegiatan'] ?? '').toString().trim();
+        if (kId.isNotEmpty) {
+          weeklyByKeg.putIfAbsent(kId, () => []).add(r);
+        }
+        if (kNama.isNotEmpty && kNama != kId) {
+          weeklyByKeg.putIfAbsent(kNama, () => []).add(r);
+        }
+        if (kId.isEmpty && kNama.isEmpty) {
+          weeklyByKeg.putIfAbsent('', () => []).add(r);
+        }
         weeklyCache[d.id] = jsonEncode(r);
       }
 
-      // Urutkan: harian terbaru dulu, mingguan urut mingguKe.
+      // Urutkan & dedup: harian terbaru dulu, mingguan urut mingguKe.
       dailyByKeg.forEach((_, list) {
+        final seen = <String>{};
+        list.retainWhere((x) => seen.add((x['id'] ?? '').toString()));
         list.sort((a, b) => (b['tanggal'] ?? '').toString().compareTo((a['tanggal'] ?? '').toString()));
       });
       weeklyByKeg.forEach((_, list) {
+        final seen = <String>{};
+        list.retainWhere((x) => seen.add((x['id'] ?? '').toString()));
         list.sort((a, b) => ((a['mingguKe'] is int) ? a['mingguKe'] as int : int.tryParse(a['mingguKe']?.toString() ?? '1') ?? 1)
             .compareTo((b['mingguKe'] is int) ? b['mingguKe'] as int : int.tryParse(b['mingguKe']?.toString() ?? '1') ?? 1));
       });
@@ -554,8 +598,10 @@ class ContractProvider with ChangeNotifier {
       for (final keg in c.kegiatans) {
         final kegId = (keg['id'] ?? '').toString();
         final kegName = keg['namaKegiatan']?.toString() ?? '';
-        keg['laporans'] = dailyByKeg[kegId] ?? dailyByKeg[kegName] ?? [];
-        keg['laporanMingguan'] = weeklyByKeg[kegId] ?? weeklyByKeg[kegName] ?? [];
+        final laps = dailyByKeg[kegId] ?? dailyByKeg[kegName] ?? (c.kegiatans.length == 1 ? dailyByKeg[''] : null) ?? [];
+        final weeks = weeklyByKeg[kegId] ?? weeklyByKeg[kegName] ?? (c.kegiatans.length == 1 ? weeklyByKeg[''] : null) ?? [];
+        keg['laporans'] = laps;
+        keg['laporanMingguan'] = weeks;
       }
     } catch (e) {
       debugPrint('[ContractProvider] Hydrate gagal untuk ${c.id}: $e');
@@ -841,14 +887,19 @@ class ContractProvider with ChangeNotifier {
     final daily = _extractReports(updatedContract, 'laporans');
     final weekly = _extractReports(updatedContract, 'laporanMingguan');
 
+    _fillCache(updatedContract.id, daily, _reportDocCache);
+    _fillCache(updatedContract.id, weekly, _weeklyDocCache);
+
     try {
+      // Sinkronkan subcollection terlebih dahulu sebelum menulis parent document
+      // agar snapshot listener tidak membaca subcollection yang belum diperbarui.
+      await _syncReports(updatedContract.id, daily, _reportDocCache, 'laporans');
+      await _syncReports(updatedContract.id, weekly, _weeklyDocCache, 'laporanMingguan');
+      await _syncDokumen(updatedContract);
       await _db
           .collection('contracts')
           .doc(updatedContract.id)
           .set(_sanitizeForWrite(updatedContract));
-      await _syncReports(updatedContract.id, daily, _reportDocCache, 'laporans');
-      await _syncReports(updatedContract.id, weekly, _weeklyDocCache, 'laporanMingguan');
-      await _syncDokumen(updatedContract);
     } catch (e) {
       debugPrint('[ContractProvider] updateContract gagal: $e');
     }

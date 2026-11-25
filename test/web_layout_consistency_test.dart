@@ -67,8 +67,8 @@ void main() {
 
         // 1. Initial State: On Dashboard
         expect(find.byType(VerticalDivider), findsOneWidget);
-        expect(find.text('CV. TATA SAKA'), findsOneWidget);
-        expect(find.text('Consultant Engineer'), findsOneWidget);
+        expect(find.text('CV. TATA SAKA CONSULTANT'), findsOneWidget);
+        expect(find.text('Engineering Consultant'), findsOneWidget);
         expect(find.text('Dashboard'), findsWidgets);
 
         // 2. Click 'Kontrak' on the Sidebar
@@ -79,8 +79,8 @@ void main() {
 
         // 3. Verify Sidebar is STILL visible
         expect(find.byType(VerticalDivider), findsOneWidget);
-        expect(find.text('CV. TATA SAKA'), findsOneWidget);
-        expect(find.text('Consultant Engineer'), findsOneWidget);
+        expect(find.text('CV. TATA SAKA CONSULTANT'), findsOneWidget);
+        expect(find.text('Engineering Consultant'), findsOneWidget);
 
         // 4. Verify Heading is STILL visible and updated to Kontrak
         expect(find.text('Kontrak'), findsWidgets);
@@ -116,7 +116,7 @@ void main() {
 
         // Sidebar and Heading stay visible
         expect(find.byType(VerticalDivider), findsOneWidget);
-        expect(find.text('CV. TATA SAKA'), findsOneWidget);
+        expect(find.text('CV. TATA SAKA CONSULTANT'), findsOneWidget);
         expect(find.byType(LaporanScreen), findsOneWidget);
       },
     );
@@ -139,7 +139,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Initial expanded sidebar shows brand text
-        expect(find.text('CV. TATA SAKA'), findsOneWidget);
+        expect(find.text('CV. TATA SAKA CONSULTANT'), findsOneWidget);
 
         // Toggle via Heading menu button
         final toggleBtn = find.byTooltip('Ciutkan Sidebar');
@@ -148,7 +148,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Minimized: Text hidden, 'Buka Sidebar' tooltip available
-        expect(find.text('CV. TATA SAKA'), findsNothing);
+        expect(find.text('CV. TATA SAKA CONSULTANT'), findsNothing);
         expect(find.byTooltip('Buka Sidebar'), findsWidgets);
 
         // Toggle again to expand
@@ -156,7 +156,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Brand text back
-        expect(find.text('CV. TATA SAKA'), findsOneWidget);
+        expect(find.text('CV. TATA SAKA CONSULTANT'), findsOneWidget);
       },
     );
 
@@ -187,7 +187,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Drawer is open
-        expect(find.text('CV. TATA SAKA'), findsOneWidget);
+        expect(find.text('CV. TATA SAKA CONSULTANT'), findsOneWidget);
       },
     );
 
@@ -216,7 +216,7 @@ void main() {
         expect(find.text('Halaman Pengujian Web'), findsOneWidget);
         expect(find.text('Konten Pengujian'), findsOneWidget);
         expect(find.byType(VerticalDivider), findsOneWidget);
-        expect(find.text('CV. TATA SAKA'), findsOneWidget);
+        expect(find.text('CV. TATA SAKA CONSULTANT'), findsOneWidget);
       },
     );
   });

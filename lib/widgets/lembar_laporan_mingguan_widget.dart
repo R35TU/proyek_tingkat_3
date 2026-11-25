@@ -621,14 +621,14 @@ class LembarLaporanMingguanWidget extends StatelessWidget {
         },
         {
           'peran': 'Konsultan Supervisi',
-          'instansi': 'CV. TATA SAKA CONSULTANT',
+          'instansi': report.ttdKonsultanJabatan ?? '',
           'nama': report.ttdKonsultanNama ?? '',
           'tanggal': report.ttdKonsultanTanggal ?? '',
           'signature': report.ttdKonsultanSignature,
         },
         {
           'peran': 'Pejabat Pembuat Komitmen (PPK)',
-          'instansi': 'DPU-PR Kab. Purbalingga',
+          'instansi': report.ttdPpkJabatan ?? '',
           'nama': report.ttdPpkNama ?? '',
           'tanggal': report.ttdPpkTanggal ?? report.periodeAkhir,
           'signature': report.ttdPpkSignature,

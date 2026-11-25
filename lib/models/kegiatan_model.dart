@@ -84,7 +84,7 @@ class KegiatanModel {
     required this.namaKegiatan,
     this.lokasi = '',
     this.sumberDana = '',
-    this.konsultanPengawas = 'CV. TATA SAKA CONSULTANT',
+    this.konsultanPengawas = '',
     this.noSpkKonsultan = '',
     this.tglSpkKonsultan = '',
     this.noSpmkKonsultan = '',
@@ -254,7 +254,7 @@ class KegiatanModel {
 
     final konsultanPengawas = (json['konsultanPengawas'] != null && json['konsultanPengawas'].toString().isNotEmpty)
         ? json['konsultanPengawas'].toString()
-        : 'CV. TATA SAKA CONSULTANT';
+        : (fallbackContract != null ? 'CV. TATA SAKA CONSULTANT' : '');
 
     final noSpkKonsultan = (json['noSpkKonsultan'] != null && json['noSpkKonsultan'].toString().isNotEmpty)
         ? json['noSpkKonsultan'].toString()

@@ -75,6 +75,9 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
   bool _loadingKontraktorUsers = true;
 
   bool get isEditing => widget.initialKegiatan != null;
+  bool _section2DatesEdited = false;
+  bool _section3DatesEdited = false;
+  bool _isSyncingDates = false;
 
   @override
   void initState() {
@@ -376,13 +379,116 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
       final formatted = WeeklyReportModel.formatIndonesianDate(picked);
       setState(() {
         controller.text = formatted;
-        if (updateWaktuBerjalan) {
+        if (controller == _awalPelaksanaanCtrl || controller == _akhirPelaksanaanCtrl) {
+          _syncFromSection2DatePicked(controller, picked, formatted);
+        } else if (controller == _tglSpmkKontraktorCtrl) {
+          _syncFromSection3Change();
+        } else if (updateWaktuBerjalan) {
           _waktuBerjalanCtrl.text = KegiatanModel.calculateWaktuBerjalan(formatted);
         }
-        if (controller == _tglSpmkKontraktorCtrl) {
+      });
+    }
+  }
+
+  int? _extractDaysCount(String text) {
+    final m = RegExp(r'\d+').firstMatch(text.trim());
+    if (m == null) return null;
+    final v = int.tryParse(m.group(0)!);
+    return (v != null && v > 0) ? v : null;
+  }
+
+  void _syncFromSection2DatePicked(
+    TextEditingController controller,
+    DateTime picked,
+    String formatted,
+  ) {
+    if (_isSyncingDates) return;
+    _section2DatesEdited = true;
+    _isSyncingDates = true;
+    try {
+      if (controller == _awalPelaksanaanCtrl) {
+        final days = _extractDaysCount(_masaPelaksanaanCtrl.text) ??
+            _extractDaysCount(_jangkaWaktuCtrl.text) ??
+            (widget.contract.hariKalender > 0 ? widget.contract.hariKalender : null);
+        if (days != null && days > 0) {
+          final endDt = DateTime(picked.year, picked.month, picked.day + days - 1);
+          _akhirPelaksanaanCtrl.text = WeeklyReportModel.formatIndonesianDate(endDt);
+        }
+        _waktuBerjalanCtrl.text = KegiatanModel.calculateWaktuBerjalan(formatted);
+        if (!_section3DatesEdited) {
+          _tglSpmkKonsultanCtrl.text = formatted;
+          _tglSpmkKontraktorCtrl.text = formatted;
+          if (_jangkaWaktuCtrl.text.trim().isEmpty && _masaPelaksanaanCtrl.text.trim().isNotEmpty) {
+            _jangkaWaktuCtrl.text = _masaPelaksanaanCtrl.text.trim();
+          }
           _updateTglAkhirSpmk();
         }
-      });
+      } else if (controller == _akhirPelaksanaanCtrl) {
+        final awalDt = WeeklyReportModel.parseIndonesianDate(_awalPelaksanaanCtrl.text);
+        if (awalDt != null) {
+          final startOnly = DateTime(awalDt.year, awalDt.month, awalDt.day);
+          final endOnly = DateTime(picked.year, picked.month, picked.day);
+          final diffDays = endOnly.difference(startOnly).inDays + 1;
+          if (diffDays > 0) {
+            final formattedDur = IndonesianTerbilang.formatHariKalender(diffDays);
+            _masaPelaksanaanCtrl.text = formattedDur;
+            if (!_section3DatesEdited) {
+              _jangkaWaktuCtrl.text = formattedDur;
+              _tglAkhirSpmkCtrl.text = formatted;
+            }
+          }
+        }
+      }
+    } finally {
+      _isSyncingDates = false;
+    }
+  }
+
+  void _syncFromSection2DurationChanged(String val) {
+    if (_isSyncingDates) return;
+    _section2DatesEdited = true;
+    _isSyncingDates = true;
+    try {
+      final calcEnd = KegiatanModel.calculateTanggalAkhirSpmk(
+        _awalPelaksanaanCtrl.text,
+        val,
+      );
+      if (calcEnd.isNotEmpty) {
+        _akhirPelaksanaanCtrl.text = calcEnd;
+      }
+      if (!_section3DatesEdited) {
+        _jangkaWaktuCtrl.text = val;
+        _updateTglAkhirSpmk();
+      }
+    } finally {
+      _isSyncingDates = false;
+    }
+  }
+
+  void _syncFromSection3Change() {
+    if (_isSyncingDates) return;
+    _section3DatesEdited = true;
+    _isSyncingDates = true;
+    try {
+      _updateTglAkhirSpmk();
+      if (!_section2DatesEdited) {
+        final spmkText = _tglSpmkKontraktorCtrl.text.trim();
+        final akhirText = _tglAkhirSpmkCtrl.text.trim();
+        final durasiText = _jangkaWaktuCtrl.text.trim();
+        if (spmkText.isNotEmpty) {
+          _tglSpmkKonsultanCtrl.text = spmkText;
+          _awalPelaksanaanCtrl.text = spmkText;
+          _waktuBerjalanCtrl.text = KegiatanModel.calculateWaktuBerjalan(spmkText);
+        }
+        if (akhirText.isNotEmpty) {
+          _akhirPelaksanaanCtrl.text = akhirText;
+        }
+        if (durasiText.isNotEmpty) {
+          _masaPelaksanaanCtrl.text = durasiText;
+        }
+      }
+    } finally {
+      _isSyncingDates = false;
     }
   }
 
@@ -677,6 +783,7 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
         _buildField(
           controller: _masaPelaksanaanCtrl,
           label: 'Masa Pelaksanaan',
+          onChanged: (val) => setState(() => _syncFromSection2DurationChanged(val)),
         ),
       ],
     );
@@ -879,6 +986,7 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
         _buildField(
           controller: _jangkaWaktuCtrl,
           label: 'Jangka Waktu Pelaksanaan',
+          onChanged: (_) => setState(() => _syncFromSection3Change()),
         ),
         const SizedBox(height: 14),
 
@@ -1018,6 +1126,7 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
     bool isBold = false,
     bool readOnly = false,
     VoidCallback? onTap,
+    ValueChanged<String>? onChanged,
     double fontSize = 13,
     String? prefixText,
     TextInputType? keyboardType,
@@ -1030,6 +1139,7 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
       maxLines: maxLines,
       readOnly: readOnly,
       onTap: onTap,
+      onChanged: onChanged,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
       validator: validator,
