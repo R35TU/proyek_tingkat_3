@@ -646,14 +646,14 @@ class _LembarLaporanBulananWidgetState extends State<LembarLaporanBulananWidget>
         },
         {
           'peran': 'Konsultan Supervisi',
-          'instansi': 'CV. TATA SAKA CONSULTANT',
+          'instansi': report.konsultanPengawas.isNotEmpty ? report.konsultanPengawas : (report.ttdKonsultanJabatan ?? ''),
           'nama': report.ttdKonsultanNama ?? '',
           'tanggal': report.ttdKonsultanTanggal ?? dateStr,
           'signature': report.ttdKonsultanSignature,
         },
         {
           'peran': 'Pejabat Pembuat Komitmen (PPK)',
-          'instansi': 'DPU-PR Kab. Purbalingga',
+          'instansi': report.ttdPpkJabatan ?? '',
           'nama': report.ttdPpkNama ?? '',
           'tanggal': report.ttdPpkTanggal ?? dateStr,
           'signature': report.ttdPpkSignature,

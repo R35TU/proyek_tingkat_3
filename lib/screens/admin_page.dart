@@ -14,7 +14,8 @@ import 'panduan_faq_screen.dart';
 /// Password TIDAK tersimpan di Firestore — dikelola Firebase Auth.
 class UserAccount {
   final String id; // uid Firebase Auth
-  String name;
+  String username;
+  String namaLengkap;
   String email;
   String role; // 'Konsultan', 'Kontraktor', 'Dinas', 'Admin'
   String instansi; // Nama CV/PT/Dinas
@@ -22,28 +23,43 @@ class UserAccount {
 
   UserAccount({
     required this.id,
-    required this.name,
+    required this.username,
+    required this.namaLengkap,
     required this.email,
     required this.role,
     required this.instansi,
     this.isActive = true,
   });
 
+  // Getter dan setter name untuk backward compatibility
+  String get name => namaLengkap;
+  set name(String val) => namaLengkap = val;
+
   factory UserAccount.fromDoc(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>? ?? {};
+    final role = (d['role'] ?? 'Konsultan').toString();
+    final instansi = role.toLowerCase() == 'konsultan'
+        ? 'CV. Tata Saka Consultant'
+        : (d['companyOrAgency'] ?? '-').toString();
+    final email = (d['email'] ?? '-').toString();
+    final fallbackUsername = email.contains('@') ? email.split('@').first : (email != '-' ? email : doc.id);
+    final username = (d['username'] ?? fallbackUsername).toString().trim();
+    final namaLengkap = (d['namaLengkap'] ?? d['full_name'] ?? d['name'] ?? username).toString().trim();
     return UserAccount(
       id: doc.id,
-      name: (d['namaLengkap'] ?? d['username'] ?? '-').toString(),
-      email: (d['email'] ?? '-').toString(),
-      role: (d['role'] ?? 'Konsultan').toString(),
-      instansi: (d['companyOrAgency'] ?? '-').toString(),
+      username: username,
+      namaLengkap: namaLengkap,
+      email: email,
+      role: role,
+      instansi: instansi,
       isActive: d['isActive'] ?? true,
     );
   }
 }
 
 class AdminPage extends StatefulWidget {
-  const AdminPage({super.key});
+  final bool bypassAuthCheck;
+  const AdminPage({super.key, this.bypassAuthCheck = false});
 
   @override
   State<AdminPage> createState() => _AdminPageState();
@@ -64,7 +80,7 @@ class _AdminPageState extends State<AdminPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (AuthService.currentUser == null) {
+      if (!widget.bypassAuthCheck && AuthService.currentUser == null) {
         Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
         return;
       }
@@ -112,7 +128,8 @@ class _AdminPageState extends State<AdminPage> {
       final matchesRole =
           _selectedRoleFilter == 'Semua' || acc.role == _selectedRoleFilter;
       final matchesSearch =
-          acc.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          acc.namaLengkap.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          acc.username.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           acc.email.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           acc.instansi.toLowerCase().contains(_searchQuery.toLowerCase());
       return matchesRole && matchesSearch;
@@ -137,13 +154,16 @@ class _AdminPageState extends State<AdminPage> {
 
   void _showAccountFormDialog({UserAccount? existingAccount}) {
     final isEdit = existingAccount != null;
-    final nameCtrl = TextEditingController(text: existingAccount?.name ?? '');
+    final usernameCtrl = TextEditingController(text: existingAccount?.username ?? '');
+    final nameCtrl = TextEditingController(text: existingAccount?.namaLengkap ?? '');
     final emailCtrl = TextEditingController(text: existingAccount?.email ?? '');
     final passCtrl = TextEditingController();
-    final instansiCtrl = TextEditingController(
-      text: existingAccount?.instansi ?? '',
-    );
     String selectedRole = existingAccount?.role ?? 'Konsultan';
+    final instansiCtrl = TextEditingController(
+      text: selectedRole == 'Konsultan'
+          ? 'CV. Tata Saka Consultant'
+          : (existingAccount?.instansi ?? ''),
+    );
     bool isActive = existingAccount?.isActive ?? true;
     bool isSaving = false;
     final formKey = GlobalKey<FormState>();
@@ -188,46 +208,107 @@ class _AdminPageState extends State<AdminPage> {
                               .toList(),
                           onChanged: (val) {
                             if (val != null) {
-                              setDialogState(() => selectedRole = val);
+                              setDialogState(() {
+                                selectedRole = val;
+                                if (selectedRole == 'Konsultan') {
+                                  instansiCtrl.text = 'CV. Tata Saka Consultant';
+                                } else if (instansiCtrl.text == 'CV. Tata Saka Consultant') {
+                                  instansiCtrl.clear();
+                                }
+                              });
                             }
                           },
                         ),
                         const SizedBox(height: 14),
+                        // ─── FIELD USERNAME (IDENTITAS LOGIN) ───
+                        TextFormField(
+                          controller: usernameCtrl,
+                          enabled: !isEdit,
+                          decoration: InputDecoration(
+                            labelText: isEdit
+                                ? 'Username (Identitas Login)'
+                                : 'Username (Identitas Login)',
+                            hintText: 'Contoh: kontraktor_andi',
+                            helperText: isEdit
+                                ? 'Username tidak dapat diubah setelah dibuat'
+                                : null,
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.alternate_email),
+                            filled: isEdit,
+                            fillColor: isEdit ? const Color(0xFFF1F5F9) : null,
+                          ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) {
+                              return 'Username wajib diisi';
+                            }
+                            final clean = v.trim();
+                            if (clean.length < 3) {
+                              return 'Username minimal 3 karakter';
+                            }
+                            if (clean.contains(' ')) {
+                              return 'Username tidak boleh mengandung spasi';
+                            }
+                            if (clean.contains('@')) {
+                              return 'Username tidak boleh mengandung karakter @';
+                            }
+                            if (!RegExp(r'^[a-zA-Z0-9._]+$').hasMatch(clean)) {
+                              return 'Username hanya boleh huruf, angka, titik, atau underscore';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 14),
+                        // ─── FIELD NAMA LENGKAP (IDENTITAS PERSONAL / PROFIL) ───
                         TextFormField(
                           controller: nameCtrl,
                           decoration: const InputDecoration(
                             labelText: 'Nama Lengkap & Gelar',
+                            hintText: 'Contoh: Budi Santoso, S.T.',
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.person_outline),
                           ),
-                          validator: (v) => v == null || v.isEmpty
-                              ? 'Nama wajib diisi'
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'Nama lengkap wajib diisi'
                               : null,
                         ),
-                        const SizedBox(height: 14),
-                        TextFormField(
-                          controller: instansiCtrl,
-                          decoration: const InputDecoration(
-                            labelText:
-                                'Nama Instansi / Perusahaan (CV/PT/Dinas)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.business_outlined),
+                        // Field instansi/perusahaan hanya muncul untuk Kontraktor dan Dinas.
+                        // Khusus Konsultan, identitas perusahaan ditetapkan secara otomatis sebagai CV. Tata Saka Consultant.
+                        if (selectedRole != 'Konsultan') ...[
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: instansiCtrl,
+                            decoration: InputDecoration(
+                              labelText: selectedRole == 'Dinas'
+                                  ? 'Nama Dinas / Instansi Terkait'
+                                  : 'Nama Perusahaan Kontraktor (CV/PT)',
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.business_outlined),
+                            ),
+                            validator: (v) => v == null || v.trim().isEmpty
+                                ? 'Instansi / Perusahaan wajib diisi'
+                                : null,
                           ),
-                          validator: (v) => v == null || v.isEmpty
-                              ? 'Instansi wajib diisi'
-                              : null,
-                        ),
+                        ],
                         const SizedBox(height: 14),
                         TextFormField(
                           controller: emailCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Email Login',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.email_outlined),
+                          enabled: !isEdit,
+                          decoration: InputDecoration(
+                            labelText: isEdit
+                                ? 'Email'
+                                : 'Email Login (Opsional)',
+                            hintText: 'nama@domain.com (Kosongkan jika otomatis)',
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.email_outlined),
+                            filled: isEdit,
+                            fillColor: isEdit ? const Color(0xFFF1F5F9) : null,
                           ),
-                          validator: (v) => v == null || !v.contains('@')
-                              ? 'Masukkan email yang valid'
-                              : null,
+                          validator: (v) {
+                            if (v != null && v.trim().isNotEmpty && !v.contains('@')) {
+                              return 'Masukkan email yang valid';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 14),
                         if (isEdit)
@@ -287,23 +368,51 @@ class _AdminPageState extends State<AdminPage> {
                           if (!formKey.currentState!.validate()) return;
                           setDialogState(() => isSaving = true);
                           try {
+                            final String effectiveInstansi = selectedRole == 'Konsultan'
+                                ? 'CV. Tata Saka Consultant'
+                                : instansiCtrl.text.trim();
+                            final cleanUsername = usernameCtrl.text.trim().toLowerCase();
+                            final cleanName = nameCtrl.text.trim();
+                            final inputEmail = emailCtrl.text.trim().toLowerCase();
+                            final effectiveEmail = inputEmail.isNotEmpty
+                                ? inputEmail
+                                : '$cleanUsername@tatasakaconsultant.id';
+
                             if (isEdit) {
                               await AuthService.updateUserDoc(
                                 existingAccount.id,
                                 {
-                                  'namaLengkap': nameCtrl.text.trim(),
+                                  'namaLengkap': cleanName,
                                   'role': selectedRole,
-                                  'companyOrAgency': instansiCtrl.text.trim(),
+                                  'companyOrAgency': effectiveInstansi,
                                   'isActive': isActive,
                                 },
                               );
                             } else {
+                              // Validasi keunikan username di database Firestore
+                              final isTaken = await AuthService.isUsernameTaken(cleanUsername);
+                              if (isTaken) {
+                                setDialogState(() => isSaving = false);
+                                if (ctx.mounted) {
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Username "$cleanUsername" sudah digunakan. Silakan gunakan username lain.',
+                                      ),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                                return;
+                              }
+
                               await AuthService.createAccount(
-                                email: emailCtrl.text,
+                                username: cleanUsername,
+                                namaLengkap: cleanName,
+                                email: effectiveEmail,
                                 password: passCtrl.text.trim(),
                                 role: selectedRole,
-                                namaLengkap: nameCtrl.text,
-                                instansi: instansiCtrl.text,
+                                instansi: effectiveInstansi,
                                 isActive: isActive,
                               );
                             }
@@ -322,14 +431,21 @@ class _AdminPageState extends State<AdminPage> {
                           } catch (e) {
                             if (ctx.mounted) {
                               setDialogState(() => isSaving = false);
+                              String errorMsg = 'Gagal menyimpan: $e';
+                              if (e is FirebaseAuthException) {
+                                if (e.code == 'email-already-in-use') {
+                                  errorMsg = 'Email atau username sudah dipakai akun lain.';
+                                } else if (e.code == 'weak-password') {
+                                  errorMsg = 'Password terlalu lemah.';
+                                } else {
+                                  errorMsg = e.message ?? e.toString();
+                                }
+                              } else if (e is Exception) {
+                                errorMsg = e.toString().replaceAll('Exception: ', '');
+                              }
                               ScaffoldMessenger.of(ctx).showSnackBar(
                                 SnackBar(
-                                  content: Text(
-                                    e is FirebaseAuthException &&
-                                            e.code == 'email-already-in-use'
-                                        ? 'Email sudah dipakai akun lain.'
-                                        : 'Gagal menyimpan: $e',
-                                  ),
+                                  content: Text(errorMsg),
                                   backgroundColor: Colors.red,
                                 ),
                               );
@@ -460,23 +576,30 @@ class _AdminPageState extends State<AdminPage> {
               color: Colors.white,
             ),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Dashboard Admin',
-                  style: TextStyle(
-                    fontSize: isCompact ? 16 : 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white70,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Dashboard Admin',
+                    style: TextStyle(
+                      fontSize: isCompact ? 16 : 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white70,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                if (!isCompact)
-                  const Text(
-                    'Manajemen akun',
-                    style: TextStyle(fontSize: 12, color: Colors.white70),
-                  ),
-              ],
+                  if (!isCompact)
+                    const Text(
+                      'Manajemen akun',
+                      style: TextStyle(fontSize: 12, color: Colors.white70),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
             ),
           ],
         ),
@@ -711,7 +834,7 @@ class _AdminPageState extends State<AdminPage> {
     final avatar = CircleAvatar(
       backgroundColor: roleColor.withOpacity(0.15),
       child: Text(
-        acc.name.isNotEmpty ? acc.name[0].toUpperCase() : '?',
+        acc.namaLengkap.isNotEmpty ? acc.namaLengkap[0].toUpperCase() : '?',
         style: TextStyle(color: roleColor, fontWeight: FontWeight.bold),
       ),
     );
@@ -727,6 +850,22 @@ class _AdminPageState extends State<AdminPage> {
     final details = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.alternate_email, size: 14, color: Color(0xFF64748B)),
+            const SizedBox(width: 4),
+            Text(
+              'Username: ${acc.username}',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF334155),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
         Text(acc.instansi, maxLines: 2, overflow: TextOverflow.ellipsis),
         Text(acc.email, maxLines: 1, overflow: TextOverflow.ellipsis),
       ],
@@ -767,7 +906,7 @@ class _AdminPageState extends State<AdminPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              acc.name,
+                              acc.namaLengkap,
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
@@ -801,7 +940,7 @@ class _AdminPageState extends State<AdminPage> {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(
-                    acc.name,
+                    acc.namaLengkap,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,

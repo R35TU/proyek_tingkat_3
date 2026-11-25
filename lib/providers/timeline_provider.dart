@@ -29,56 +29,68 @@ class TimelineProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   List<TimelineEventModel> get allEvents => List.unmodifiable(_events);
 
-  TimelineProvider() {
-    loadEvents();
+  TimelineProvider({bool seedDefaultIfEmpty = false}) {
+    loadEvents(seedDefaultIfEmpty: seedDefaultIfEmpty);
   }
 
   /// Memuat riwayat timeline: utama dari Firestore, fallback ke SharedPreferences
   /// (mode offline / lingkungan test). Data lokal lama otomatis dimigrasikan ke cloud.
-  Future<void> loadEvents() async {
+  Future<void> loadEvents({bool seedDefaultIfEmpty = false}) async {
     _isLoading = true;
     try {
       final db = _db;
       if (db != null) {
         final snap = await db.collection(_cloudCollection).get();
         if (snap.docs.isNotEmpty) {
-          _events = snap.docs.map((d) {
+          var cloudEvents = snap.docs.map((d) {
             final data = Map<String, dynamic>.from(d.data());
             data['id'] = d.id;
             return TimelineEventModel.fromJson(data);
           }).toList();
-          _sortEvents();
-          _saveEvents(); // mirror lokal tanpa menunggu
-          return;
+          // Cloud sudah bersih dari seed lama (seeder dinonaktifkan).
+          // Tidak ada filter di sini — tampilkan semua event dari Firestore apa adanya.
+          if (cloudEvents.isNotEmpty || !seedDefaultIfEmpty) {
+            _events = cloudEvents;
+            _sortEvents();
+            _saveEvents(); // mirror lokal tanpa menunggu
+            return;
+          }
         }
       }
-      // Cloud kosong / tidak tersedia → muat lokal (atau seed bawaan)
-      await _loadFromLocal();
+      // Cloud kosong / tidak tersedia → muat lokal (tanpa auto-seed dummy secara default)
+      await _loadFromLocal(seedDefaultIfEmpty: seedDefaultIfEmpty);
       // Migrasikan isi lokal ke cloud agar lintas perangkat
       final db2 = _db;
-      if (db2 != null && _events.isNotEmpty) {
+      if (db2 != null && _events.isNotEmpty && !seedDefaultIfEmpty) {
         await _pushEventsToCloud(_events);
       }
     } catch (e) {
       debugPrint('Error loading timeline events: $e');
-      _events = _generateInitialSeedEvents();
+      _events = seedDefaultIfEmpty ? _generateInitialSeedEvents() : [];
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  /// Muat dari SharedPreferences (perilaku lama) + seed bila kosong.
-  Future<void> _loadFromLocal() async {
+  /// Muat dari SharedPreferences (perilaku lama).
+  Future<void> _loadFromLocal({bool seedDefaultIfEmpty = false}) async {
     final prefs = await SharedPreferences.getInstance();
     final rawData = prefs.getString(_storageKey);
     if (rawData != null && rawData.isNotEmpty) {
       final List<dynamic> decoded = jsonDecode(rawData);
-      _events = decoded
+      var loaded = decoded
           .map((item) => TimelineEventModel.fromJson(Map<String, dynamic>.from(item)))
           .toList();
+
+      if (loaded.isEmpty && seedDefaultIfEmpty) {
+        _events = _generateInitialSeedEvents();
+        await _saveEvents();
+      } else {
+        _events = loaded;
+      }
     } else {
-      _events = _generateInitialSeedEvents();
+      _events = seedDefaultIfEmpty ? _generateInitialSeedEvents() : [];
       await _saveEvents();
     }
     _sortEvents();

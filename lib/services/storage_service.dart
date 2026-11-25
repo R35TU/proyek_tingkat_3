@@ -69,6 +69,55 @@ class StorageService {
     return cleaned.join('/');
   }
 
+  /// Mendeteksi Content-Type (MIME) dari nama berkas atau ekstensi.
+  static String detectContentType(String nameOrExt) {
+    final clean = nameOrExt.split('?').first.split('#').first;
+    final ext = clean.contains('.')
+        ? clean.split('.').last.toLowerCase().trim()
+        : clean.toLowerCase().trim();
+    switch (ext) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'doc':
+        return 'application/msword';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'xls':
+        return 'application/vnd.ms-excel';
+      case 'xlsx':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'ppt':
+        return 'application/vnd.ms-powerpoint';
+      case 'pptx':
+        return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'svg':
+        return 'image/svg+xml';
+      case 'zip':
+        return 'application/zip';
+      case 'rar':
+        return 'application/vnd.rar';
+      case '7z':
+        return 'application/x-7z-compressed';
+      case 'txt':
+        return 'text/plain';
+      case 'csv':
+        return 'text/csv';
+      case 'img':
+        return 'image/jpeg';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
   /// Mengunggah data bytes (Uint8List) langsung ke Cloudflare R2 menggunakan S3 Signature V4.
   /// Mengembalikan URL publik file yang berhasil diunggah.
   static Future<String> uploadBytes({

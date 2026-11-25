@@ -2,6 +2,8 @@ import 'dart:math';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/kegiatan_model.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
+import 'package:tata_saka_app/utils/execution_period_helper.dart';
+import 'package:tata_saka_app/utils/progress_calculator.dart';
 
 class MonthlyBoQItem {
   final String no;
@@ -387,31 +389,40 @@ class MonthlyReportModel {
         ? kegiatan
         : KegiatanModel.fromJson(kegMap, fallbackContract: contract);
 
-    final List dailyReports = (kegMap['laporans'] as List?) ?? [];
+    // Selesaikan periode pelaksanaan otoritatif dari Kegiatan & Kontrak terbaru
+    final period = ExecutionPeriodHelper.resolveExecutionPeriod(
+      kegMap,
+      contract: contract,
+    );
+    final int totalDays = period.durationDays > 0
+        ? period.durationDays
+        : (contract.hariKalender > 0 ? contract.hariKalender : 90);
 
-    // Ambil list divisi aktif (Addendum CCO terakhir jika ada, atau Kontrak Awal)
-    final List<Map<String, dynamic>> activeDivisiList = kegModel.activeRkkDivisiList;
+    // Tentukan total minggu kontrak kegiatan berdasarkan periode terbaru
+    int totalWeeks = period.totalWeeks;
+    if (kegMap['minggu'] != null) {
+      final parsed = int.tryParse(kegMap['minggu'].toString());
+      if (parsed != null && parsed > 0) totalWeeks = parsed;
+    }
 
-    // Ambil seluruh laporan mingguan
+    // Ambil seluruh laporan mingguan yang selaras dengan jadwal aktif (jika periodeAwal cocok atau kosong)
     final List rawMingguan = (kegMap['laporanMingguan'] as List?) ?? [];
-    final List<WeeklyReportModel> weeklyReports = rawMingguan
+    final List<WeeklyReportModel> allWeeklyReports = rawMingguan
         .map((w) => (w is WeeklyReportModel)
             ? w
             : WeeklyReportModel.fromJson(Map<String, dynamic>.from(w as Map)))
         .toList();
 
+    final List<WeeklyReportModel> weeklyReports = [];
+    for (final w in allWeeklyReports) {
+      final range = ExecutionPeriodHelper.calcWeekRange(w.mingguKe, period.startDate, totalDays);
+      if (ExecutionPeriodHelper.doesSavedWeeklyMatchRange(w, range)) {
+        weeklyReports.add(w);
+      }
+    }
     weeklyReports.sort((a, b) => a.mingguKe.compareTo(b.mingguKe));
 
-    // Tentukan total minggu kontrak kegiatan
-    int totalWeeks = 13;
-    if (kegMap['minggu'] != null) {
-      final parsed = int.tryParse(kegMap['minggu'].toString());
-      if (parsed != null && parsed > 0) totalWeeks = parsed;
-    } else if (contract.hariKalender > 0) {
-      totalWeeks = (contract.hariKalender / 7.0).ceil();
-    }
-
-    // Pastikan totalWeeks minimal mengakomodasi minggu terakhir yang ada
+    // Pastikan totalWeeks minimal mengakomodasi minggu terakhir yang selaras
     if (weeklyReports.isNotEmpty && weeklyReports.last.mingguKe > totalWeeks) {
       totalWeeks = weeklyReports.last.mingguKe;
     }
@@ -432,13 +443,13 @@ class MonthlyReportModel {
         : contract.sumberDana;
     final pelaksanaKontraktor = kegModel.kontraktor.isNotEmpty
         ? kegModel.kontraktor
-        : 'CV. DIVAN INSAN CEMERLANG';
+        : (kegMap['kontraktor']?.toString() ?? '');
     final noKontrak = kegModel.noSuratPesanan.isNotEmpty
         ? kegModel.noSuratPesanan
-        : contract.nomorSpk;
+        : (contract.nomorSpk.isNotEmpty ? contract.nomorSpk : contract.nomorSpmk);
     final konsultanPengawas = kegModel.konsultanPengawas.isNotEmpty
         ? kegModel.konsultanPengawas
-        : 'CV. TATA SAKA CONSULTANT';
+        : (kegMap['konsultanPengawas']?.toString() ?? '');
     final noKontrakPengawas = kegModel.noSpkKonsultan.isNotEmpty
         ? kegModel.noSpkKonsultan
         : contract.nomorSpmk;
@@ -458,12 +469,84 @@ class MonthlyReportModel {
       final WeeklyReportModel? latestBefore =
           weeksBefore.isNotEmpty ? weeksBefore.last : null;
 
-      // Status bulan
+      // Periode Tanggal SELALU dihitung dinamis dari tanggal pelaksanaan kegiatan terbaru
+      String periodeFormatted;
+      DateTime? monthStartDt;
+      DateTime? monthEndDt;
+
+      if (period.startDate != null) {
+        final spmkDt = period.startDate!;
+        final startDayIdx = (startWeek - 1) * 7;
+        final endDayIdx = min(endWeek * 7 - 1, totalDays - 1);
+        monthStartDt = DateTime(spmkDt.year, spmkDt.month, spmkDt.day + startDayIdx);
+        monthEndDt = DateTime(spmkDt.year, spmkDt.month, spmkDt.day + max(startDayIdx, endDayIdx));
+        periodeFormatted =
+            '${WeeklyReportModel.formatIndonesianDate(monthStartDt)} - ${WeeklyReportModel.formatIndonesianDate(monthEndDt)}';
+      } else if (weeksInMonth.isNotEmpty) {
+        final firstWeek = weeksInMonth.first;
+        final lastWeek = weeksInMonth.last;
+        periodeFormatted = '${firstWeek.periodeAwal} - ${lastWeek.periodeAkhir}';
+        monthStartDt = WeeklyReportModel.parseIndonesianDate(firstWeek.periodeAwal);
+        monthEndDt = WeeklyReportModel.parseIndonesianDate(lastWeek.periodeAkhir);
+      } else {
+        periodeFormatted = 'Minggu $startWeek s.d. Minggu $endWeek';
+      }
+
+      // Hitung agregasi BOQ terpusat dari ProgressCalculator (Sinkron dengan Laporan Harian)
+      final boqResult = ProgressCalculator.calculateBoqProgress(
+        kegMap: kegMap,
+        startDt: monthStartDt,
+        endDt: monthEndDt,
+        minStartDt: period.startDate,
+      );
+
+      // Laporan mingguan referensi s/d akhir bulan berjalan
+      final WeeklyReportModel? currentLatestWeek =
+          weeksInMonth.isNotEmpty ? weeksInMonth.last : null;
+      final prevItems = _flattenBoqItems(latestBefore?.boqProgressList);
+      final currItems = _flattenBoqItems(currentLatestWeek?.boqProgressList);
+
+      // Cek apakah ada laporan harian di dalam bulan ini sesudah minggu terakhir yang tersimpan
+      bool hasDailyAfterCurrentWeek = false;
+      final DateTime? currentWeekEndDt = currentLatestWeek != null
+          ? WeeklyReportModel.parseIndonesianDate(currentLatestWeek.periodeAkhir)
+          : null;
+      if (currentWeekEndDt != null && monthEndDt != null) {
+        final cwEndDay = DateTime(currentWeekEndDt.year, currentWeekEndDt.month, currentWeekEndDt.day);
+        final mEndDay = DateTime(monthEndDt.year, monthEndDt.month, monthEndDt.day);
+        final minStartDay = period.startDate != null
+            ? DateTime(period.startDate!.year, period.startDate!.month, period.startDate!.day)
+            : null;
+        if (mEndDay.isAfter(cwEndDay)) {
+          final rawDaily = (kegMap['laporans'] as List?) ?? [];
+          for (final rep in rawDaily) {
+            if (rep is! Map) continue;
+            final tglStr = rep['tanggal']?.toString() ?? rep['tanggalFormatted']?.toString() ?? '';
+            final dt = DateTime.tryParse(tglStr) ?? WeeklyReportModel.parseIndonesianDate(tglStr);
+            if (dt == null) continue;
+            final day = DateTime(dt.year, dt.month, dt.day);
+            if (minStartDay != null && day.isBefore(minStartDay)) continue;
+            if (day.isAfter(cwEndDay) && !day.isAfter(mEndDay)) {
+              hasDailyAfterCurrentWeek = true;
+              break;
+            }
+          }
+        }
+      }
+
+      final bool hasDailyInMonth = boqResult.totalBobotPeriodeIni > 0;
+
+      // Status bulan (mempertimbangkan laporan mingguan selaras & realisasi harian bulan ini)
       String status;
       String statusDetail;
       if (weeksInMonth.isEmpty) {
-        status = 'Belum Ada Data';
-        statusDetail = 'Rencana (M-$startWeek s.d. M-$endWeek)';
+        if (hasDailyInMonth) {
+          status = 'Sedang Berjalan';
+          statusDetail = 'Realisasi Harian (M-$startWeek s.d. M-$endWeek)';
+        } else {
+          status = 'Belum Ada Data';
+          statusDetail = 'Rencana (M-$startWeek s.d. M-$endWeek)';
+        }
       } else if (weeksInMonth.length == (endWeek - startWeek + 1)) {
         status = 'Selesai';
         statusDetail = 'Lengkap (M-$startWeek s.d. M-$endWeek)';
@@ -476,39 +559,6 @@ class MonthlyReportModel {
             : 'Sedang Berjalan (M-$minW s.d. M-$maxW)';
       }
 
-      // Periode Tanggal
-      String periodeFormatted;
-      if (weeksInMonth.isNotEmpty) {
-        final firstWeek = weeksInMonth.first;
-        final lastWeek = weeksInMonth.last;
-        periodeFormatted = '${firstWeek.periodeAwal} - ${lastWeek.periodeAkhir}';
-      } else {
-        periodeFormatted = 'Minggu $startWeek s.d. Minggu $endWeek';
-      }
-
-      // Laporan mingguan referensi s/d akhir bulan berjalan
-      final WeeklyReportModel? currentLatestWeek =
-          weeksInMonth.isNotEmpty ? weeksInMonth.last : null;
-
-      // Rencana, Realisasi, Deviasi
-      double rencanaFisik = 0.0;
-      double realisasiKumulatif = 0.0;
-      double deviasi = 0.0;
-
-      if (currentLatestWeek != null) {
-        rencanaFisik = currentLatestWeek.rencanaPersen;
-        realisasiKumulatif = currentLatestWeek.realisasiPersen;
-        deviasi = currentLatestWeek.deviasiPersen;
-      } else if (latestBefore != null) {
-        rencanaFisik = latestBefore.rencanaPersen;
-        realisasiKumulatif = latestBefore.realisasiPersen;
-        deviasi = latestBefore.deviasiPersen;
-      }
-
-      // Extract flat items from Weekly boqProgressList
-      final prevItems = _flattenBoqItems(latestBefore?.boqProgressList);
-      final currItems = _flattenBoqItems(currentLatestWeek?.boqProgressList);
-
       // Hitung rincian tabel per divisi dan item BoQ
       final List<MonthlyBoQDivision> divisions = [];
       double totalBobotCCO = 0.0;
@@ -517,8 +567,11 @@ class MonthlyReportModel {
       double totalBobotSdBulanIni = 0.0;
       double totalBobotSisa = 0.0;
 
-      for (int divIndex = 0; divIndex < activeDivisiList.length; divIndex++) {
-        final div = activeDivisiList[divIndex];
+      final bool useSavedCurrWeek =
+          currItems.isNotEmpty && !hasDailyAfterCurrentWeek;
+
+      for (int divIndex = 0; divIndex < boqResult.divisions.length; divIndex++) {
+        final div = boqResult.divisions[divIndex];
         final String kode = (div['nomorRomawi'] ?? div['kode'] ?? (divIndex + 1).toString()).toString();
         final String namaDivisi = (div['namaDivisi'] ?? div['nama'] ?? 'DIVISI').toString();
         final List rawItems = (div['items'] as List?) ?? [];
@@ -531,33 +584,35 @@ class MonthlyReportModel {
           final String noMataPembayaran = (it['noMataPembayaran'] ?? '').toString();
           final String uraian = (it['uraian'] ?? it['nama'] ?? '').toString();
           final String satuan = (it['satuan'] ?? '').toString();
-          final double volCCO = (it['volume'] as num?)?.toDouble() ?? 0.0;
+          final double volCCO = (it['volumeCCO'] ?? it['volume'] as num?)?.toDouble() ?? 0.0;
           final double bbtCCO = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
 
-          // 1. Hitung akumulasi volume s.d. Bulan Lalu (minggu sebelum bulan ini)
-          double volBulanLalu = 0.0;
-          if (prevItems.isNotEmpty) {
-            final prevMatch = _findMatchingItem(prevItems, noMataPembayaran, uraian);
-            volBulanLalu = _getSdVolume(prevMatch);
-          } else if (latestBefore != null) {
-            final endDtBefore = WeeklyReportModel.parseIndonesianDate(latestBefore.periodeAkhir);
-            volBulanLalu = _calcVolFromDailyReports(dailyReports, noMataPembayaran, uraian, endDtBefore);
+          final double calcVolLalu =
+              (it['mingguLaluVolume'] as num?)?.toDouble() ??
+                  (it['bulanLaluVolume'] as num?)?.toDouble() ??
+                  0.0;
+          final double calcVolIni =
+              (it['mingguIniVolume'] as num?)?.toDouble() ??
+                  (it['bulanIniVolume'] as num?)?.toDouble() ??
+                  0.0;
+
+          final double volBulanLalu = prevItems.isNotEmpty
+              ? _getSdVolume(_findMatchingItem(prevItems, noMataPembayaran, uraian))
+              : calcVolLalu;
+
+          final double volSdBulanIni;
+          if (useSavedCurrWeek) {
+            volSdBulanIni = _getSdVolume(
+              _findMatchingItem(currItems, noMataPembayaran, uraian),
+            );
+          } else if (currItems.isEmpty && prevItems.isNotEmpty && !hasDailyInMonth) {
+            volSdBulanIni = volBulanLalu;
+          } else {
+            volSdBulanIni = volBulanLalu + calcVolIni;
           }
 
-          // 2. Hitung akumulasi volume s.d. Bulan Ini (minggu terakhir yang tersedia di bulan ini)
-          double volSdBulanIni = volBulanLalu;
-          if (currItems.isNotEmpty) {
-            final currMatch = _findMatchingItem(currItems, noMataPembayaran, uraian);
-            volSdBulanIni = _getSdVolume(currMatch);
-          } else if (currentLatestWeek != null) {
-            final endDtCurrent = WeeklyReportModel.parseIndonesianDate(currentLatestWeek.periodeAkhir);
-            volSdBulanIni = _calcVolFromDailyReports(dailyReports, noMataPembayaran, uraian, endDtCurrent);
-          }
-
-          // 3. Volume Bulan Ini = S/D Bulan Ini - Bulan Lalu
           final double volBulanIni = max(0.0, volSdBulanIni - volBulanLalu);
 
-          // 4. Hitung Bobot %
           final double bbtBulanLalu = (volCCO > 0)
               ? (volBulanLalu / volCCO) * bbtCCO
               : 0.0;
@@ -568,7 +623,6 @@ class MonthlyReportModel {
               ? (volSdBulanIni / volCCO) * bbtCCO
               : 0.0;
 
-          // 5. Sisa Pekerjaan
           final double sisaVolume = max(0.0, volCCO - volSdBulanIni);
           final double sisaBobot = max(0.0, bbtCCO - bbtSdBulanIni);
 
@@ -606,6 +660,27 @@ class MonthlyReportModel {
           ),
         );
       }
+
+      // Rencana, Realisasi, Deviasi
+      double rencanaFisik = 0.0;
+      double realisasiKumulatif = totalBobotSdBulanIni;
+
+      if (currentLatestWeek != null) {
+        if (currentLatestWeek.rencanaPersen > 0) {
+          rencanaFisik = currentLatestWeek.rencanaPersen;
+        }
+        if (useSavedCurrWeek && currentLatestWeek.realisasiPersen > 0) {
+          realisasiKumulatif = currentLatestWeek.realisasiPersen;
+        }
+      } else if (latestBefore != null) {
+        if (latestBefore.rencanaPersen > 0) {
+          rencanaFisik = latestBefore.rencanaPersen;
+        }
+        if (!hasDailyInMonth && latestBefore.realisasiPersen > 0) {
+          realisasiKumulatif = latestBefore.realisasiPersen;
+        }
+      }
+      final double deviasi = realisasiKumulatif - rencanaFisik;
 
       // Tanda tangan tersimpan untuk bulan ini
       final rawBulananList = (kegMap['laporanBulanan'] as List?) ?? [];
@@ -653,12 +728,22 @@ class MonthlyReportModel {
       } else {
         ttdKontraktorNama = pelaksanaKontraktor;
         ttdKontraktorJabatan = 'Kontraktor Pelaksana';
+        final konsultanName = kegModel.konsultanPengawas.isNotEmpty
+            ? kegModel.konsultanPengawas
+            : (kegMap['konsultanPengawas']?.toString() ?? '');
+        final dinasName = contract.instansiDinas.isNotEmpty
+            ? contract.instansiDinas.first
+            : '';
         ttdKonsultanNama = contract.siteEngineer;
-        ttdKonsultanJabatan = 'Konsultan Supervisi\nCV. TATA SAKA CONSULTANT';
+        ttdKonsultanJabatan = konsultanName.isNotEmpty
+            ? 'Konsultan Supervisi\n$konsultanName'
+            : 'Konsultan Supervisi';
         ttdPpkNama = kegModel.penggunaAnggaran.isNotEmpty
             ? kegModel.penggunaAnggaran
             : (kegMap['penggunaAnggaran']?.toString() ?? '');
-        ttdPpkJabatan = 'Pejabat Pembuat Komitmen (PPK)\nDPU-PR Kab. Purbalingga';
+        ttdPpkJabatan = dinasName.isNotEmpty
+            ? 'Pejabat Pembuat Komitmen (PPK)\n$dinasName'
+            : 'Pejabat Pembuat Komitmen (PPK)';
         ttdPpkTanggal = periodeFormatted.split('-').last.trim();
       }
 

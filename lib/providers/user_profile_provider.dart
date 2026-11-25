@@ -76,6 +76,7 @@ class UserProfileProvider with ChangeNotifier {
   static List<String> get registeredAgencyNames => [];
 
   // ─── 1. ACTIVE USER PROFILE & ROLE ───
+  bool _isInitialized = false;
   String _uid = '';
   String _namaLengkap = '';
   String _username = '';
@@ -104,11 +105,18 @@ class UserProfileProvider with ChangeNotifier {
   final List<LoginActivityItem> _loginActivities = [];
 
   // Getters Profile & Roles
+  bool get isInitialized => _isInitialized;
+  bool get isAuthenticated => _username.isNotEmpty;
   String get uid => _uid.isNotEmpty ? _uid : (AuthService.currentUser?.uid ?? '');
   String get namaLengkap => _namaLengkap;
   String get username => _username;
   String get role => _role;
-  String get companyOrAgency => _companyOrAgency;
+  String get companyOrAgency {
+    if (isKonsultan) {
+      return 'CV. Tata Saka Consultant';
+    }
+    return _companyOrAgency;
+  }
   String? get profileImagePath => _profileImagePath;
   String get currentPassword => _currentPassword;
 
@@ -159,7 +167,11 @@ class UserProfileProvider with ChangeNotifier {
         _namaLengkap = p['namaLengkap'] ?? _namaLengkap;
         _username = p['username'] ?? _username;
         _role = p['role'] ?? _role;
-        _companyOrAgency = p['companyOrAgency'] ?? _companyOrAgency;
+        if (_role.toLowerCase() == 'konsultan') {
+          _companyOrAgency = 'CV. Tata Saka Consultant';
+        } else {
+          _companyOrAgency = p['companyOrAgency'] ?? _companyOrAgency;
+        }
         _profileImagePath = p['profileImagePath'];
         _currentPassword = p['currentPassword'] ?? _currentPassword;
       }
@@ -178,8 +190,9 @@ class UserProfileProvider with ChangeNotifier {
         _lastBackupDate = s['lastBackupDate'] ?? _lastBackupDate;
         _cacheSize = s['cacheSize'] ?? _cacheSize;
       }
-      notifyListeners();
     } catch (_) {}
+    _isInitialized = true;
+    notifyListeners();
   }
 
   Future<void> _saveToPreferences() async {
@@ -236,8 +249,12 @@ class UserProfileProvider with ChangeNotifier {
       final fallbackUsername = cleanInput.contains('@') ? cleanInput.split('@').first : cleanInput;
       _username = (doc?['username'] ?? fallbackUsername).toString();
       _role = (doc?['role'] ?? roleHint ?? 'Konsultan').toString();
-      _namaLengkap = (doc?['namaLengkap'] ?? fallbackUsername).toString();
-      _companyOrAgency = (doc?['companyOrAgency'] ?? 'Tata Saka').toString();
+      _namaLengkap = (doc?['namaLengkap'] ?? doc?['full_name'] ?? doc?['name'] ?? fallbackUsername).toString();
+      if (_role.toLowerCase() == 'konsultan') {
+        _companyOrAgency = 'CV. Tata Saka Consultant';
+      } else {
+        _companyOrAgency = (doc?['companyOrAgency'] ?? '').toString();
+      }
       _currentPassword = cleanPassword;
       _profileImagePath = null;
       notifyListeners();
@@ -261,7 +278,9 @@ class UserProfileProvider with ChangeNotifier {
     _username = user.username;
     _role = user.role;
     _namaLengkap = user.namaLengkap;
-    _companyOrAgency = user.companyOrAgency;
+    _companyOrAgency = user.role.toLowerCase() == 'konsultan'
+        ? 'CV. Tata Saka Consultant'
+        : user.companyOrAgency;
     _currentPassword = user.password;
     _profileImagePath = null;
 
@@ -275,6 +294,11 @@ class UserProfileProvider with ChangeNotifier {
       _namaLengkap = newName.trim();
       notifyListeners();
       _saveToPreferences();
+      if (_uid.isNotEmpty) {
+        try {
+          AuthService.updateUserDoc(_uid, {'namaLengkap': _namaLengkap});
+        } catch (_) {}
+      }
     }
   }
 

@@ -102,6 +102,19 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
   late String _lokasi;
   late List<_FolderData> _folders;
   bool _isExecutiveInfoExpanded = true;
+  ContractModel? _syncedContractRef;
+
+  ContractModel _resolveLiveContract({bool listen = false}) {
+    try {
+      final prov = Provider.of<ContractProvider>(context, listen: listen);
+      return prov.contracts.firstWhere(
+        (c) => c.id == widget.contract.id,
+        orElse: () => widget.contract,
+      );
+    } catch (_) {
+      return widget.contract;
+    }
+  }
 
   @override
   void initState() {
@@ -117,9 +130,12 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
     }
   }
 
-  void _loadData() {
-    _kegiatanMap = Map<String, dynamic>.from(widget.contract.kegiatans[widget.kegiatanIndex]);
-    _kegiatan = KegiatanModel.fromJson(_kegiatanMap, fallbackContract: widget.contract);
+  void _loadData([ContractModel? explicitContract]) {
+    final live = explicitContract ?? _resolveLiveContract(listen: false);
+    _syncedContractRef = live;
+    if (widget.kegiatanIndex >= live.kegiatans.length) return;
+    _kegiatanMap = Map<String, dynamic>.from(live.kegiatans[widget.kegiatanIndex]);
+    _kegiatan = KegiatanModel.fromJson(_kegiatanMap, fallbackContract: live);
     _namaKegiatan = _kegiatan.namaKegiatan;
     _lokasi = _kegiatan.lokasi;
     
@@ -152,8 +168,11 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
       'documents': f.documents.map((d) => d.toJson()).toList(),
     }).toList();
 
-    widget.contract.kegiatans[widget.kegiatanIndex] = _kegiatanMap;
-    Provider.of<ContractProvider>(context, listen: false).updateContract(widget.contract);
+    final live = _resolveLiveContract(listen: false);
+    if (widget.kegiatanIndex < live.kegiatans.length) {
+      live.kegiatans[widget.kegiatanIndex] = _kegiatanMap;
+      Provider.of<ContractProvider>(context, listen: false).updateContract(live);
+    }
   }
 
   void _addFolder() {
@@ -681,11 +700,14 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                                             bytes: uploadBytesData,
                                             remotePath: StorageService.safeObjectPath(
                                                 'dokumen/${widget.contract.namaKontrak}/${_folders[selectedFolderIdx].name}/${DateTime.now().millisecondsSinceEpoch}_$pickedFileName'),
-                                            contentType: detectedType == 'IMG'
-                                                ? 'image/jpeg'
-                                                : 'application/pdf',
+                                            contentType: StorageService.detectContentType(pickedFileName),
                                           );
-                                    } catch (_) {}
+                                    } catch (e) {
+                                      debugPrint('[Upload] Gagal unggah ke storage: $e');
+                                      if (kIsWeb) {
+                                        throw Exception('Gagal mengunggah berkas ke cloud storage: $e');
+                                      }
+                                    }
                                   }
 
                                   final formattedSize = _formatFileSize(pickedFileBytes > 0 ? pickedFileBytes : 1024 * 350);
@@ -903,11 +925,19 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                 leading: const Icon(Icons.storage_outlined, size: 20, color: AppColors.textLight),
                 title: const Text('Status File Fisik', style: TextStyle(fontSize: 13, color: AppColors.textLight)),
                 trailing: Text(
-                  doc.localPath != null && File(doc.localPath!).existsSync() ? 'Tersimpan Offline' : 'Tersimpan di Cloud',
+                  !kIsWeb && doc.localPath != null && File(doc.localPath!).existsSync()
+                      ? 'Tersimpan Offline'
+                      : ((doc.remoteUrl ?? '').isNotEmpty
+                          ? 'Tersimpan di Cloud'
+                          : 'Berkas Tidak Tersedia'),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: doc.localPath != null && File(doc.localPath!).existsSync() ? Colors.green : Colors.orange,
+                    color: !kIsWeb && doc.localPath != null && File(doc.localPath!).existsSync()
+                        ? Colors.green
+                        : ((doc.remoteUrl ?? '').isNotEmpty
+                            ? Colors.orange
+                            : Colors.red),
                   ),
                 ),
               ),
@@ -918,10 +948,21 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(ctx);
-                        // Web: buka langsung dari URL Cloudflare di tab baru
-                        // (PDF/gambar tampil di viewer bawaan browser).
+                        final resolvedName = resolveDocFileName(doc.name, doc.type, doc.remoteUrl ?? doc.localPath);
+                        // Web: buka PDF/gambar langsung di tab baru (viewer bawaan browser),
+                        // sedangkan file office/arsip (DOC, DOCX, XLS, XLSX, ZIP) langsung diunduh.
                         if (kIsWeb && (doc.remoteUrl ?? '').isNotEmpty) {
-                          openRemoteInNewTab(doc.remoteUrl!);
+                          if (isPreviewableInBrowser(doc.type, doc.remoteUrl)) {
+                            openRemoteInNewTab(doc.remoteUrl!);
+                          } else {
+                            downloadAndOpenRemote(doc.remoteUrl!, resolvedName).catchError((e) {
+                              if (!mounted) return null;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Gagal mengunduh dokumen: $e')),
+                              );
+                              return null;
+                            });
+                          }
                           return;
                         }
                         if (doc.type == 'IMG' && doc.localPath != null && File(doc.localPath!).existsSync()) {
@@ -956,7 +997,7 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                               duration: Duration(seconds: 2),
                             ),
                           );
-                          downloadAndOpenRemote(doc.remoteUrl!, doc.name).catchError((e) {
+                          downloadAndOpenRemote(doc.remoteUrl!, resolvedName).catchError((e) {
                             if (!mounted) return null;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Gagal membuka dokumen: $e')),
@@ -1006,11 +1047,12 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
   }
 
   Future<void> _editKegiatanSelf() async {
+    final live = _resolveLiveContract(listen: false);
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
         builder: (context) => FormKegiatanScreen(
-          contract: widget.contract,
+          contract: live,
           initialKegiatan: _kegiatanMap,
           kegiatanIndex: widget.kegiatanIndex,
         ),
@@ -1021,14 +1063,17 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
       if (_kegiatanMap.containsKey('folders')) {
         result['folders'] = _kegiatanMap['folders'];
       }
+      final updatedLive = _resolveLiveContract(listen: false);
       setState(() {
         _kegiatanMap = result;
-        _kegiatan = KegiatanModel.fromJson(_kegiatanMap, fallbackContract: widget.contract);
+        _kegiatan = KegiatanModel.fromJson(_kegiatanMap, fallbackContract: updatedLive);
         _namaKegiatan = _kegiatan.namaKegiatan;
         _lokasi = _kegiatan.lokasi;
-        widget.contract.kegiatans[widget.kegiatanIndex] = _kegiatanMap;
+        if (widget.kegiatanIndex < updatedLive.kegiatans.length) {
+          updatedLive.kegiatans[widget.kegiatanIndex] = _kegiatanMap;
+        }
       });
-      Provider.of<ContractProvider>(context, listen: false).updateContract(widget.contract);
+      Provider.of<ContractProvider>(context, listen: false).updateContract(updatedLive);
       try {
         final timeline = Provider.of<TimelineProvider>(context, listen: false);
         timeline.logEvent(
@@ -1103,6 +1148,17 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final live = _resolveLiveContract(listen: true);
+    if (!identical(live, _syncedContractRef)) {
+      _loadData(live);
+    } else if (widget.kegiatanIndex >= 0 &&
+        widget.kegiatanIndex < live.kegiatans.length) {
+      _kegiatanMap =
+          Map<String, dynamic>.from(live.kegiatans[widget.kegiatanIndex]);
+      _kegiatan = KegiatanModel.fromJson(_kegiatanMap, fallbackContract: live);
+      _namaKegiatan = _kegiatan.namaKegiatan;
+      _lokasi = _kegiatan.lokasi;
+    }
     UserProfileProvider? userProf;
     try {
       userProf = Provider.of<UserProfileProvider>(context);
@@ -1490,7 +1546,7 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => DetailDataLaporanScreen(
-                                contract: widget.contract,
+                                contract: _resolveLiveContract(listen: false),
                                 kegiatanIndex: widget.kegiatanIndex,
                                 initialTab: 1,
                               ),
@@ -1514,7 +1570,7 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => DetailDataLaporanScreen(
-                                contract: widget.contract,
+                                contract: _resolveLiveContract(listen: false),
                                 kegiatanIndex: widget.kegiatanIndex,
                                 initialTab: 0,
                               ),
@@ -1912,6 +1968,8 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                   _buildDocRow('No. Surat Pesanan/tanggal', _kegiatan.suratPesananFull),
                   _buildDocRow('No. SPMK/tanggal', _kegiatan.spmkKontraktorFull),
                   _buildDocRow('Jangka Waktu Pelaksanaan', _kegiatan.jangkaWaktu),
+                  if (_kegiatan.tglAkhirSpmk.isNotEmpty)
+                    _buildDocRow('Tanggal Akhir SPMK', _kegiatan.tglAkhirSpmk),
                 ],
               ),
             ),
@@ -1949,7 +2007,11 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          _kegiatan.nilaiKontrak.isNotEmpty ? _kegiatan.nilaiKontrak : '-',
+                          _kegiatan.nilaiKontrak.isNotEmpty
+                              ? (_kegiatan.nilaiKontrak.startsWith('Rp')
+                                  ? _kegiatan.nilaiKontrak
+                                  : 'Rp ${_kegiatan.nilaiKontrak}')
+                              : '-',
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -2185,8 +2247,14 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
     );
   }
 
-  double get _currentProgresFisik =>
-      ProgressCalculator.calculateKegiatanProgress(_kegiatanMap);
+  double get _currentProgresFisik {
+    final live = _resolveLiveContract(listen: false);
+    final keg = (widget.kegiatanIndex >= 0 &&
+            widget.kegiatanIndex < live.kegiatans.length)
+        ? live.kegiatans[widget.kegiatanIndex]
+        : _kegiatanMap;
+    return ProgressCalculator.calculateKegiatanProgress(keg, contract: live);
+  }
 
   void _bukaLembarTambahKurangLatest() {
     if (!_kegiatan.hasAddendum) return;
@@ -2391,7 +2459,7 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => KelolaRkkScreen(
-                          contract: widget.contract,
+                          contract: _resolveLiveContract(listen: false),
                           kegiatanIndex: widget.kegiatanIndex,
                           readOnly: !isKonsultan,
                         ),
@@ -2430,7 +2498,7 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (_) => KelolaAddendumScreen(
-                            contract: widget.contract,
+                            contract: _resolveLiveContract(listen: false),
                             kegiatanIndex: widget.kegiatanIndex,
                             readOnly: !isKonsultan,
                           ),
@@ -2511,7 +2579,6 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
     final rawRkk = _kegiatan.activeRkkDivisiList;
     int totalItems = 0;
     double totalHarga = 0.0;
-    double totalBobot = 0.0;
 
     for (final div in rawRkk) {
       final items = (div['items'] as List? ?? []);
@@ -2521,9 +2588,12 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
         final vol = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
         final th = (it['totalHarga'] as num?)?.toDouble() ?? (hs * vol);
         totalHarga += th;
-        totalBobot += (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
       }
     }
+
+    final double nilaiKontrakKegiatan = RupiahUtil.parseToDouble(_kegiatan.nilaiKontrak);
+    final double divisor = nilaiKontrakKegiatan > 0 ? nilaiKontrakKegiatan : totalHarga;
+    final double totalBobot = divisor > 0 ? (totalHarga / divisor) * 100.0 : 0.0;
 
     final hasRkk = rawRkk.isNotEmpty && totalItems > 0;
 
@@ -2593,6 +2663,12 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
           ),
           const SizedBox(height: 12),
 
+          // Validasi Kesesuaian Total RAB terhadap Nilai Kontrak Kegiatan
+          _buildRabValidationStatus(
+            totalRab: totalHarga,
+            nilaiKontrak: nilaiKontrakKegiatan,
+          ),
+
           if (!hasRkk)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
@@ -2655,9 +2731,10 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                           final vol = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
                           final th = (it['totalHarga'] as num?)?.toDouble() ?? (hs * vol);
                           divSubtotal += th;
-                          divBobot += totalHarga > 0
-                              ? (th / totalHarga) * 100.0
+                          final bbtItem = divisor > 0
+                              ? (th / divisor) * 100.0
                               : ((it['nilaiBobot'] as num?)?.toDouble() ?? 0.0);
+                          divBobot += bbtItem;
                         }
 
                         return [
@@ -2686,9 +2763,9 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                             final hs = (it['hargaSatuan'] as num?)?.toDouble() ?? 0.0;
                             final vol = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
                             final th = (it['totalHarga'] as num?)?.toDouble() ?? (hs * vol);
-                            // Rumus konsisten: Bobot Pekerjaan (%) = (Total Harga Item / Total Nilai RAB) * 100%
-                            final bbt = totalHarga > 0
-                                ? (th / totalHarga) * 100.0
+                            // Rumus: Bobot Pekerjaan (%) = (Total Harga Item / Nilai Kontrak Kegiatan) * 100%
+                            final bbt = divisor > 0
+                                ? (th / divisor) * 100.0
                                 : ((it['nilaiBobot'] as num?)?.toDouble() ?? 0.0);
 
                             return TableRow(
@@ -2718,7 +2795,7 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                           _rabTd('', align: TextAlign.right),
                           _rabTd('', align: TextAlign.right),
                           _rabTd(KelolaRkkScreen.formatRupiah(totalHarga).replaceFirst('Rp ', ''), align: TextAlign.right, isBold: true),
-                          _rabTd(totalHarga > 0 ? '100.000%' : '0.000%', align: TextAlign.right, isBold: true),
+                          _rabTd(divisor > 0 ? '${totalBobot.toStringAsFixed(3)}%' : '0.000%', align: TextAlign.right, isBold: true),
                         ],
                       ),
                       // Baris Pembulatan Sesuai Format Dokumen Fisik Dinas PU (Floor kelipatan Rp 1.000)
@@ -2744,7 +2821,13 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                               align: TextAlign.right,
                               isBold: true,
                             ),
-                            _rabTd('100.000%', align: TextAlign.right, isBold: true),
+                            _rabTd(
+                              divisor > 0
+                                  ? '${((RupiahUtil.floorToNearestThousand(totalHarga > 0 ? totalHarga : nilaiKontrakKegiatan) / divisor) * 100.0).toStringAsFixed(3)}%'
+                                  : '0.000%',
+                              align: TextAlign.right,
+                              isBold: true,
+                            ),
                           ],
                         ),
                     ],
@@ -2785,6 +2868,164 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
           color: isBold ? const Color(0xFF0F172A) : const Color(0xFF334155),
           height: 1.25,
         ),
+      ),
+    );
+  }
+
+  Widget _buildRabValidationStatus({
+    required double totalRab,
+    required double nilaiKontrak,
+  }) {
+    if (nilaiKontrak <= 0) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.info_outline, size: 16, color: Color(0xFF64748B)),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Nilai Kontrak Kegiatan belum ditentukan. Lengkapi nilai kontrak pada edit kegiatan agar validasi RAB aktif.',
+                style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final double diff = totalRab - nilaiKontrak;
+    final bool isSesuai = diff.abs() <= 0.005;
+    final bool isKurang = !isSesuai && diff < 0;
+    final bool isMelebihi = !isSesuai && diff > 0;
+
+    final double bobotAktual = (totalRab / nilaiKontrak) * 100.0;
+
+    final Color bgColor = isSesuai
+        ? const Color(0xFFECFDF5)
+        : (isKurang ? const Color(0xFFFFFBEB) : const Color(0xFFFFF1F2));
+    final Color borderColor = isSesuai
+        ? const Color(0xFFA7F3D0)
+        : (isKurang ? const Color(0xFFFDE68A) : const Color(0xFFFECDD3));
+    final Color badgeBg = isSesuai
+        ? const Color(0xFFD1FAE5)
+        : (isKurang ? const Color(0xFFFEF3C7) : const Color(0xFFFFE4E6));
+    final Color badgeTextColor = isSesuai
+        ? const Color(0xFF065F46)
+        : (isKurang ? const Color(0xFF92400E) : const Color(0xFF9F1239));
+    final Color iconColor = isSesuai
+        ? const Color(0xFF059669)
+        : (isKurang ? const Color(0xFFD97706) : const Color(0xFFE11D48));
+    final IconData icon = isSesuai
+        ? Icons.check_circle_outline
+        : (isKurang ? Icons.warning_amber_rounded : Icons.error_outline_rounded);
+
+    final String badgeLabel = isSesuai
+        ? 'Sesuai'
+        : (isKurang ? 'Belum Sesuai' : 'Melebihi');
+    final String statusTitle = isSesuai
+        ? 'Total RAB sudah sesuai dengan nilai kontrak kegiatan'
+        : (isKurang
+            ? 'Total RAB belum mencapai nilai kontrak kegiatan'
+            : 'Peringatan: Total RAB melebihi nilai kontrak kegiatan');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: iconColor),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: badgeBg,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  badgeLabel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: badgeTextColor,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  statusTitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: badgeTextColor,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 16,
+            runSpacing: 4,
+            children: [
+              _buildValidationSubInfo('Nilai Kontrak', KelolaRkkScreen.formatRupiah(nilaiKontrak)),
+              _buildValidationSubInfo('Total RAB', KelolaRkkScreen.formatRupiah(totalRab)),
+              _buildValidationSubInfo('Total Bobot', '${bobotAktual.toStringAsFixed(3)}%'),
+              if (isKurang)
+                _buildValidationSubInfo(
+                  'Kekurangan',
+                  KelolaRkkScreen.formatRupiah(diff.abs()),
+                  textColor: const Color(0xFFB45309),
+                ),
+              if (isMelebihi)
+                _buildValidationSubInfo(
+                  'Kelebihan',
+                  KelolaRkkScreen.formatRupiah(diff.abs()),
+                  textColor: const Color(0xFFBE123C),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildValidationSubInfo(String label, String value, {Color? textColor}) {
+    return Text.rich(
+      TextSpan(
+        text: '$label: ',
+        style: const TextStyle(
+          fontSize: 10.5,
+          color: Color(0xFF64748B),
+          fontWeight: FontWeight.w500,
+        ),
+        children: [
+          TextSpan(
+            text: value,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: textColor ?? const Color(0xFF0F172A),
+            ),
+          ),
+        ],
       ),
     );
   }

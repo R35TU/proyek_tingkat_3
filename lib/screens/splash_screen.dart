@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/screens/admin_page.dart';
+import 'package:tata_saka_app/screens/detail_kontrak_screen.dart';
 import 'package:tata_saka_app/screens/landing_screen.dart';
 import 'package:tata_saka_app/screens/main_layout.dart';
 import 'package:tata_saka_app/services/auth_service.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/utils/web_navigation.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -16,13 +20,15 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  Timer? _navTimer;
+
   @override
   void initState() {
     super.initState();
     // Di web, rute '/' langsung di-render deklaratif oleh build()
     if (kIsWeb) return;
 
-    Future.delayed(const Duration(seconds: 2), () {
+    _navTimer = Timer(const Duration(seconds: 2), () {
       if (!mounted) return;
       if (ModalRoute.of(context)?.isCurrent != true) return;
       final userProf = context.read<UserProfileProvider>();
@@ -40,20 +46,13 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    // Pada web, route '/' langsung tampilkan konten sebenarnya tanpa screen mati
-    if (kIsWeb) {
-      final userProf = context.watch<UserProfileProvider>();
-      final isAuth = AuthService.currentUser != null && userProf.username.isNotEmpty;
-      if (isAuth) {
-        if (userProf.role.toLowerCase() == 'admin') {
-          return const AdminPage();
-        }
-        return const MainLayout();
-      }
-      return const LandingScreen();
-    }
+  void dispose() {
+    _navTimer?.cancel();
+    _navTimer = null;
+    super.dispose();
+  }
 
+  Widget _buildSplashBody() {
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
@@ -94,6 +93,43 @@ class _SplashScreenState extends State<SplashScreen> {
         ],
       ),
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Pada web, route '/' langsung tampilkan konten sebenarnya tanpa screen mati
+    if (kIsWeb) {
+      final userProf = context.watch<UserProfileProvider>();
+      if (!userProf.isInitialized) {
+        return _buildSplashBody();
+      }
+      if (userProf.isAuthenticated) {
+        final initialWebRoute = getInitialWebRoute();
+        if (initialWebRoute.isNotEmpty && initialWebRoute != '/') {
+          final uri = Uri.tryParse(initialWebRoute);
+          if (uri != null) {
+            if (uri.path == '/detail-kontrak') {
+              final cid = uri.queryParameters['id'];
+              final tab = int.tryParse(uri.queryParameters['tab'] ?? '0') ?? 0;
+              return DetailKontrakScreen(contractId: cid, initialTabIndex: tab);
+            }
+            final cleanPath = uri.path.startsWith('/') ? uri.path.substring(1) : uri.path;
+            if (cleanPath.isNotEmpty && cleanPath != 'main') {
+              return MainLayout(initialMenu: cleanPath);
+            }
+          }
+        }
+        if (userProf.role.toLowerCase() == 'admin') {
+          replaceWebUrl('/#/admin');
+          return const AdminPage();
+        }
+        replaceWebUrl('/#/dashboard');
+        return const MainLayout(initialMenu: 'dashboard');
+      }
+      return const LandingScreen();
+    }
+
+    return _buildSplashBody();
   }
 }
 

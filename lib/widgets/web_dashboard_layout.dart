@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
+import 'package:tata_saka_app/utils/web_navigation.dart';
 
 /// Reusable Web Dashboard Layout Shell for Tata Saka Consultant.
 ///
@@ -77,14 +79,17 @@ class WebDashboardLayout extends StatefulWidget {
 
 class _WebDashboardLayoutState extends State<WebDashboardLayout> {
   void _handleMenuClick(String menuKey) {
+    if (kIsWeb) {
+      replaceWebUrl('/#/$menuKey');
+    }
     WebDashboardLayout.activeWebMenu.value = menuKey;
     if (widget.onMenuSelected != null) {
       widget.onMenuSelected!(menuKey);
     } else {
       if (Navigator.canPop(context)) {
-        Navigator.popUntil(context, (route) => route.isFirst);
+        Navigator.pop(context);
       } else {
-        Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+        Navigator.pushReplacementNamed(context, '/$menuKey');
       }
     }
   }
@@ -527,7 +532,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'CV. TATA SAKA',
+                                'CV. TATA SAKA CONSULTANT',
                                 style: TextStyle(
                                   color: Color(0xFF0F172A),
                                   fontSize: 14,
@@ -546,7 +551,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                                 ),
                               ),
                               Text(
-                                'Consultant Engineer',
+                                'Engineering Consultant',
                                 style: TextStyle(
                                   color: Color(0xFF94A3B8),
                                   fontSize: 9.5,

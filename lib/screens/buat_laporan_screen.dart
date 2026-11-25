@@ -13,13 +13,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
+import 'package:tata_saka_app/models/kegiatan_model.dart';
+import 'package:tata_saka_app/models/weekly_report_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/services/storage_service.dart';
-import 'package:flutter/foundation.dart';
-import 'package:provider/provider.dart';
-import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/utils/execution_period_helper.dart';
 import 'package:tata_saka_app/utils/plat_nomor_util.dart';
 import 'package:tata_saka_app/widgets/clean_text_form_field.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
@@ -256,9 +256,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             .toList();
         final perList = (item['personils'] as List<dynamic>?)
             ?.map(
-              (p) => Map<String, String>.from(
+              (p) => Map<String, dynamic>.from(
                 (p as Map).map(
-                  (k, v) => MapEntry(k.toString(), v?.toString() ?? ''),
+                  (k, v) => MapEntry(k.toString(), v),
                 ),
               ),
             )
@@ -267,7 +267,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         // Backward compatibility: If loaded data has no nested sub-items, attach root lists to first pekerjaan
         List<Map<String, String>> finalMats = matList ?? [];
         List<Map<String, String>> finalAlats = alatList ?? [];
-        List<Map<String, String>> finalPers = perList ?? [];
+        List<Map<String, dynamic>> finalPers = perList ?? [];
 
         if (matList == null && i == 0) {
           final oldMats = r['materialList'] as List<dynamic>? ?? [];
@@ -310,6 +310,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                   'role': (p['role'] ?? '').toString(),
                   'cacah': (p['cacah'] ?? p['count'] ?? '').toString(),
                   'lokasi': (p['lokasi'] ?? '').toString(),
+                  'isCustomLokasi': p['isCustomLokasi'],
                 },
               )
               .toList();
@@ -556,6 +557,12 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
           batchingPlant: item['batchingPlant']?.toString() ?? '',
           jamBerangkat: item['jamBerangkat']?.toString() ?? '',
           jamDatang: item['jamDatang']?.toString() ?? '',
+          jamBerangkatLap: item['jamBerangkatLap']?.toString() ??
+              item['jamBerangkatLapangan']?.toString() ??
+              '',
+          jamTibaPlant: item['jamTibaPlant']?.toString() ??
+              item['jamTibaBatchingPlant']?.toString() ??
+              '',
           slumpTest: item['slumpTest']?.toString() ?? '',
           volume: item['volume']?.toString() ?? '',
           volumeKumulatif: item['volumeKumulatif']?.toString() ?? '',
@@ -759,7 +766,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     double? nilaiBobot,
     List<Map<String, String>> initialMaterials = const [],
     List<Map<String, String>> initialPeralatans = const [],
-    List<Map<String, String>> initialPersonils = const [],
+    List<Map<String, dynamic>> initialPersonils = const [],
     bool addEmptySubRowsIfEmpty = true,
   }) {
     setState(() {
@@ -811,19 +818,37 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
 
       final personilsList = <Map<String, dynamic>>[];
       for (var per in initialPersonils) {
+        final perRole = (per['role'] ?? '').toString();
+        final perCacah = (per['cacah'] ?? per['count'] ?? '').toString();
+        final perLok = (per['lokasi'] ?? '').toString();
+
+        final rawCustom = per['isCustomLokasi'];
+        final bool isCustom;
+        if (rawCustom is bool) {
+          isCustom = rawCustom;
+        } else if (rawCustom is String) {
+          isCustom = rawCustom.toLowerCase() == 'true';
+        } else {
+          isCustom = perLok.isNotEmpty &&
+              lokasi.isNotEmpty &&
+              perLok.trim() != lokasi.trim();
+        }
+
+        final effectiveLok = (!isCustom && perLok.isEmpty) ? lokasi : perLok;
+
         personilsList.add({
-          'roleController': TextEditingController(text: per['role'] ?? ''),
-          'cacahController': TextEditingController(
-            text: per['cacah'] ?? per['count'] ?? '',
-          ),
-          'lokasiController': TextEditingController(text: per['lokasi'] ?? ''),
+          'roleController': TextEditingController(text: perRole),
+          'cacahController': TextEditingController(text: perCacah),
+          'lokasiController': TextEditingController(text: effectiveLok),
+          'isCustomLokasi': isCustom,
         });
       }
       if (personilsList.isEmpty && addEmptySubRowsIfEmpty) {
         personilsList.add({
           'roleController': TextEditingController(text: ''),
           'cacahController': TextEditingController(text: ''),
-          'lokasiController': TextEditingController(text: ''),
+          'lokasiController': TextEditingController(text: lokasi),
+          'isCustomLokasi': false,
         });
       }
 
@@ -832,10 +857,24 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         if (mounted) setState(() {});
       });
 
+      final lokController = TextEditingController(text: lokasi);
+      lokController.addListener(() {
+        if (!mounted) return;
+        final newLok = lokController.text;
+        for (var per in personilsList) {
+          if (per['isCustomLokasi'] != true) {
+            final c = per['lokasiController'] as TextEditingController?;
+            if (c != null && c.text != newLok) {
+              c.text = newLok;
+            }
+          }
+        }
+      });
+
       _pekerjaanList.add({
         'jenis': TextEditingController(text: jenis),
         'volume': volController,
-        'lokasi': TextEditingController(text: lokasi),
+        'lokasi': lokController,
         'noMataPembayaran': noMataPembayaran,
         'satuan': satuan,
         'rkkItemId': rkkItemId,
@@ -900,14 +939,33 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     String role = '',
     String cacah = '',
     String lokasi = '',
+    bool? isCustomLokasi,
   }) {
     setState(() {
+      final p = _pekerjaanList[pIdx];
+      final currentPekLokasi =
+          (p['lokasi'] as TextEditingController?)?.text ?? '';
       final personils =
-          _pekerjaanList[pIdx]['personils'] as List<Map<String, dynamic>>;
+          p['personils'] as List<Map<String, dynamic>>;
+
+      final bool effectiveIsCustom;
+      final String effectiveLokasi;
+
+      if (lokasi.isNotEmpty) {
+        effectiveLokasi = lokasi;
+        effectiveIsCustom = isCustomLokasi ??
+            (lokasi.trim() != currentPekLokasi.trim());
+      } else {
+        // Auto-fill lokasi penugasan dari lokasi pekerjaan terkini
+        effectiveLokasi = currentPekLokasi;
+        effectiveIsCustom = false;
+      }
+
       personils.add({
         'roleController': TextEditingController(text: role),
         'cacahController': TextEditingController(text: cacah),
-        'lokasiController': TextEditingController(text: lokasi),
+        'lokasiController': TextEditingController(text: effectiveLokasi),
+        'isCustomLokasi': effectiveIsCustom,
       });
     });
   }
@@ -1022,6 +1080,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     String batchingPlant = '',
     String jamBerangkat = '',
     String jamDatang = '',
+    String jamBerangkatLap = '',
+    String jamTibaPlant = '',
     String slumpTest = '',
     String volume = '',
     String volumeKumulatif = '',
@@ -1045,6 +1105,12 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         ),
         'jamDatang': TextEditingController(
           text: PlatNomorUtil.normalizeTime(jamDatang),
+        ),
+        'jamBerangkatLap': TextEditingController(
+          text: PlatNomorUtil.normalizeTime(jamBerangkatLap),
+        ),
+        'jamTibaPlant': TextEditingController(
+          text: PlatNomorUtil.normalizeTime(jamTibaPlant),
         ),
         'slumpTest': TextEditingController(text: slumpTest),
         'volume': ctrlVolume,
@@ -1078,9 +1144,36 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     }
   }
 
+  DateTime? get _kegiatanStartDate {
+    return ExecutionPeriodHelper.resolveExecutionPeriod(
+      _currentKegiatan,
+      contract: _selectedContract,
+    ).startDate;
+  }
+
+  DateTime? get _kegiatanEndDate {
+    return ExecutionPeriodHelper.resolveExecutionPeriod(
+      _currentKegiatan,
+      contract: _selectedContract,
+    ).endDate;
+  }
+
+  void _clampSelectedDateToPeriod() {
+    final start = _kegiatanStartDate;
+    final end = _kegiatanEndDate;
+    if (start != null && _selectedDate.isBefore(start)) {
+      _selectedDate = start;
+    } else if (end != null && _selectedDate.isAfter(end)) {
+      _selectedDate = end;
+    }
+  }
+
   Future<void> _pickDate() async {
-    final firstDate = DateTime(2015);
-    final lastDate = DateTime(2040);
+    final start = _kegiatanStartDate;
+    final end = _kegiatanEndDate;
+
+    final firstDate = start ?? DateTime(2015);
+    final lastDate = end ?? DateTime(2040);
     DateTime initial = _selectedDate;
     if (initial.isBefore(firstDate)) initial = firstDate;
     if (initial.isAfter(lastDate)) initial = lastDate;
@@ -1180,6 +1273,92 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     final String lokasiKegiatan = keg['lokasi'] ?? '-';
     final String sumberDanaKontrak = _selectedContract!.sumberDana;
     final String namaKontraktor = keg['kontraktor'] ?? '-';
+
+    // ─── VALIDASI PERIODE KONTRAK KEGIATAN (KASUS 1 & ATURAN PELAPORAN) ───
+    final start = _kegiatanStartDate;
+    final end = _kegiatanEndDate;
+    final repDateOnly =
+        DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+
+    if (start != null &&
+        repDateOnly.isBefore(DateTime(start.year, start.month, start.day))) {
+      final startStr = WeeklyReportModel.formatIndonesianDate(start);
+      final curStr = WeeklyReportModel.formatIndonesianDate(_selectedDate);
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: const [
+              Icon(Icons.block, color: Color(0xFFDC2626), size: 28),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Tanggal di Luar Periode',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'Tanggal laporan ($curStr) tidak boleh lebih awal dari tanggal mulai pelaksanaan kegiatan ($startStr).\n\nSilakan sesuaikan tanggal laporan dalam rentang periode kontrak kegiatan.',
+            style: const TextStyle(fontSize: 13, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(
+                'Tutup',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (end != null &&
+        repDateOnly.isAfter(DateTime(end.year, end.month, end.day))) {
+      final endStr = WeeklyReportModel.formatIndonesianDate(end);
+      final curStr = WeeklyReportModel.formatIndonesianDate(_selectedDate);
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: const [
+              Icon(Icons.block, color: Color(0xFFDC2626), size: 28),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Tanggal di Luar Periode',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'Tanggal laporan ($curStr) tidak boleh melewati tanggal akhir pelaksanaan kegiatan ($endStr).\n\nSilakan sesuaikan tanggal laporan dalam rentang periode kontrak kegiatan.',
+            style: const TextStyle(fontSize: 13, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(
+                'Tutup',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
 
     final rkkFlatItems = _getRkkFlatItems();
 
@@ -1423,9 +1602,10 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                           ?.text
                           .trim() ??
                       '',
+                  'isCustomLokasi': pe.value['isCustomLokasi'] == true,
                 },
               )
-              .where((m) => m['role']!.isNotEmpty)
+              .where((m) => (m['role'] as String).isNotEmpty)
               .toList();
 
           return {
@@ -1451,7 +1631,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     // B, C, D: Flattened Aggregated Lists for root & backward compatibility
     final List<Map<String, String>> cleanMaterial = [];
     final List<Map<String, String>> cleanPeralatan = [];
-    final List<Map<String, String>> cleanPersonil = [];
+    final List<Map<String, dynamic>> cleanPersonil = [];
 
     int matNo = 1;
     int alatNo = 1;
@@ -1466,9 +1646,14 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       for (var a in alats) {
         cleanPeralatan.add({...a, 'no': '${alatNo++}'});
       }
-      final pers = p['personils'] as List<Map<String, String>>;
+      final pers = p['personils'] as List<dynamic>;
       for (var pr in pers) {
-        cleanPersonil.add({...pr, 'no': '${persNo++}'});
+        if (pr is Map) {
+          cleanPersonil.add({
+            ...Map<String, dynamic>.from(pr),
+            'no': '${persNo++}',
+          });
+        }
       }
     }
 
@@ -1507,13 +1692,17 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         .where((m) => m['jenisKejadian']!.isNotEmpty || m['cuaca']!.isNotEmpty)
         .toList();
 
-    // F. Clean Instruksi (Konsultan Supervisi CV. TATA SAKA CONSULTANT)
+    // F. Clean Instruksi (Konsultan Supervisi)
     final String instruksiText = _instruksiKonsultanController.text.trim();
+    final String namaKonsultan = _currentKegiatan?['konsultanPengawas']?.toString().trim() ?? '';
+    final String labelKonsultan = namaKonsultan.isNotEmpty
+        ? 'Konsultan Supervisi ($namaKonsultan)'
+        : 'Konsultan Supervisi';
     final cleanInstruksi = instruksiText.isNotEmpty
         ? [
             {
               'no': '1',
-              'pihak': 'Konsultan Supervisi (CV. TATA SAKA CONSULTANT)',
+              'pihak': labelKonsultan,
               'uraian': instruksiText,
             },
           ]
@@ -1625,6 +1814,12 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         final jamDatang = PlatNomorUtil.normalizeTime(
           m['jamDatang']?.text.trim() ?? '',
         );
+        final jamBerangkatLap = PlatNomorUtil.normalizeTime(
+          m['jamBerangkatLap']?.text.trim() ?? '',
+        );
+        final jamTibaPlant = PlatNomorUtil.normalizeTime(
+          m['jamTibaPlant']?.text.trim() ?? '',
+        );
 
         cleanRekapPengecoranBeton.add({
           'no': '${i + 1}',
@@ -1632,6 +1827,8 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
           'batchingPlant': m['batchingPlant']?.text.trim() ?? '',
           'jamBerangkat': jamBerangkat,
           'jamDatang': jamDatang,
+          'jamBerangkatLap': jamBerangkatLap,
+          'jamTibaPlant': jamTibaPlant,
           'slumpTest': m['slumpTest']?.text.trim() ?? '',
           'volume': m['volume']?.text.trim() ?? '',
           'volumeKumulatif': m['volumeKumulatif']?.text.trim() ?? '',
@@ -1654,6 +1851,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
 
     final Map<String, dynamic> reportData = {
       'id': reportId,
+      'kegiatanId': (keg['id'] ?? '').toString(),
+      'kegiatanNama': keg['namaKegiatan'] ?? '',
+      'contractId': _selectedContract!.id,
       'tanggal': dateKey,
       'tanggalFormatted': dateFormatted,
       'namaKontrak': _selectedContract!.namaKontrak,
@@ -1870,6 +2070,24 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       _selectedContract = contracts.first;
       if (_selectedContract!.kegiatans.isNotEmpty) {
         _selectedKegiatanIndex = 0;
+      }
+      if (widget.editReport == null && widget.initialDate == null) {
+        _clampSelectedDateToPeriod();
+      }
+    } else if (_selectedContract != null && contracts.isNotEmpty) {
+      final fresh = contracts.cast<ContractModel?>().firstWhere(
+        (c) => c?.id == _selectedContract!.id,
+        orElse: () => null,
+      );
+      if (fresh != null && !identical(fresh, _selectedContract)) {
+        _selectedContract = fresh;
+        if (_selectedKegiatanIndex != null &&
+            _selectedKegiatanIndex! >= fresh.kegiatans.length) {
+          _selectedKegiatanIndex = fresh.kegiatans.isNotEmpty ? 0 : null;
+        }
+        if (widget.editReport == null && widget.initialDate == null) {
+          _clampSelectedDateToPeriod();
+        }
       }
     }
 
@@ -2096,6 +2314,37 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             ),
           ],
         ),
+        if (_kegiatanStartDate != null || _kegiatanEndDate != null) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFBFDBFE)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.info_outline,
+                  size: 14,
+                  color: Color(0xFF1D4ED8),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Periode Pelaksanaan Kegiatan: ${_kegiatanStartDate != null ? WeeklyReportModel.formatIndonesianDate(_kegiatanStartDate!) : '-'} s/d ${_kegiatanEndDate != null ? WeeklyReportModel.formatIndonesianDate(_kegiatanEndDate!) : '-'}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF1E40AF),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -2121,7 +2370,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         ),
         const SizedBox(height: 6),
         DropdownButtonFormField<ContractModel>(
-          value: _selectedContract,
+          value: contracts.any((c) => identical(c, _selectedContract))
+              ? _selectedContract
+              : null,
           isExpanded: true,
           decoration: _cleanInputDec('Pilih Kontrak'),
           items: contracts
@@ -2142,6 +2393,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
               _selectedKegiatanIndex = (val?.kegiatans.isNotEmpty ?? false)
                   ? 0
                   : null;
+              _clampSelectedDateToPeriod();
             });
           },
         ),
@@ -2196,6 +2448,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             onChanged: (idx) {
               setState(() {
                 _selectedKegiatanIndex = idx;
+                _clampSelectedDateToPeriod();
               });
             },
           ),
@@ -2813,6 +3066,19 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                         controller: lokPekCtrl,
                         label: 'Lokasi / STA',
                         hintText: 'Contoh: STA 0+150 - STA 0+200',
+                        onChanged: (val) {
+                          // Otomatis mutakhirkan personel yang masih mengikuti nilai default pekerjaan
+                          for (var per in personils) {
+                            if (per['isCustomLokasi'] != true) {
+                              final c = per['lokasiController']
+                                  as TextEditingController?;
+                              if (c != null && c.text != val) {
+                                c.text = val;
+                              }
+                            }
+                          }
+                          setState(() {});
+                        },
                       ),
                       const SizedBox(height: 16),
                       const Divider(height: 1, color: Color(0xFFE5E7EB)),
@@ -3081,11 +3347,149 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                                 hintText: 'Contoh: 4 Orang',
                               ),
                               const SizedBox(height: 8),
-                              _buildField(
-                                controller: lokasiCtrl,
-                                label: 'Lokasi Penugasan',
-                                hintText: 'Contoh: STA 0+150',
-                              ),
+                              () {
+                                final bool isCustom =
+                                    pers['isCustomLokasi'] == true;
+                                final String pekLokasi =
+                                    lokPekCtrl.text.trim();
+                                final bool hasPekLokasi =
+                                    pekLokasi.isNotEmpty;
+
+                                Widget? locationSuffix;
+                                if (isCustom) {
+                                  locationSuffix = Tooltip(
+                                    message: hasPekLokasi
+                                        ? 'Lokasi khusus personel (Klik untuk menyamakan kembali dengan lokasi pekerjaan: $pekLokasi)'
+                                        : 'Lokasi khusus personel',
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(6),
+                                      onTap: hasPekLokasi
+                                          ? () {
+                                              setState(() {
+                                                lokasiCtrl.text =
+                                                    lokPekCtrl.text;
+                                                pers['isCustomLokasi'] = false;
+                                              });
+                                            }
+                                          : null,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 6,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 6,
+                                                vertical: 2.5,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFFEF3C7),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                                border: Border.all(
+                                                  color:
+                                                      const Color(0xFFFDE68A),
+                                                  width: 0.8,
+                                                ),
+                                              ),
+                                              child: const Text(
+                                                'Khusus',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Color(0xFFB45309),
+                                                ),
+                                              ),
+                                            ),
+                                            if (hasPekLokasi) ...[
+                                              const SizedBox(width: 4),
+                                              const Icon(
+                                                Icons.sync_rounded,
+                                                size: 15,
+                                                color: Color(0xFFB45309),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                } else if (hasPekLokasi) {
+                                  locationSuffix = Tooltip(
+                                    message:
+                                        'Otomatis mengikuti Lokasi / STA Pekerjaan: $pekLokasi',
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 6,
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            padding:
+                                                const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 2.5,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFECFDF5),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                              border: Border.all(
+                                                color:
+                                                    const Color(0xFFA7F3D0),
+                                                width: 0.8,
+                                              ),
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.link_rounded,
+                                                  size: 12,
+                                                  color: Color(0xFF059669),
+                                                ),
+                                                SizedBox(width: 3),
+                                                Text(
+                                                  'Auto',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Color(0xFF059669),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                return _buildField(
+                                  controller: lokasiCtrl,
+                                  label: 'Lokasi Penugasan',
+                                  hintText: hasPekLokasi
+                                      ? 'Mengikuti pekerjaan: $pekLokasi'
+                                      : 'Contoh: STA 0+150',
+                                  suffixIcon: locationSuffix,
+                                  onChanged: (val) {
+                                    final isSame = val.trim() == pekLokasi;
+                                    final newCustom = !isSame;
+                                    if (pers['isCustomLokasi'] != newCustom) {
+                                      setState(() {
+                                        pers['isCustomLokasi'] = newCustom;
+                                      });
+                                    }
+                                  },
+                                );
+                              }(),
                             ],
                           );
                         }),
@@ -4755,6 +5159,18 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                   hintText: 'Pilih jam (HH:mm:ss)',
                 ),
                 const SizedBox(height: 10),
+                _buildTimePickerField(
+                  controller: m['jamBerangkatLap']!,
+                  label: 'Jam Berangkat dari Lapangan',
+                  hintText: 'Pilih jam (HH:mm:ss)',
+                ),
+                const SizedBox(height: 10),
+                _buildTimePickerField(
+                  controller: m['jamTibaPlant']!,
+                  label: 'Jam Tiba di Batching Plant',
+                  hintText: 'Pilih jam (HH:mm:ss)',
+                ),
+                const SizedBox(height: 10),
                 _buildField(
                   controller: m['slumpTest']!,
                   label: 'Slump Test',
@@ -4980,6 +5396,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     TextInputType keyboardType = TextInputType.text,
     ValueChanged<String>? onChanged,
     String? suffixText,
+    Widget? suffixIcon,
   }) {
     return CleanTextFormField(
       controller: controller,
@@ -4990,19 +5407,21 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       maxLines: maxLines,
       keyboardType: keyboardType,
       onChanged: onChanged,
-      suffixIcon: suffixText != null
-          ? Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              child: Text(
-                suffixText,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.slate,
-                ),
-              ),
-            )
-          : null,
+      suffixIcon: suffixIcon ??
+          (suffixText != null
+              ? Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  child: Text(
+                    suffixText,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.slate,
+                    ),
+                  ),
+                )
+              : null),
     );
   }
 

@@ -7,9 +7,9 @@ import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/timeline_provider.dart';
-import 'package:provider/provider.dart';
-import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/utils/execution_period_helper.dart';
+import 'package:tata_saka_app/utils/progress_calculator.dart';
 import 'package:tata_saka_app/utils/rupiah_input_formatter.dart';
 import 'package:tata_saka_app/widgets/lembar_laporan_mingguan_widget.dart';
 import 'package:tata_saka_app/widgets/lembar_boq_mingguan_widget.dart';
@@ -21,37 +21,6 @@ import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 /// dipetakan ke 'Kontrak' agar sesuai pilihan dropdown ('Kontrak'/'Adendum').
 String _normalizeStatusDokumen(String s) {
   return s == 'Adendum' ? 'Adendum' : 'Kontrak';
-}
-
-/// Struktur perhitungan rentang tanggal kalender per minggu
-class WeekDateRange {
-  final int weekNum;
-  final int startDayIndex; // 1-based (misal: 1, 8, 15, ..., 85)
-  final int endDayIndex; // 1-based (misal: 7, 14, 21, ..., 90)
-  final int daysCount; // 7 hari atau sisa hari di minggu terakhir (misal: 6 hari atau 2 hari)
-  final DateTime? startDt;
-  final DateTime? endDt;
-  final String tglMulaiSlash; // dd/MM/yyyy
-  final String tglSelesaiSlash; // dd/MM/yyyy
-  final String tglMulaiIndo; // d MMMM yyyy
-  final String tglSelesaiIndo; // d MMMM yyyy
-  final int elapsedDays; // total hari kalender terpakai s/d minggu ini
-  final int remainingDays; // sisa hari kalender
-
-  WeekDateRange({
-    required this.weekNum,
-    required this.startDayIndex,
-    required this.endDayIndex,
-    required this.daysCount,
-    this.startDt,
-    this.endDt,
-    required this.tglMulaiSlash,
-    required this.tglSelesaiSlash,
-    required this.tglMulaiIndo,
-    required this.tglSelesaiIndo,
-    required this.elapsedDays,
-    required this.remainingDays,
-  });
 }
 
 class _TtdMingguanItem {
@@ -93,6 +62,7 @@ class _TtdMingguanItem {
 class BuatLaporanMingguanScreen extends StatefulWidget {
   final ContractModel? initialContract;
   final int? initialKegiatanIndex;
+  final int? initialMingguKe;
   final WeeklyReportModel? editReport;
   final bool isEmbedded;
 
@@ -100,6 +70,7 @@ class BuatLaporanMingguanScreen extends StatefulWidget {
     super.key,
     this.initialContract,
     this.initialKegiatanIndex,
+    this.initialMingguKe,
     this.editReport,
     this.isEmbedded = false,
   });
@@ -113,6 +84,7 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
 
   ContractModel? _selectedContract;
   int? _selectedKegiatanIndex;
+  String? _syncedFingerprint;
 
   // Metadata Controllers
   final TextEditingController _pekerjaanController = TextEditingController();
@@ -146,6 +118,7 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
   double _nilaiKontrakNumeric = 0.0;
   double _rencanaPersen = 0.0;
   double _realisasiPersen = 0.0;
+  double _realisasiMingguIni = 0.0;
   double get _deviasiPersen => _realisasiPersen - _rencanaPersen;
   double get _rencanaNominal => (_rencanaPersen / 100) * _nilaiKontrakNumeric;
   double get _realisasiNominal => (_realisasiPersen / 100) * _nilaiKontrakNumeric;
@@ -241,39 +214,104 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
     super.dispose();
   }
 
+  String _computeFingerprint() {
+    final c = _selectedContract;
+    final k = _currentKegiatan;
+    return '${c?.id}|$_selectedKegiatanIndex|${c?.tglMulaiSpmk}|${c?.tglSelesaiSpmk}|${c?.hariKalender}|'
+        '${k?['tglSpmkKontraktor']}|${k?['awalPelaksanaan']}|${k?['akhirPelaksanaan']}|'
+        '${k?['tglAkhirSpmkKontraktor']}|${k?['jangkaWaktu']}|${k?['masaPelaksanaan']}|'
+        '${(k?['laporans'] as List?)?.length}|${(k?['laporanMingguan'] as List?)?.length}';
+  }
+
   void _loadFromExistingReport(WeeklyReportModel r) {
-    _pekerjaanController.text = r.pekerjaan;
-    _lokasiController.text = r.lokasiProyek;
-    _kontraktorController.text = r.kontraktor;
-    _jangkaWaktuController.text = '${r.jangkaWaktu}';
-    _nomorKontrakController.text = r.nomorKontrak;
-    _tanggalKontrakController.text = r.tanggalKontrak;
-    _nilaiKontrakController.text = r.nilaiKontrak;
-    _nilaiKontrakNumeric = r.nilaiKontrakNumeric;
-    _tanggalSpmkController.text = r.tanggalSpmk;
+    final c = _selectedContract;
+    final keg = _currentKegiatan;
+    final period = ExecutionPeriodHelper.resolveExecutionPeriod(keg, contract: c);
+
+    final namaKeg = keg?['namaKegiatan']?.toString().trim() ?? '';
+    _pekerjaanController.text = namaKeg.isNotEmpty ? namaKeg : r.pekerjaan;
+    _lokasiController.text = (keg?['lokasi']?.toString().trim().isNotEmpty == true)
+        ? keg!['lokasi'].toString()
+        : r.lokasiProyek;
+    _kontraktorController.text = (keg?['kontraktor']?.toString().trim().isNotEmpty == true)
+        ? keg!['kontraktor'].toString()
+        : r.kontraktor;
+
+    final effectiveDays = (c != null || keg != null) && period.durationDays > 0
+        ? period.durationDays
+        : r.jangkaWaktu;
+    _jangkaWaktuController.text = '$effectiveDays';
+
+    final noSP = keg?['noSuratPesanan']?.toString().trim() ?? '';
+    _nomorKontrakController.text = noSP.isNotEmpty
+        ? noSP
+        : (c != null && c.nomorSpk.isNotEmpty ? c.nomorSpk : r.nomorKontrak);
+
+    final tglSP = keg?['tglSuratPesanan']?.toString().trim() ?? '';
+    _tanggalKontrakController.text = tglSP.isNotEmpty
+        ? tglSP
+        : (c != null && c.tglMulaiSpk.isNotEmpty ? c.tglMulaiSpk : r.tanggalKontrak);
+
+    final kegNilai = keg?['nilaiKontrak']?.toString().trim() ?? '';
+    if (kegNilai.isNotEmpty) {
+      _nilaiKontrakController.text = RupiahUtil.formatString(kegNilai);
+      _nilaiKontrakNumeric = WeeklyReportModel.parseRupiah(_nilaiKontrakController.text);
+    } else {
+      _nilaiKontrakController.text = r.nilaiKontrak;
+      _nilaiKontrakNumeric = r.nilaiKontrakNumeric;
+    }
+
+    _tanggalSpmkController.text =
+        period.startFormatted.isNotEmpty ? period.startFormatted : r.tanggalSpmk;
+    _akhirMasaKontrakController.text =
+        period.endFormatted.isNotEmpty ? period.endFormatted : r.akhirMasaKontrak;
 
     _mingguKe = r.mingguKe;
-    _totalMinggu = r.totalMinggu;
-    _periodeAwalController.text = r.periodeAwal;
-    _periodeAkhirController.text = r.periodeAkhir;
+    _totalMinggu = (c != null || keg != null) ? period.totalWeeks : r.totalMinggu;
+
+    final range = _calcWeekDateRange(
+      _mingguKe,
+      period.startDate ?? WeeklyReportModel.parseIndonesianDate(_tanggalSpmkController.text),
+      effectiveDays,
+    );
+    _periodeAwalController.text = range.tglMulaiIndo.isNotEmpty ? range.tglMulaiIndo : r.periodeAwal;
+    _periodeAkhirController.text = range.tglSelesaiIndo.isNotEmpty ? range.tglSelesaiIndo : r.periodeAkhir;
+    _waktuTerpakaiController.text = range.startDt != null ? '${range.elapsedDays}' : '${r.waktuTerpakai}';
+    _sisaWaktuController.text = range.startDt != null ? '${range.remainingDays}' : '${r.sisaWaktu}';
 
     _rencanaPersen = r.rencanaPersen;
-    _realisasiPersen = r.realisasiPersen;
     _rencanaPersenController.text = _rencanaPersen > 0 ? _rencanaPersen.toStringAsFixed(3).replaceAll('.', ',') : '';
-    _realisasiPersenController.text = _realisasiPersen > 0 ? _realisasiPersen.toStringAsFixed(3).replaceAll('.', ',') : '';
 
-    _waktuTerpakaiController.text = '${r.waktuTerpakai}';
-    _sisaWaktuController.text = '${r.sisaWaktu}';
-    _akhirMasaKontrakController.text = r.akhirMasaKontrak;
+    if (keg != null) {
+      final boqRes = ProgressCalculator.calculateBoqProgress(
+        kegMap: keg,
+        startDt: range.startDt,
+        endDt: range.endDt,
+        minStartDt: period.startDate,
+      );
+      _realisasiMingguIni = boqRes.totalBobotIni;
+      _realisasiPersen = boqRes.totalBobotSdIni;
+    } else {
+      _realisasiPersen = r.realisasiPersen;
+      _realisasiMingguIni = 0.0;
+    }
+    _realisasiPersenController.text = _realisasiPersen > 0 ? _realisasiPersen.toStringAsFixed(3).replaceAll('.', ',') : '0,000';
 
-    _tabelMingguan = r.tabelMingguan.map((e) => WeeklyTableRow(
-      status: _normalizeStatusDokumen(e.status),
-      mingguKe: e.mingguKe,
-      tglMulai: e.tglMulai,
-      tglSelesai: e.tglSelesai,
-      rencana: e.rencana,
-      realisasi: e.realisasi,
-    )).toList();
+    _tabelMingguan = r.tabelMingguan.map((e) {
+      final wr = _calcWeekDateRange(
+        e.mingguKe,
+        period.startDate ?? WeeklyReportModel.parseIndonesianDate(_tanggalSpmkController.text),
+        effectiveDays,
+      );
+      return WeeklyTableRow(
+        status: _normalizeStatusDokumen(e.status),
+        mingguKe: e.mingguKe,
+        tglMulai: wr.tglMulaiSlash.isNotEmpty ? wr.tglMulaiSlash : e.tglMulai,
+        tglSelesai: wr.tglSelesaiSlash.isNotEmpty ? wr.tglSelesaiSlash : e.tglSelesai,
+        rencana: e.rencana,
+        realisasi: e.mingguKe == _mingguKe ? _realisasiPersen : e.realisasi,
+      );
+    }).toList();
 
     // Set status dari baris minggu saat ini
     final currentRow = _tabelMingguan.firstWhere(
@@ -295,33 +333,36 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
           peran: t['peran']?.toString() ?? t['jabatan']?.toString() ?? '',
           instansi: t['instansi']?.toString() ?? '',
           nama: t['nama']?.toString() ?? '',
-          tanggal: t['tanggal']?.toString() ?? r.periodeAkhir,
+          tanggal: t['tanggal']?.toString() ?? _periodeAkhirController.text,
           signatureBase64: t['signature']?.toString(),
         );
       }
     } else {
       _addTtdRow(
         peran: 'Kontraktor Pelaksana',
-        instansi: r.kontraktor,
+        instansi: _kontraktorController.text,
         nama: r.ttdKontraktorNama ?? '',
-        tanggal: r.ttdKontraktorTanggal ?? r.periodeAkhir,
+        tanggal: r.ttdKontraktorTanggal ?? _periodeAkhirController.text,
         signatureBase64: r.ttdKontraktorSignature,
       );
+      final namaKonsultan = keg?['konsultanPengawas']?.toString().trim() ?? '';
+      final instansiDinas = (c != null && c.instansiDinas.isNotEmpty) ? c.instansiDinas.first : '';
       _addTtdRow(
         peran: 'Konsultan Supervisi',
-        instansi: 'CV. TATA SAKA CONSULTANT',
+        instansi: namaKonsultan,
         nama: r.ttdKonsultanNama ?? '',
-        tanggal: r.ttdKonsultanTanggal ?? r.periodeAkhir,
+        tanggal: r.ttdKonsultanTanggal ?? _periodeAkhirController.text,
         signatureBase64: r.ttdKonsultanSignature,
       );
       _addTtdRow(
         peran: 'Pejabat Pembuat Komitmen (PPK)',
-        instansi: 'DPU-PR Kab. Purbalingga',
+        instansi: instansiDinas,
         nama: r.ttdPpkNama ?? '',
-        tanggal: r.ttdPpkTanggal ?? r.periodeAkhir,
+        tanggal: r.ttdPpkTanggal ?? _periodeAkhirController.text,
         signatureBase64: r.ttdPpkSignature,
       );
     }
+    _syncedFingerprint = _computeFingerprint();
   }
 
   void _initFromSelectedKegiatanData() {
@@ -342,10 +383,9 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
       _nilaiKontrakController.text = RupiahUtil.formatString(kegNilai.isNotEmpty ? kegNilai : c.nilaiKontrak);
       _nilaiKontrakNumeric = WeeklyReportModel.parseRupiah(_nilaiKontrakController.text);
 
-      // 4. Jangka Waktu, Nomor Kontrak, Tanggal Kontrak, SPMK, Akhir Masa Kontrak
-      final matchDays = RegExp(r'\d+').firstMatch(keg['jangkaWaktu']?.toString() ?? '');
-      final durasiStr = matchDays != null ? matchDays.group(0)! : (c.hariKalender > 0 ? '${c.hariKalender}' : '90');
-      _jangkaWaktuController.text = durasiStr;
+      // 4. Jangka Waktu, Nomor Kontrak, Tanggal Kontrak, SPMK, Akhir Masa Kontrak (Single Source of Truth)
+      final period = ExecutionPeriodHelper.resolveExecutionPeriod(keg, contract: c);
+      _jangkaWaktuController.text = '${period.durationDays}';
 
       final noSP = keg['noSuratPesanan']?.toString().trim() ?? '';
       _nomorKontrakController.text = noSP.isNotEmpty ? noSP : (c.nomorSpk.isNotEmpty ? c.nomorSpk : c.nomorSpmk);
@@ -353,37 +393,22 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
       final tglSP = keg['tglSuratPesanan']?.toString().trim() ?? '';
       _tanggalKontrakController.text = tglSP.isNotEmpty ? tglSP : c.tglMulaiSpk;
 
-      final tglSpmkK = keg['tglSpmkKontraktor']?.toString().trim() ?? '';
-      _tanggalSpmkController.text = tglSpmkK.isNotEmpty ? tglSpmkK : c.tglMulaiSpmk;
-
-      final akhirK = keg['akhirPelaksanaan']?.toString().trim() ?? '';
-      final totalDays = int.tryParse(durasiStr) ?? 90;
-      if (akhirK.isNotEmpty) {
-        _akhirMasaKontrakController.text = akhirK;
-      } else if (_tanggalSpmkController.text.isNotEmpty && totalDays > 0) {
-        final spmkDt = WeeklyReportModel.parseIndonesianDate(_tanggalSpmkController.text);
-        if (spmkDt != null) {
-          final endDt = spmkDt.add(Duration(days: totalDays - 1));
-          _akhirMasaKontrakController.text = WeeklyReportModel.formatIndonesianDate(endDt);
-        } else {
-          _akhirMasaKontrakController.text = c.tglSelesaiSpmk;
-        }
-      } else {
-        _akhirMasaKontrakController.text = c.tglSelesaiSpmk;
-      }
+      _tanggalSpmkController.text = period.startFormatted;
+      _akhirMasaKontrakController.text = period.endFormatted;
 
       _autoBuildWeeklyTableAndState();
     } else if (c != null) {
+      final period = ExecutionPeriodHelper.resolveExecutionPeriod(null, contract: c);
       _pekerjaanController.text = c.namaKontrak;
       _lokasiController.text = '';
       _kontraktorController.text = '';
-      _jangkaWaktuController.text = c.hariKalender > 0 ? '${c.hariKalender}' : '90';
+      _jangkaWaktuController.text = '${period.durationDays}';
       _nomorKontrakController.text = c.nomorSpk.isNotEmpty ? c.nomorSpk : c.nomorSpmk;
       _tanggalKontrakController.text = c.tglMulaiSpk;
       _nilaiKontrakController.text = c.nilaiKontrak;
       _nilaiKontrakNumeric = WeeklyReportModel.parseRupiah(c.nilaiKontrak);
-      _tanggalSpmkController.text = c.tglMulaiSpmk;
-      _akhirMasaKontrakController.text = c.tglSelesaiSpmk;
+      _tanggalSpmkController.text = period.startFormatted;
+      _akhirMasaKontrakController.text = period.endFormatted;
       _autoBuildWeeklyTableAndState();
     } else {
       _pekerjaanController.text = '';
@@ -412,60 +437,27 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
       nama: '',
       tanggal: _periodeAkhirController.text.trim(),
     );
+    final namaKonsultan = keg?['konsultanPengawas']?.toString().trim() ?? '';
+    final instansiDinas = (c != null && c.instansiDinas.isNotEmpty) ? c.instansiDinas.first : '';
+
     _addTtdRow(
       peran: 'Konsultan Supervisi',
-      instansi: 'CV. TATA SAKA CONSULTANT',
+      instansi: namaKonsultan,
       nama: '',
       tanggal: _periodeAkhirController.text.trim(),
     );
     _addTtdRow(
       peran: 'Pejabat Pembuat Komitmen (PPK)',
-      instansi: 'DPU-PR Kab. Purbalingga',
+      instansi: instansiDinas,
       nama: '',
       tanggal: _periodeAkhirController.text.trim(),
     );
+    _syncedFingerprint = _computeFingerprint();
   }
 
   /// Kalkulasi rentang tanggal dan durasi hari per minggu kalender murni (tanpa hari libur).
-  /// Minggu terakhir menampung sisa hari kalender yang belum genap 7 hari (misal 6 hari atau 2 hari).
   WeekDateRange _calcWeekDateRange(int w, DateTime? spmkDt, int totalDays) {
-    final startDay = (w - 1) * 7 + 1;
-    final endDay = min(w * 7, totalDays);
-    final days = max(1, endDay - startDay + 1);
-
-    if (spmkDt != null && totalDays > 0) {
-      final start = spmkDt.add(Duration(days: startDay - 1));
-      final end = spmkDt.add(Duration(days: endDay - 1));
-      return WeekDateRange(
-        weekNum: w,
-        startDayIndex: startDay,
-        endDayIndex: endDay,
-        daysCount: days,
-        startDt: start,
-        endDt: end,
-        tglMulaiSlash: WeeklyReportModel.formatDateSlash(start),
-        tglSelesaiSlash: WeeklyReportModel.formatDateSlash(end),
-        tglMulaiIndo: WeeklyReportModel.formatIndonesianDate(start),
-        tglSelesaiIndo: WeeklyReportModel.formatIndonesianDate(end),
-        elapsedDays: endDay,
-        remainingDays: max(0, totalDays - endDay),
-      );
-    } else {
-      return WeekDateRange(
-        weekNum: w,
-        startDayIndex: startDay,
-        endDayIndex: endDay,
-        daysCount: days,
-        startDt: null,
-        endDt: null,
-        tglMulaiSlash: '',
-        tglSelesaiSlash: '',
-        tglMulaiIndo: '',
-        tglSelesaiIndo: '',
-        elapsedDays: endDay,
-        remainingDays: max(0, totalDays - endDay),
-      );
-    }
+    return ExecutionPeriodHelper.calcWeekRange(w, spmkDt, totalDays);
   }
 
   Future<void> _pickDateForWeekly(TextEditingController controller, {bool isSpmk = false}) async {
@@ -515,28 +507,38 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
   }
 
   /// Membangun otomatis tabel bobot mingguan (1 s/d totalMinggu) dengan mengompilasi
-  /// riwayat laporan mingguan yang sudah pernah disimpan sebelumnya untuk kegiatan ini.
+  /// riwayat laporan mingguan yang selaras dengan jadwal aktif kegiatan ini.
   void _autoBuildWeeklyTableAndState() {
     final keg = _currentKegiatan;
-    final spmkDt = WeeklyReportModel.parseIndonesianDate(_tanggalSpmkController.text);
-    final totalDays = int.tryParse(_jangkaWaktuController.text) ?? 90;
+    final period = ExecutionPeriodHelper.resolveExecutionPeriod(
+      keg,
+      contract: _selectedContract,
+    );
+    final spmkDt = WeeklyReportModel.parseIndonesianDate(_tanggalSpmkController.text) ??
+        period.startDate;
+    final totalDays = int.tryParse(_jangkaWaktuController.text) ?? period.durationDays;
     _totalMinggu = totalDays > 0 ? (totalDays / 7).ceil() : 1;
     if (_totalMinggu < 1) _totalMinggu = 1;
 
-    // Ambil riwayat laporan mingguan tersimpan pada kegiatan ini
+    // Ambil riwayat laporan mingguan tersimpan yang selaras dengan jadwal aktif
     final Map<int, WeeklyReportModel> savedReportsByWeek = {};
     if (keg != null && keg['laporanMingguan'] != null) {
       for (var item in (keg['laporanMingguan'] as List<dynamic>)) {
         try {
           final r = WeeklyReportModel.fromJson(Map<String, dynamic>.from(item));
-          savedReportsByWeek[r.mingguKe] = r;
+          final wRange = _calcWeekDateRange(r.mingguKe, spmkDt, totalDays);
+          if (ExecutionPeriodHelper.doesSavedWeeklyMatchRange(r, wRange)) {
+            savedReportsByWeek[r.mingguKe] = r;
+          }
         } catch (_) {}
       }
     }
 
     // Tentukan minggu aktif yang dilaporkan
     if (widget.editReport != null) {
-      _mingguKe = widget.editReport!.mingguKe;
+      _mingguKe = widget.editReport!.mingguKe.clamp(1, max(1, _totalMinggu));
+    } else if (widget.initialMingguKe != null) {
+      _mingguKe = widget.initialMingguKe!.clamp(1, max(1, _totalMinggu));
     } else {
       // Cari minggu pertama yang belum terisi, atau minggu setelah minggu terakhir yang terisi
       int nextWeek = 1;
@@ -589,6 +591,19 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
         status = _normalizeStatusDokumen(match.status);
       }
 
+      // Selalu perbarui realisasi dengan data agregasi terbaru dari Laporan Harian
+      if (keg != null) {
+        final boqWeek = ProgressCalculator.calculateBoqProgress(
+          kegMap: keg,
+          startDt: range.startDt,
+          endDt: range.endDt,
+          minStartDt: spmkDt,
+        );
+        if (boqWeek.totalBobotSdIni > 0) {
+          realisasi = boqWeek.totalBobotSdIni;
+        }
+      }
+
       rows.add(WeeklyTableRow(
         status: status,
         mingguKe: w,
@@ -635,109 +650,49 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
         _rencanaPersen = 0.0;
         _rencanaPersenController.text = '';
       }
-
-      if (row.realisasi != null) {
-        _realisasiPersen = row.realisasi!;
-        _realisasiPersenController.text = _realisasiPersen.toStringAsFixed(3).replaceAll('.', ',');
-      } else {
-        // Otomatis hitung agregasi realisasi bobot dari Laporan Harian s/d minggu ini
-        final autoRealisasi = _calcAutoRealisasiBobot(range.endDt);
-        if (autoRealisasi > 0) {
-          _realisasiPersen = autoRealisasi;
-          _realisasiPersenController.text = _realisasiPersen.toStringAsFixed(3).replaceAll('.', ',');
-          row.realisasi = autoRealisasi;
-        } else {
-          _realisasiPersen = 0.0;
-          _realisasiPersenController.text = '';
-        }
-      }
     } else {
       _statusDokumen = 'Kontrak';
       _rencanaPersen = 0.0;
-      _realisasiPersen = 0.0;
       _rencanaPersenController.text = '';
-      _realisasiPersenController.text = '';
     }
 
-    setState(() {});
+    // Otomatis hitung agregasi realisasi bobot dari Laporan Harian untuk minggu ini dan s/d minggu ini
+    final keg = _currentKegiatan;
+    if (keg != null) {
+      final boqRes = ProgressCalculator.calculateBoqProgress(
+        kegMap: keg,
+        startDt: range.startDt,
+        endDt: range.endDt,
+        minStartDt: spmkDt,
+      );
+      _realisasiMingguIni = boqRes.totalBobotIni;
+      _realisasiPersen = boqRes.totalBobotSdIni;
+      _realisasiPersenController.text = _realisasiPersen > 0
+          ? _realisasiPersen.toStringAsFixed(3).replaceAll('.', ',')
+          : '0,000';
+      if (row != null) {
+        row.realisasi = _realisasiPersen;
+      }
+    } else {
+      _realisasiMingguIni = 0.0;
+      _realisasiPersen = 0.0;
+      _realisasiPersenController.text = '0,000';
+    }
+
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   double _calcAutoRealisasiBobot(DateTime? endDt) {
     final keg = _currentKegiatan;
     if (keg == null) return 0.0;
-
-    List rawRkk = [];
-    final adds = (keg['addendums'] as List?) ?? [];
-    if (adds.isNotEmpty) {
-      final latest = adds.last;
-      final divList = (latest['rkkDivisiList'] as List?);
-      if (divList != null && divList.isNotEmpty) {
-        rawRkk = divList;
-      }
-    }
-    if (rawRkk.isEmpty) {
-      rawRkk = (keg['rkkDivisiList'] as List?) ?? [];
-    }
-    if (rawRkk.isEmpty) return 0.0;
-
-    final dailyReports = (keg['laporans'] as List?) ?? [];
-    if (dailyReports.isEmpty) return 0.0;
-
-    double totalBobotRealisasi = 0.0;
-
-    for (final rawDiv in rawRkk) {
-      final items = (rawDiv['items'] as List?) ?? [];
-      for (final rawIt in items) {
-        final it = Map<String, dynamic>.from(rawIt);
-        final noMata = (it['noMataPembayaran'] ?? '').toString();
-        final volKontrak = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
-        final bbtKontrak = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
-        if (volKontrak <= 0 || bbtKontrak <= 0) continue;
-
-        double volAkumulasi = 0.0;
-        for (final rep in dailyReports) {
-          if (rep is! Map) continue;
-          if (endDt != null) {
-            DateTime? repDate;
-            final repTglStr = rep['tanggal']?.toString() ?? '';
-            if (repTglStr.isNotEmpty) {
-              repDate = WeeklyReportModel.parseIndonesianDate(repTglStr) ?? DateTime.tryParse(repTglStr);
-            }
-            if (repDate != null) {
-              final repDayOnly = DateTime(repDate.year, repDate.month, repDate.day);
-              final endDayOnly = DateTime(endDt.year, endDt.month, endDt.day);
-              if (repDayOnly.isAfter(endDayOnly)) continue;
-            }
-          }
-
-          final pList = (rep['pekerjaanList'] as List?) ?? [];
-          final rkkId = '${rawDiv['nomorRomawi'] ?? 'I'}_${it['uraian']}';
-          final uraianClean = it['uraian']?.toString().trim().toLowerCase() ?? '';
-
-          for (final p in pList) {
-            if (p is! Map) continue;
-            final pId = p['rkkItemId']?.toString().trim() ?? '';
-            final pNoMata = p['noMataPembayaran']?.toString().trim() ?? '';
-            final pUraian = (p['uraian'] ?? p['jenis'])?.toString().trim().toLowerCase() ?? '';
-
-            final matchId = pId.isNotEmpty && pId == rkkId;
-            final matchNoMata = noMata.isNotEmpty && pNoMata == noMata.trim();
-            final matchUraian = uraianClean.isNotEmpty && (pUraian == uraianClean || uraianClean.contains(pUraian) || pUraian.contains(uraianClean));
-
-            if (matchId || matchNoMata || matchUraian) {
-              final vStr = (p['volume'] ?? '').toString();
-              final vNum = double.tryParse(vStr.split(' ').first.replaceAll(',', '.')) ?? 0.0;
-              volAkumulasi += vNum;
-            }
-          }
-        }
-
-        final bbtItem = (volAkumulasi / volKontrak) * bbtKontrak;
-        totalBobotRealisasi += bbtItem;
-      }
-    }
-
-    return totalBobotRealisasi;
+    final boqRes = ProgressCalculator.calculateBoqProgress(
+      kegMap: keg,
+      startDt: null,
+      endDt: endDt,
+    );
+    return boqRes.totalBobotSdIni;
   }
 
   void _onStatusDokumenChanged(String newStatus) {
@@ -767,138 +722,36 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
   }
 
   void _onRealisasiInputChanged(String val) {
-    final clean = val.replaceAll(',', '.').trim();
-    final parsed = double.tryParse(clean);
-    setState(() {
-      _realisasiPersen = parsed ?? 0.0;
-      for (var r in _tabelMingguan) {
-        if (r.mingguKe == _mingguKe) {
-          r.realisasi = parsed;
-          break;
-        }
-      }
-    });
+    // Realisasi dihitung otomatis dari Laporan Harian
   }
-
-
 
   List<Map<String, dynamic>> _buildBoqProgressSnapshot({
     required Map<String, dynamic> keg,
     required DateTime? startDt,
     required DateTime? endDt,
+    DateTime? minStartDt,
   }) {
-    List rawRkk = [];
-    final adds = (keg['addendums'] as List?) ?? [];
-    if (adds.isNotEmpty) {
-      final latest = adds.last;
-      final divList = (latest['rkkDivisiList'] as List?);
-      if (divList != null && divList.isNotEmpty) {
-        rawRkk = divList;
-      }
-    }
-    if (rawRkk.isEmpty) {
-      rawRkk = (keg['rkkDivisiList'] as List?) ?? (keg['rkkKontrakAwal'] as List?) ?? [];
-    }
-
-    final dailyReports = (keg['laporans'] as List?) ?? [];
-    final List<Map<String, dynamic>> resultDivisions = [];
-
-    for (final rawDiv in rawRkk) {
-      final div = Map<String, dynamic>.from(rawDiv);
-      final rawItems = (div['items'] as List? ?? []);
-      final List<Map<String, dynamic>> computedItems = [];
-
-      for (final rawIt in rawItems) {
-        final it = Map<String, dynamic>.from(rawIt);
-        final noMata = (it['noMataPembayaran'] ?? '').toString().trim();
-        final uraian = (it['uraian'] ?? '').toString().trim().toLowerCase();
-        final rkkId = '${div['nomorRomawi'] ?? 'I'}_${it['uraian']}';
-        final volKontrak = (it['volumeCCO'] ?? it['volume'] as num?)?.toDouble() ?? 0.0;
-        final bbtKontrak = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
-
-        double volMingguIni = 0.0;
-        double volMingguLalu = 0.0;
-
-        for (final rep in dailyReports) {
-          if (rep is! Map) continue;
-          DateTime? repDate;
-          final repTglStr = rep['tanggal']?.toString() ?? '';
-          if (repTglStr.isNotEmpty) {
-            repDate = WeeklyReportModel.parseIndonesianDate(repTglStr) ?? DateTime.tryParse(repTglStr);
-          }
-
-          bool isMingguIni = false;
-          bool isMingguLalu = false;
-
-          if (startDt != null && endDt != null && repDate != null) {
-            final repDayOnly = DateTime(repDate.year, repDate.month, repDate.day);
-            final startDayOnly = DateTime(startDt.year, startDt.month, startDt.day);
-            final endDayOnly = DateTime(endDt.year, endDt.month, endDt.day);
-
-            if (repDayOnly.isBefore(startDayOnly)) {
-              isMingguLalu = true;
-            } else if (!repDayOnly.isAfter(endDayOnly)) {
-              isMingguIni = true;
-            }
-          } else {
-            isMingguIni = true;
-          }
-
-          final pList = (rep['pekerjaanList'] as List?) ?? [];
-          for (final p in pList) {
-            if (p is! Map) continue;
-            final pId = p['rkkItemId']?.toString().trim() ?? '';
-            final pNoMata = p['noMataPembayaran']?.toString().trim() ?? '';
-            final pUraian = (p['uraian'] ?? p['jenis'])?.toString().trim().toLowerCase() ?? '';
-
-            final matchId = pId.isNotEmpty && pId == rkkId;
-            final matchNoMata = noMata.isNotEmpty && pNoMata == noMata;
-            final matchUraian = uraian.isNotEmpty && (pUraian == uraian || uraian.contains(pUraian) || pUraian.contains(uraian));
-
-            if (matchId || matchNoMata || matchUraian) {
-              final vStr = (p['volume'] ?? '').toString();
-              final vNum = double.tryParse(vStr.split(' ').first.replaceAll(',', '.')) ?? 0.0;
-              if (isMingguIni) {
-                volMingguIni += vNum;
-              } else if (isMingguLalu) {
-                volMingguLalu += vNum;
-              }
-            }
-          }
-        }
-
-        final bbtMingguLalu = volKontrak > 0 ? (volMingguLalu / volKontrak) * bbtKontrak : 0.0;
-        final bbtMingguIni = volKontrak > 0 ? (volMingguIni / volKontrak) * bbtKontrak : 0.0;
-        final volSdMingguIni = volMingguLalu + volMingguIni;
-        final bbtSdMingguIni = bbtMingguLalu + bbtMingguIni;
-        final volSisa = (volKontrak - volSdMingguIni).clamp(0.0, volKontrak);
-        final bbtSisa = (bbtKontrak - bbtSdMingguIni).clamp(0.0, bbtKontrak);
-
-        it['mingguLaluVolume'] = volMingguLalu;
-        it['mingguLaluBobot'] = bbtMingguLalu;
-        it['mingguIniVolume'] = volMingguIni;
-        it['mingguIniBobot'] = bbtMingguIni;
-        it['sdMingguIniVolume'] = volSdMingguIni;
-        it['sdMingguIniBobot'] = bbtSdMingguIni;
-        it['sisaVolume'] = volSisa;
-        it['sisaBobot'] = bbtSisa;
-
-        computedItems.add(it);
-      }
-
-      div['items'] = computedItems;
-      resultDivisions.add(div);
-    }
-
-    return resultDivisions;
+    final boqRes = ProgressCalculator.calculateBoqProgress(
+      kegMap: keg,
+      startDt: startDt,
+      endDt: endDt,
+      minStartDt: minStartDt,
+    );
+    return boqRes.divisiList;
   }
 
   WeeklyReportModel _buildReportObject() {
     final startDt = WeeklyReportModel.parseIndonesianDate(_periodeAwalController.text.trim());
     final endDt = WeeklyReportModel.parseIndonesianDate(_periodeAkhirController.text.trim());
+    final spmkDt = WeeklyReportModel.parseIndonesianDate(_tanggalSpmkController.text.trim());
     final keg = _currentKegiatan;
     final List<Map<String, dynamic>>? boqSnapshot = keg != null
-        ? _buildBoqProgressSnapshot(keg: keg, startDt: startDt, endDt: endDt)
+        ? _buildBoqProgressSnapshot(
+            keg: keg,
+            startDt: startDt,
+            endDt: endDt,
+            minStartDt: spmkDt,
+          )
         : null;
 
     final cleanTtdList = _ttdList.map((item) => item.toMap()).toList();
@@ -984,8 +837,18 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
     final reportMap = reportObj.toJson();
 
     List<dynamic> existingWeekly = List.from(keg['laporanMingguan'] ?? []);
-    // Cek apakah laporan minggu ini sudah ada, jika ya update, jika belum tambahkan
-    final idx = existingWeekly.indexWhere((r) => r['mingguKe'] == reportObj.mingguKe || r['id'] == reportObj.id);
+    final spmkDt = WeeklyReportModel.parseIndonesianDate(_tanggalSpmkController.text);
+    final activeRange = _calcWeekDateRange(reportObj.mingguKe, spmkDt, reportObj.jangkaWaktu);
+    // Cek apakah laporan untuk minggu & jadwal aktif ini sudah ada
+    final idx = existingWeekly.indexWhere((r) {
+      if (r is! Map) return false;
+      if (r['id'] == reportObj.id) return true;
+      if (r['mingguKe'] == reportObj.mingguKe) {
+        final parsed = WeeklyReportModel.fromJson(Map<String, dynamic>.from(r));
+        return ExecutionPeriodHelper.doesSavedWeeklyMatchRange(parsed, activeRange);
+      }
+      return false;
+    });
     if (idx >= 0) {
       existingWeekly[idx] = reportMap;
     } else {
@@ -1001,10 +864,12 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
 
     keg['laporanMingguan'] = existingWeekly;
 
-    // Sinkronisasi progress fisik kegiatan jika realisasi tersedia
-    if (reportObj.realisasiPersen > 0) {
-      keg['progressFisik'] = reportObj.realisasiPersen / 100.0;
-    }
+    // Sinkronisasi progress fisik kegiatan agar selalu selaras dengan ProgressCalculator
+    keg['progressFisik'] = ProgressCalculator.calculateKegiatanProgress(
+          keg,
+          contract: _selectedContract,
+        ) /
+        100.0;
 
     provider.updateContract(_selectedContract!);
 
@@ -1120,6 +985,30 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
       _selectedContract = contracts.first;
       _selectedKegiatanIndex = _selectedContract!.kegiatans.isNotEmpty ? 0 : null;
       _initFromSelectedKegiatanData();
+    } else if (_selectedContract != null && contracts.isNotEmpty) {
+      final fresh = contracts.cast<ContractModel?>().firstWhere(
+        (c) => c?.id == _selectedContract!.id,
+        orElse: () => null,
+      );
+      if (fresh != null) {
+        _selectedContract = fresh;
+        if (_selectedKegiatanIndex != null &&
+            _selectedKegiatanIndex! >= fresh.kegiatans.length) {
+          _selectedKegiatanIndex = fresh.kegiatans.isNotEmpty ? 0 : null;
+        }
+        final fp = _computeFingerprint();
+        if (_syncedFingerprint != null && _syncedFingerprint != fp) {
+          _syncedFingerprint = fp;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            if (widget.editReport != null) {
+              _loadFromExistingReport(widget.editReport!);
+            } else {
+              _initFromSelectedKegiatanData();
+            }
+          });
+        }
+      }
     }
 
     final saveButton = Padding(
@@ -1796,9 +1685,29 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'REALISASI FISIK S/D MINGGU INI',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: Color(0xFF374151), letterSpacing: 0.3),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Text(
+                    'REALISASI FISIK S/D MINGGU INI',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: Color(0xFF374151), letterSpacing: 0.3),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: Text(
+                      'Minggu Ini: ${_realisasiMingguIni.toStringAsFixed(3)}% (Otomatis)',
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 10, color: Color(0xFF1D4ED8)),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               Row(
@@ -1807,14 +1716,13 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
                     width: 95,
                     child: TextFormField(
                       controller: _realisasiPersenController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      onChanged: _onRealisasiInputChanged,
+                      readOnly: true,
                       decoration: InputDecoration(
                         suffixText: '%',
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                         filled: true,
-                        fillColor: Colors.white,
+                        fillColor: const Color(0xFFF9FAFB),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFFD1D5DB))),
                         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFFD1D5DB))),
                         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFF1F2937), width: 1.5)),
@@ -2034,32 +1942,38 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 12,
-                          backgroundColor: AppColors.primaryBlue,
-                          child: Text(
-                            '${idx + 1}',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 12,
+                            backgroundColor: AppColors.primaryBlue,
+                            child: Text(
+                              '${idx + 1}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          item.peranController.text.isNotEmpty
-                              ? item.peranController.text
-                              : 'Penandatangan ${idx + 1}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            color: Color(0xFF0F172A),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              item.peranController.text.isNotEmpty
+                                  ? item.peranController.text
+                                  : 'Penandatangan ${idx + 1}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: Color(0xFF0F172A),
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     if (_ttdList.length > 1)
                       IconButton(
@@ -2099,7 +2013,7 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
                         controller: item.instansiController,
                         decoration: InputDecoration(
                           labelText: 'Instansi / Perusahaan',
-                          hintText: 'Misal: CV. DIVAN INSAN CEMERLANG',
+                          hintText: 'Misal: PT / CV Penyedia Jasa',
                           filled: true,
                           fillColor: Colors.white,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

@@ -69,8 +69,8 @@ void main() {
         await tester.pumpAndSettle();
 
         // Drawer is opened, showing Corporate Slate Sidebar
-        expect(find.text('CV. TATA SAKA'), findsOneWidget);
-        expect(find.text('Consultant Engineer'), findsOneWidget);
+        expect(find.text('CV. TATA SAKA CONSULTANT'), findsOneWidget);
+        expect(find.text('Engineering Consultant'), findsOneWidget);
         for (final category in [
           'UTAMA',
           'PELAPORAN',
@@ -128,8 +128,8 @@ void main() {
 
         // Sidebar is visible in main body
         expect(find.byType(VerticalDivider), findsOneWidget);
-        expect(find.text('CV. TATA SAKA'), findsOneWidget);
-        expect(find.text('Consultant Engineer'), findsOneWidget);
+        expect(find.text('CV. TATA SAKA CONSULTANT'), findsOneWidget);
+        expect(find.text('Engineering Consultant'), findsOneWidget);
         expect(find.text('UTAMA'), findsOneWidget);
         expect(find.text('PELAPORAN'), findsOneWidget);
         // Menu yang dihapus TIDAK ada di Web sidebar
@@ -145,7 +145,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // In collapsed state, text labels are hidden, chevron_right is shown
-        expect(find.text('CV. TATA SAKA'), findsNothing);
+        expect(find.text('CV. TATA SAKA CONSULTANT'), findsNothing);
         expect(find.byIcon(Icons.chevron_right), findsOneWidget);
 
         // Tap expand button (chevron_right)
@@ -153,7 +153,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Expanded again
-        expect(find.text('CV. TATA SAKA'), findsOneWidget);
+        expect(find.text('CV. TATA SAKA CONSULTANT'), findsOneWidget);
       },
     );
 

@@ -6,6 +6,7 @@ import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/screens/detail_data_laporan_screen.dart';
+import 'package:tata_saka_app/utils/progress_calculator.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 
@@ -411,7 +412,7 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
     ContractModel contract,
     UserProfileProvider userProf,
   ) {
-    int progressPercentage = (contract.progressFisik * 100).toInt();
+    final double progressPercentage = contract.progressPercent;
     final visibleEntries = contract.kegiatans.asMap().entries.where((entry) {
       if (!userProf.isKontraktor) return true;
       return _isKegiatanOwnedByContractor(entry.value, userProf);
@@ -539,7 +540,7 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        '$progressPercentage%',
+                        '${progressPercentage.toStringAsFixed(1)}%',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: AppColors.textDark,
@@ -589,6 +590,10 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                   k['namaKegiatan'] ?? 'Kegiatan ${originalIndex + 1}';
               final lokasi = k['lokasi'] ?? '-';
               final kontraktor = k['kontraktor'] ?? '-';
+              final double kegProgress = ProgressCalculator.calculateKegiatanProgress(
+                k,
+                contract: contract,
+              );
 
               return InkWell(
                 onTap: () {
@@ -652,6 +657,35 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(3),
+                                    child: LinearProgressIndicator(
+                                      value: (kegProgress / 100.0).clamp(0.0, 1.0),
+                                      backgroundColor: AppColors.inputBackground,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        kegProgress > 0
+                                            ? AppColors.successGreen
+                                            : AppColors.primaryBlue,
+                                      ),
+                                      minHeight: 4,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${kegProgress.toStringAsFixed(2)}%',
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textDark,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
+import 'package:tata_saka_app/utils/execution_period_helper.dart';
+import 'package:tata_saka_app/utils/progress_calculator.dart';
 import 'package:tata_saka_app/widgets/horizontal_drag_scroll_area.dart';
 
 class LembarBoqMingguanWidget extends StatelessWidget {
@@ -135,127 +137,35 @@ class LembarBoqMingguanWidget extends StatelessWidget {
       'pekerjaan': report.pekerjaan.isNotEmpty ? report.pekerjaan : (keg['namaKegiatan'] ?? '-'),
       'lokasi': report.lokasiProyek.isNotEmpty ? report.lokasiProyek : (keg['lokasi'] ?? 'Kab. Purbalingga'),
       'sumberDana': (keg['sumberDana'] ?? 'APBD Kab. Purbalingga').toString(),
-      'kontraktor': report.kontraktor.isNotEmpty ? report.kontraktor : (keg['kontraktor'] ?? 'CV. DIVAN INSAN CEMERLANG'),
+      'kontraktor': report.kontraktor.isNotEmpty ? report.kontraktor : (keg['kontraktor'] ?? '-'),
       'noKontrak': report.nomorKontrak.isNotEmpty ? report.nomorKontrak : (keg['noSuratPesanan'] ?? keg['noSpmkKontraktor'] ?? '-'),
-      'pengawas': (keg['konsultanPengawas'] ?? 'CV. TATA SAKA CONSULTANT').toString(),
+      'pengawas': (keg['konsultanPengawas'] ?? '-').toString(),
       'noKontrakPengawasan': (keg['noSpkKonsultan'] ?? keg['noSpmkKonsultan'] ?? '-').toString(),
       'tanggalLaporan': report.periodeAkhir.isNotEmpty ? report.periodeAkhir : report.tanggalKontrak,
     };
   }
 
   List<Map<String, dynamic>> _resolveDivisiList() {
+    if (kegiatan != null) {
+      final startDt = WeeklyReportModel.parseIndonesianDate(report.periodeAwal);
+      final endDt = WeeklyReportModel.parseIndonesianDate(report.periodeAkhir);
+      final minStart = ExecutionPeriodHelper.resolveExecutionPeriod(kegiatan).startDate;
+      final boqRes = ProgressCalculator.calculateBoqProgress(
+        kegMap: kegiatan!,
+        startDt: startDt,
+        endDt: endDt,
+        minStartDt: minStart,
+      );
+      if (boqRes.divisiList.isNotEmpty) {
+        return boqRes.divisiList;
+      }
+    }
+
     if (report.boqProgressList != null && report.boqProgressList!.isNotEmpty) {
       return report.boqProgressList!;
     }
 
-    // Prioritaskan rkkDivisiList dari addendum terakhir jika ada, jika tidak gunakan rkkDivisiList Kontrak Awal
-    List rawRkk = [];
-    if (kegiatan != null) {
-      final adds = (kegiatan!['addendums'] as List?) ?? [];
-      if (adds.isNotEmpty) {
-        final latest = adds.last;
-        final divList = (latest['rkkDivisiList'] as List?);
-        if (divList != null && divList.isNotEmpty) {
-          rawRkk = divList;
-        }
-      }
-      if (rawRkk.isEmpty) {
-        rawRkk = (kegiatan!['rkkDivisiList'] as List?) ?? [];
-      }
-    }
-
-    // Map each division and calculate / attach weekly volumes
-    final List<Map<String, dynamic>> calculated = [];
-
-    // Extract all daily reports in kegiatan to compute actual cumulative progress
-    final dailyReports = (kegiatan?['laporans'] as List?) ?? [];
-    final startDt = WeeklyReportModel.parseIndonesianDate(report.periodeAwal);
-    final endDt = WeeklyReportModel.parseIndonesianDate(report.periodeAkhir);
-
-    for (final rawDiv in rawRkk) {
-      final div = Map<String, dynamic>.from(rawDiv);
-      final rawItems = (div['items'] as List? ?? []);
-      final List<Map<String, dynamic>> computedItems = [];
-
-      for (final rawIt in rawItems) {
-        final it = Map<String, dynamic>.from(rawIt);
-        final noMata = (it['noMataPembayaran'] ?? '').toString();
-        final volKontrak = (it['volume'] ?? it['volumeCCO'] as num?)?.toDouble() ?? 0.0;
-        final bbtKontrak = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
-
-        // Calculate volumes from daily reports if available
-        double volMingguIni = 0.0;
-        double volMingguLalu = 0.0;
-
-        for (final rep in dailyReports) {
-          if (rep is Map) {
-            DateTime? repDate;
-            final repTglStr = rep['tanggal']?.toString() ?? '';
-            if (repTglStr.isNotEmpty) {
-              repDate = WeeklyReportModel.parseIndonesianDate(repTglStr) ?? DateTime.tryParse(repTglStr);
-            }
-
-            bool isMingguIni = false;
-            bool isMingguLalu = false;
-
-            if (startDt != null && endDt != null && repDate != null) {
-              final repDayOnly = DateTime(repDate.year, repDate.month, repDate.day);
-              final startDayOnly = DateTime(startDt.year, startDt.month, startDt.day);
-              final endDayOnly = DateTime(endDt.year, endDt.month, endDt.day);
-
-              if (repDayOnly.isBefore(startDayOnly)) {
-                isMingguLalu = true;
-              } else if (!repDayOnly.isAfter(endDayOnly)) {
-                isMingguIni = true;
-              }
-            } else {
-              isMingguIni = true;
-            }
-
-            final pList = (rep['pekerjaanList'] as List?) ?? [];
-            for (final p in pList) {
-              if (p is Map) {
-                final matchNoMata = p['noMataPembayaran']?.toString().trim() == noMata.trim() && noMata.isNotEmpty;
-                final matchUraian = p['jenis']?.toString().trim().toLowerCase() == it['uraian']?.toString().trim().toLowerCase() ||
-                    p['uraian']?.toString().trim().toLowerCase() == it['uraian']?.toString().trim().toLowerCase();
-                if (matchNoMata || matchUraian) {
-                  final vStr = (p['volume'] ?? '').toString();
-                  final vNum = double.tryParse(vStr.split(' ').first.replaceAll(',', '.')) ?? 0.0;
-                  if (isMingguIni) {
-                    volMingguIni += vNum;
-                  } else if (isMingguLalu) {
-                    volMingguLalu += vNum;
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        final bbtMingguLalu = volKontrak > 0 ? (volMingguLalu / volKontrak) * bbtKontrak : 0.0;
-        final bbtMingguIni = volKontrak > 0 ? (volMingguIni / volKontrak) * bbtKontrak : 0.0;
-        final volSdMingguIni = volMingguLalu + volMingguIni;
-        final bbtSdMingguIni = bbtMingguLalu + bbtMingguIni;
-        final volSisa = (volKontrak - volSdMingguIni).clamp(0.0, volKontrak);
-        final bbtSisa = (bbtKontrak - bbtSdMingguIni).clamp(0.0, bbtKontrak);
-
-        it['mingguLaluVolume'] = volMingguLalu;
-        it['mingguLaluBobot'] = bbtMingguLalu;
-        it['mingguIniVolume'] = volMingguIni;
-        it['mingguIniBobot'] = bbtMingguIni;
-        it['sdMingguIniVolume'] = volSdMingguIni;
-        it['sdMingguIniBobot'] = bbtSdMingguIni;
-        it['sisaVolume'] = volSisa;
-        it['sisaBobot'] = bbtSisa;
-
-        computedItems.add(it);
-      }
-
-      div['items'] = computedItems;
-      calculated.add(div);
-    }
-
-    return calculated;
+    return [];
   }
 
   Widget _buildProjectInfoTable(Map<String, String> meta) {

@@ -488,16 +488,21 @@ class PanduanFaqScreen extends StatelessWidget {
         isSub: true,
       ),
       _GuideStep(
-        'Nama Lengkap & Gelar: masukkan nama lengkap beserta gelar pengguna.',
+        'Username: tentukan identitas unik akun yang akan digunakan pengguna saat login.',
         isSub: true,
       ),
       _GuideStep(
-        'Nama Instansi / Perusahaan: masukkan nama CV, PT, atau Dinas terkait.',
+        'Nama Lengkap & Gelar: masukkan nama lengkap pengguna untuk identitas profil dan dokumen laporan.',
         isSub: true,
       ),
       _GuideStep(
-        'Email Login & Password: tentukan kredensial yang akan digunakan '
-        'pengguna untuk masuk ke sistem.',
+        'Nama Instansi / Perusahaan: masukkan nama CV, PT, atau Dinas terkait. '
+        'Khusus untuk peran Konsultan, kolom ini tidak perlu diisi karena secara otomatis '
+        'ditetapkan sebagai CV. Tata Saka Consultant.',
+        isSub: true,
+      ),
+      _GuideStep(
+        'Email & Password: tentukan email kontak/login dan kata sandi akun.',
         isSub: true,
       ),
       _GuideStep(

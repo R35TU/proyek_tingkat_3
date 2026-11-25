@@ -112,8 +112,8 @@ void main() {
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
-      timelineProv = TimelineProvider();
-      await timelineProv.loadEvents();
+      timelineProv = TimelineProvider(seedDefaultIfEmpty: true);
+      await timelineProv.loadEvents(seedDefaultIfEmpty: true);
       userProfileProv = UserProfileProvider();
     });
 
@@ -293,7 +293,7 @@ void main() {
         userProfileProv.setThemeMode('Gelap');
       }
 
-      final timelineProv = TimelineProvider();
+      final timelineProv = TimelineProvider(seedDefaultIfEmpty: true);
 
       return MultiProvider(
         providers: [

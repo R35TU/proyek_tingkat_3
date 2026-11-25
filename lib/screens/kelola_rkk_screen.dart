@@ -50,7 +50,6 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
   late List<Map<String, dynamic>> _rkkDivisiList;
   late String _namaKegiatan;
   late double _nilaiKontrakKegiatan;
-  String _dasarBobot = 'rab'; // 'rab' = Total Nilai RAB, 'kontrak' = Nilai Kontrak Acuan Tetap
   bool _isModified = false;
 
   static const List<String> _romanNumerals = [
@@ -211,18 +210,15 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
     return RupiahUtil.parseToDouble(clean);
   }
 
-  /// Nilai pembagi (denominator) yang konsisten untuk perhitungan bobot pekerjaan.
-  /// Rumus: Bobot Pekerjaan (%) = (Total Harga Item / Total Nilai RAB) * 100%
-  /// Nilai pembagi bersifat independen dan tidak dipengaruhi urutan input data.
+  /// Nilai pembagi (denominator) tetap untuk perhitungan bobot pekerjaan.
+  /// Rumus: Bobot Pekerjaan (%) = (Total Harga Item / Nilai Kontrak Kegiatan) * 100%
+  /// Nilai Kontrak Kegiatan menjadi acuan tetap, bukan total RAB yang sudah diinput.
   double _getEffectiveDivisor() {
-    final totalRkk = _totalHargaRkk;
-    if (_dasarBobot == 'kontrak' && _nilaiKontrakKegiatan > 0) {
+    if (_nilaiKontrakKegiatan > 0) {
       return _nilaiKontrakKegiatan;
     }
-    // Default 'rab': Gunakan akumulasi Total Nilai RAB jika > 0, fallback ke nilai kontrak acuan
-    return totalRkk > 0
-        ? totalRkk
-        : (_nilaiKontrakKegiatan > 0 ? _nilaiKontrakKegiatan : 0.0);
+    final totalRkk = _totalHargaRkk;
+    return totalRkk > 0 ? totalRkk : 0.0;
   }
 
   double get _totalHargaRkk {
@@ -247,11 +243,7 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
   double get _totalBobot {
     final divisor = _getEffectiveDivisor();
     if (divisor <= 0) return 0.0;
-    final totalRkk = _totalHargaRkk;
-    if (_dasarBobot == 'rab' && totalRkk > 0) {
-      return 100.0;
-    }
-    return (totalRkk / divisor) * 100.0;
+    return (_totalHargaRkk / divisor) * 100.0;
   }
 
   int get _totalItems {
@@ -331,54 +323,6 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
         ),
       );
     }
-  }
-
-  void _syncNilaiKegiatan() {
-    final totalRkk = _totalHargaRkk;
-    if (totalRkk <= 0) return;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Selaraskan Nilai Kontrak Acuan?'),
-        content: Text(
-          'Nilai kontrak awal acuan saat ini: ${formatRupiah(_nilaiKontrakKegiatan)}.\n\n'
-          'Apakah Anda yakin ingin menyelaraskan nilai acuan kontrak menjadi sama dengan akumulasi Total RAB: ${formatRupiah(totalRkk)}?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryBlue,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              setState(() {
-                _nilaiKontrakKegiatan = totalRkk;
-                final keg = widget.contract.kegiatans[widget.kegiatanIndex];
-                keg['nilaiKontrak'] = formatRupiah(totalRkk);
-                _isModified = true;
-              });
-              _recalculateAllBobot(notify: false);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Nilai Kontrak acuan diselaraskan: ${formatRupiah(totalRkk)}'),
-                  backgroundColor: const Color(0xFF059669),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              );
-            },
-            child: const Text('Ya, Selaraskan'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _saveRkk() {
@@ -1008,18 +952,9 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                 totalHargaCtrl.text = '0';
               }
 
-              // Hitung pembagi yang konsisten untuk live preview bobot
-              final double refTotal;
-              if (_dasarBobot == 'kontrak' && _nilaiKontrakKegiatan > 0) {
-                refTotal = _nilaiKontrakKegiatan;
-              } else {
-                // Dasar Total RAB: akumulasi item lain ditambah item ini
-                final projectedRab =
-                    (_totalHargaRkk - (isEdit ? initialTotal : 0.0)) + tot;
-                refTotal = projectedRab > 0
-                    ? projectedRab
-                    : (_nilaiKontrakKegiatan > 0 ? _nilaiKontrakKegiatan : 0.0);
-              }
+              final double refTotal = _nilaiKontrakKegiatan > 0
+                  ? _nilaiKontrakKegiatan
+                  : (_totalHargaRkk > 0 ? _totalHargaRkk : 0.0);
               if (refTotal > 0 && tot > 0) {
                 final bbt = (tot / refTotal) * 100.0;
                 bobotCtrl.text = bbt.toStringAsFixed(3);
@@ -1930,8 +1865,13 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
     }
     final isReadOnly = widget.readOnly ?? !(userProf?.isKonsultan ?? true);
     final totalBobotVal = _totalBobot;
-    final is100Percent = (totalBobotVal - 100.0).abs() < 0.05;
     final totalRkkHarga = _totalHargaRkk;
+    final double diff = totalRkkHarga - _nilaiKontrakKegiatan;
+    final bool isSesuai = _nilaiKontrakKegiatan > 0
+        ? (diff.abs() <= 0.005)
+        : ((totalBobotVal - 100.0).abs() < 0.05);
+    final bool isKurang = _nilaiKontrakKegiatan > 0 ? (!isSesuai && diff < 0) : (!isSesuai && totalBobotVal < 100.0);
+    final bool isMelebihi = _nilaiKontrakKegiatan > 0 ? (!isSesuai && diff > 0) : (!isSesuai && totalBobotVal > 100.0);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -2150,13 +2090,13 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                                       'Nilai Kontrak: ${formatRupiah(_nilaiKontrakKegiatan)}',
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: (_nilaiKontrakKegiatan - totalRkkHarga).abs() > 1.0
-                                            ? const Color(0xFFB45309)
-                                            : const Color(0xFF059669),
+                                        color: isSesuai
+                                            ? const Color(0xFF059669)
+                                            : (isKurang ? const Color(0xFFB45309) : const Color(0xFFE11D48)),
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                    if ((_nilaiKontrakKegiatan - totalRkkHarga).abs() > 1.0)
+                                    if (isKurang)
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                                         decoration: BoxDecoration(
@@ -2165,10 +2105,44 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                                           border: Border.all(color: const Color(0xFFFDE68A)),
                                         ),
                                         child: Text(
-                                          'Selisih: ${formatRupiah((totalRkkHarga - _nilaiKontrakKegiatan).abs())}',
+                                          'Kekurangan: ${formatRupiah(diff.abs())}',
                                           style: const TextStyle(
                                             fontSize: 9.5,
                                             color: Color(0xFFB45309),
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    if (isMelebihi)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFFE4E6),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: const Color(0xFFFECDD3)),
+                                        ),
+                                        child: Text(
+                                          'Kelebihan: ${formatRupiah(diff.abs())}',
+                                          style: const TextStyle(
+                                            fontSize: 9.5,
+                                            color: Color(0xFFE11D48),
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    if (isSesuai)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFD1FAE5),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: const Color(0xFFA7F3D0)),
+                                        ),
+                                        child: const Text(
+                                          'RAB Sesuai Nilai Kontrak',
+                                          style: TextStyle(
+                                            fontSize: 9.5,
+                                            color: Color(0xFF059669),
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
@@ -2238,9 +2212,11 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                               style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w900,
-                                color: is100Percent
+                                color: isSesuai
                                     ? const Color(0xFF10B981)
-                                    : const Color(0xFF0F172A),
+                                    : (isKurang
+                                        ? const Color(0xFFD97706)
+                                        : const Color(0xFFE11D48)),
                               ),
                             ),
                             const SizedBox(width: 3),
@@ -2260,14 +2236,18 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: is100Percent
+                            color: isSesuai
                                 ? const Color(0xFFECFDF5)
-                                : const Color(0xFFFEF3C7),
+                                : (isKurang
+                                    ? const Color(0xFFFEF3C7)
+                                    : const Color(0xFFFFE4E6)),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: is100Percent
+                              color: isSesuai
                                   ? const Color(0xFFA7F3D0)
-                                  : const Color(0xFFFDE68A),
+                                  : (isKurang
+                                      ? const Color(0xFFFDE68A)
+                                      : const Color(0xFFFECDD3)),
                               width: 0.8,
                             ),
                           ),
@@ -2275,23 +2255,31 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                is100Percent
+                                isSesuai
                                     ? Icons.check_circle
-                                    : Icons.info_outline,
+                                    : (isKurang
+                                        ? Icons.warning_amber_rounded
+                                        : Icons.error_outline),
                                 size: 12,
-                                color: is100Percent
+                                color: isSesuai
                                     ? const Color(0xFF059669)
-                                    : const Color(0xFFB45309),
+                                    : (isKurang
+                                        ? const Color(0xFFB45309)
+                                        : const Color(0xFFE11D48)),
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                is100Percent ? 'Sesuai 100%' : 'Belum 100%',
+                                isSesuai
+                                    ? 'Sesuai 100%'
+                                    : (isKurang ? 'Belum Sesuai' : 'Melebihi'),
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: is100Percent
+                                  color: isSesuai
                                       ? const Color(0xFF059669)
-                                      : const Color(0xFFB45309),
+                                      : (isKurang
+                                          ? const Color(0xFFB45309)
+                                          : const Color(0xFFE11D48)),
                                 ),
                               ),
                             ],
@@ -2307,9 +2295,11 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                         minHeight: 7,
                         backgroundColor: const Color(0xFFF1F5F9),
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          is100Percent
+                          isSesuai
                               ? const Color(0xFF10B981)
-                              : AppColors.primaryBlue,
+                              : (isKurang
+                                  ? AppColors.primaryBlue
+                                  : const Color(0xFFE11D48)),
                         ),
                       ),
                     ),
@@ -2320,6 +2310,7 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
@@ -2348,89 +2339,31 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                               ),
                             ),
                           ),
-                          if (_nilaiKontrakKegiatan > 0 && totalRkkHarga > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: const Color(0xFFCBD5E1)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Text(
-                                    'Dasar Bobot: ',
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF475569),
-                                    ),
-                                  ),
-                                  DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: _dasarBobot,
-                                      isDense: true,
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF0F172A),
-                                      ),
-                                      items: const [
-                                        DropdownMenuItem(
-                                          value: 'rab',
-                                          child: Text('Total Nilai RAB (100%)'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 'kontrak',
-                                          child: Text('Nilai Kontrak Awal'),
-                                        ),
-                                      ],
-                                      onChanged: isReadOnly
-                                          ? null
-                                          : (val) {
-                                              if (val != null) {
-                                                setState(() {
-                                                  _dasarBobot = val;
-                                                  _recalculateAllBobot(notify: false);
-                                                });
-                                              }
-                                            },
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFCBD5E1)),
                             ),
-                          if (totalRkkHarga > 0 &&
-                              (_nilaiKontrakKegiatan - totalRkkHarga).abs() >
-                                  1.0)
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF059669),
-                                side: const BorderSide(
-                                  color: Color(0xFFA7F3D0),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.info_outline, size: 13, color: Color(0xFF64748B)),
+                                const SizedBox(width: 5),
+                                Text(
+                                  _nilaiKontrakKegiatan > 0
+                                      ? 'Dasar Bobot: Nilai Kontrak (${formatRupiah(_nilaiKontrakKegiatan)})'
+                                      : 'Dasar Bobot: Total Nilai RAB',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF475569),
+                                  ),
                                 ),
-                                backgroundColor: const Color(0xFFECFDF5),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 6,
-                                ),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              onPressed: _syncNilaiKegiatan,
-                              icon: const Icon(Icons.sync, size: 14),
-                              label: const Text(
-                                'Samakan Nilai Kegiatan',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                              ],
                             ),
+                          ),
                         ],
                       ),
                   ],

@@ -54,6 +54,7 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
   late TextEditingController _tglSpmkKontraktorCtrl;
   late TextEditingController _nilaiKontrakCtrl;
   late TextEditingController _jangkaWaktuCtrl;
+  late TextEditingController _tglAkhirSpmkCtrl;
 
   // 4. STRUKTUR ORGANISASI KEGIATAN
   late TextEditingController _penggunaAnggaranCtrl;
@@ -74,6 +75,9 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
   bool _loadingKontraktorUsers = true;
 
   bool get isEditing => widget.initialKegiatan != null;
+  bool _section2DatesEdited = false;
+  bool _section3DatesEdited = false;
+  bool _isSyncingDates = false;
 
   @override
   void initState() {
@@ -158,12 +162,24 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
           ? init!['tglSpmkKontraktor']
           : c.tglMulaiSpmk,
     );
-    _nilaiKontrakCtrl = TextEditingController(text: RupiahUtil.formatString(init?['nilaiKontrak'] ?? ''));
+    _nilaiKontrakCtrl = TextEditingController(
+      text: RupiahUtil.formatString(init?['nilaiKontrak'] ?? '', allowDecimals: true),
+    );
     _jangkaWaktuCtrl = TextEditingController(
       text: (init?['jangkaWaktu']?.toString().isNotEmpty == true)
           ? init!['jangkaWaktu']
           : defaultDurasi,
     );
+    _tglAkhirSpmkCtrl = TextEditingController(
+      text: (init?['tglAkhirSpmkKontraktor']?.toString().isNotEmpty == true)
+          ? init!['tglAkhirSpmkKontraktor'].toString()
+          : KegiatanModel.calculateTanggalAkhirSpmk(
+              _tglSpmkKontraktorCtrl.text,
+              _jangkaWaktuCtrl.text,
+            ),
+    );
+    _jangkaWaktuCtrl.addListener(_updateTglAkhirSpmk);
+    _tglSpmkKontraktorCtrl.addListener(_updateTglAkhirSpmk);
 
     // 4. Struktur Organisasi Kegiatan
     _penggunaAnggaranCtrl = TextEditingController(
@@ -314,7 +330,10 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
     _noSpmkKontraktorCtrl.dispose();
     _tglSpmkKontraktorCtrl.dispose();
     _nilaiKontrakCtrl.dispose();
+    _jangkaWaktuCtrl.removeListener(_updateTglAkhirSpmk);
     _jangkaWaktuCtrl.dispose();
+    _tglSpmkKontraktorCtrl.removeListener(_updateTglAkhirSpmk);
+    _tglAkhirSpmkCtrl.dispose();
     _penggunaAnggaranCtrl.dispose();
     _stafTeknis1Ctrl.dispose();
     _stafTeknis2Ctrl.dispose();
@@ -360,10 +379,126 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
       final formatted = WeeklyReportModel.formatIndonesianDate(picked);
       setState(() {
         controller.text = formatted;
-        if (updateWaktuBerjalan) {
+        if (controller == _awalPelaksanaanCtrl || controller == _akhirPelaksanaanCtrl) {
+          _syncFromSection2DatePicked(controller, picked, formatted);
+        } else if (controller == _tglSpmkKontraktorCtrl) {
+          _syncFromSection3Change();
+        } else if (updateWaktuBerjalan) {
           _waktuBerjalanCtrl.text = KegiatanModel.calculateWaktuBerjalan(formatted);
         }
       });
+    }
+  }
+
+  int? _extractDaysCount(String text) {
+    final m = RegExp(r'\d+').firstMatch(text.trim());
+    if (m == null) return null;
+    final v = int.tryParse(m.group(0)!);
+    return (v != null && v > 0) ? v : null;
+  }
+
+  void _syncFromSection2DatePicked(
+    TextEditingController controller,
+    DateTime picked,
+    String formatted,
+  ) {
+    if (_isSyncingDates) return;
+    _section2DatesEdited = true;
+    _isSyncingDates = true;
+    try {
+      if (controller == _awalPelaksanaanCtrl) {
+        final days = _extractDaysCount(_masaPelaksanaanCtrl.text) ??
+            _extractDaysCount(_jangkaWaktuCtrl.text) ??
+            (widget.contract.hariKalender > 0 ? widget.contract.hariKalender : null);
+        if (days != null && days > 0) {
+          final endDt = DateTime(picked.year, picked.month, picked.day + days - 1);
+          _akhirPelaksanaanCtrl.text = WeeklyReportModel.formatIndonesianDate(endDt);
+        }
+        _waktuBerjalanCtrl.text = KegiatanModel.calculateWaktuBerjalan(formatted);
+        if (!_section3DatesEdited) {
+          _tglSpmkKonsultanCtrl.text = formatted;
+          _tglSpmkKontraktorCtrl.text = formatted;
+          if (_jangkaWaktuCtrl.text.trim().isEmpty && _masaPelaksanaanCtrl.text.trim().isNotEmpty) {
+            _jangkaWaktuCtrl.text = _masaPelaksanaanCtrl.text.trim();
+          }
+          _updateTglAkhirSpmk();
+        }
+      } else if (controller == _akhirPelaksanaanCtrl) {
+        final awalDt = WeeklyReportModel.parseIndonesianDate(_awalPelaksanaanCtrl.text);
+        if (awalDt != null) {
+          final startOnly = DateTime(awalDt.year, awalDt.month, awalDt.day);
+          final endOnly = DateTime(picked.year, picked.month, picked.day);
+          final diffDays = endOnly.difference(startOnly).inDays + 1;
+          if (diffDays > 0) {
+            final formattedDur = IndonesianTerbilang.formatHariKalender(diffDays);
+            _masaPelaksanaanCtrl.text = formattedDur;
+            if (!_section3DatesEdited) {
+              _jangkaWaktuCtrl.text = formattedDur;
+              _tglAkhirSpmkCtrl.text = formatted;
+            }
+          }
+        }
+      }
+    } finally {
+      _isSyncingDates = false;
+    }
+  }
+
+  void _syncFromSection2DurationChanged(String val) {
+    if (_isSyncingDates) return;
+    _section2DatesEdited = true;
+    _isSyncingDates = true;
+    try {
+      final calcEnd = KegiatanModel.calculateTanggalAkhirSpmk(
+        _awalPelaksanaanCtrl.text,
+        val,
+      );
+      if (calcEnd.isNotEmpty) {
+        _akhirPelaksanaanCtrl.text = calcEnd;
+      }
+      if (!_section3DatesEdited) {
+        _jangkaWaktuCtrl.text = val;
+        _updateTglAkhirSpmk();
+      }
+    } finally {
+      _isSyncingDates = false;
+    }
+  }
+
+  void _syncFromSection3Change() {
+    if (_isSyncingDates) return;
+    _section3DatesEdited = true;
+    _isSyncingDates = true;
+    try {
+      _updateTglAkhirSpmk();
+      if (!_section2DatesEdited) {
+        final spmkText = _tglSpmkKontraktorCtrl.text.trim();
+        final akhirText = _tglAkhirSpmkCtrl.text.trim();
+        final durasiText = _jangkaWaktuCtrl.text.trim();
+        if (spmkText.isNotEmpty) {
+          _tglSpmkKonsultanCtrl.text = spmkText;
+          _awalPelaksanaanCtrl.text = spmkText;
+          _waktuBerjalanCtrl.text = KegiatanModel.calculateWaktuBerjalan(spmkText);
+        }
+        if (akhirText.isNotEmpty) {
+          _akhirPelaksanaanCtrl.text = akhirText;
+        }
+        if (durasiText.isNotEmpty) {
+          _masaPelaksanaanCtrl.text = durasiText;
+        }
+      }
+    } finally {
+      _isSyncingDates = false;
+    }
+  }
+
+  void _updateTglAkhirSpmk() {
+    final calculated = KegiatanModel.calculateTanggalAkhirSpmk(
+      _tglSpmkKontraktorCtrl.text,
+      _jangkaWaktuCtrl.text,
+    );
+    if (_tglAkhirSpmkCtrl.text != calculated) {
+      _tglAkhirSpmkCtrl.text = calculated;
     }
   }
 
@@ -406,6 +541,12 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
           ? 'Rp ${_nilaiKontrakCtrl.text.trim()}'
           : '',
       'jangkaWaktu': _jangkaWaktuCtrl.text.trim(),
+      'tglAkhirSpmkKontraktor': _tglAkhirSpmkCtrl.text.trim().isNotEmpty
+          ? _tglAkhirSpmkCtrl.text.trim()
+          : KegiatanModel.calculateTanggalAkhirSpmk(
+              _tglSpmkKontraktorCtrl.text.trim(),
+              _jangkaWaktuCtrl.text.trim(),
+            ),
       'penggunaAnggaran': _penggunaAnggaranCtrl.text.trim(),
       'stafTeknis1': _stafTeknis1Ctrl.text.trim(),
       'stafTeknis2': _stafTeknis2Ctrl.text.trim(),
@@ -642,6 +783,7 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
         _buildField(
           controller: _masaPelaksanaanCtrl,
           label: 'Masa Pelaksanaan',
+          onChanged: (val) => setState(() => _syncFromSection2DurationChanged(val)),
         ),
       ],
     );
@@ -818,8 +960,8 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
           label: 'Nilai Kontrak Kegiatan *',
           isBold: true,
           prefixText: 'Rp ',
-          keyboardType: TextInputType.number,
-          inputFormatters: [RupiahInputFormatter()],
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [RupiahInputFormatter(allowDecimals: true)],
           validator: (val) => val == null || val.trim().isEmpty ? 'Nilai kontrak kegiatan wajib diisi' : null,
         ),
         const SizedBox(height: 16),
@@ -844,6 +986,16 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
         _buildField(
           controller: _jangkaWaktuCtrl,
           label: 'Jangka Waktu Pelaksanaan',
+          onChanged: (_) => setState(() => _syncFromSection3Change()),
+        ),
+        const SizedBox(height: 14),
+
+        // Tanggal Akhir SPMK (Dihitung Otomatis)
+        _buildField(
+          controller: _tglAkhirSpmkCtrl,
+          label: 'Tanggal Akhir SPMK',
+          readOnly: true,
+          suffixIcon: const Icon(Icons.calendar_month, color: Color(0xFF6B7280), size: 18),
         ),
       ],
     );
@@ -861,12 +1013,12 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
         const SizedBox(height: 14),
         _buildField(
           controller: _stafTeknis1Ctrl,
-          label: 'Staf Teknis 1 DPU-PR',
+          label: 'Staf Teknis 1',
         ),
         const SizedBox(height: 14),
         _buildField(
           controller: _stafTeknis2Ctrl,
-          label: 'Staf Teknis 2 DPU-PR',
+          label: 'Staf Teknis 2',
         ),
       ],
     );
@@ -974,6 +1126,7 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
     bool isBold = false,
     bool readOnly = false,
     VoidCallback? onTap,
+    ValueChanged<String>? onChanged,
     double fontSize = 13,
     String? prefixText,
     TextInputType? keyboardType,
@@ -986,6 +1139,7 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
       maxLines: maxLines,
       readOnly: readOnly,
       onTap: onTap,
+      onChanged: onChanged,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
       validator: validator,
