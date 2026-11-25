@@ -1268,7 +1268,29 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () {
-              Provider.of<ContractProvider>(context, listen: false).deleteContract(contract.id);
+              final deletedContract = contract;
+              try {
+                final userProf = Provider.of<UserProfileProvider>(context, listen: false);
+                final actorName = userProf.namaLengkap.trim().isNotEmpty
+                    ? userProf.namaLengkap.trim()
+                    : 'CV. Tata Saka Consultant';
+                final actorRole = userProf.role.trim().isNotEmpty ? userProf.role.trim() : 'Konsultan';
+                final timeline = Provider.of<TimelineProvider>(context, listen: false);
+                timeline.logEvent(
+                  actorName: actorName,
+                  actorRole: actorRole,
+                  actionType: 'DELETE',
+                  entityType: 'KONTRAK',
+                  contractId: deletedContract.id,
+                  contractName: deletedContract.namaKontrak,
+                  dinasName: deletedContract.instansiDinas.isNotEmpty
+                      ? deletedContract.instansiDinas.first
+                      : 'DPU-PR Kab. Purbalingga',
+                  title: 'Penghapusan Kontrak: ${deletedContract.namaKontrak}',
+                  description: 'Kontrak "${deletedContract.namaKontrak}" beserta seluruh kegiatan dan laporannya telah dihapus dari sistem.',
+                );
+              } catch (_) {}
+              Provider.of<ContractProvider>(context, listen: false).deleteContract(deletedContract.id);
               Navigator.pop(ctx);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(

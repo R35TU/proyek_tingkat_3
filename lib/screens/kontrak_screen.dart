@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
+import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/screens/detail_kegiatan_screen.dart';
 import 'package:tata_saka_app/screens/detail_kontrak_screen.dart';
@@ -565,6 +566,27 @@ class _KontrakScreenState extends State<KontrakScreen> {
             ),
             onPressed: () {
               Navigator.pop(ctx);
+              try {
+                final userProf = Provider.of<UserProfileProvider>(context, listen: false);
+                final actorName = userProf.namaLengkap.trim().isNotEmpty
+                    ? userProf.namaLengkap.trim()
+                    : 'CV. Tata Saka Consultant';
+                final actorRole = userProf.role.trim().isNotEmpty ? userProf.role.trim() : 'Konsultan';
+                final timeline = Provider.of<TimelineProvider>(context, listen: false);
+                timeline.logEvent(
+                  actorName: actorName,
+                  actorRole: actorRole,
+                  actionType: 'DELETE',
+                  entityType: 'KONTRAK',
+                  contractId: contract.id,
+                  contractName: contract.namaKontrak,
+                  dinasName: contract.instansiDinas.isNotEmpty
+                      ? contract.instansiDinas.first
+                      : 'DPU-PR Kab. Purbalingga',
+                  title: 'Penghapusan Kontrak: ${contract.namaKontrak}',
+                  description: 'Kontrak "${contract.namaKontrak}" beserta seluruh kegiatan dan laporannya telah dihapus dari sistem.',
+                );
+              } catch (_) {}
               Provider.of<ContractProvider>(context, listen: false).deleteContract(contract.id);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Kontrak berhasil dihapus')),
