@@ -1390,8 +1390,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     double sumProgress = 0.0;
-    for (final k in myKegiatans) {
-      sumProgress += _calcKegiatanProgress(k);
+    for (int i = 0; i < myKegiatans.length; i++) {
+      sumProgress += _calcKegiatanProgress(
+        myKegiatans[i],
+        contract: parentContracts[i],
+      );
     }
     final double avgProgress = myKegiatans.isNotEmpty
         ? (sumProgress / myKegiatans.length)
@@ -1580,7 +1583,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 final k = myKegiatans[idx];
                 final parentContract = parentContracts[idx];
                 final kIndex = kegIndices[idx];
-                final prog = _calcKegiatanProgress(k);
+                final prog = _calcKegiatanProgress(k, contract: parentContract);
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 14),
@@ -1813,8 +1816,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  double _calcKegiatanProgress(Map<String, dynamic> keg) =>
-      ProgressCalculator.calculateKegiatanProgress(keg);
+  double _calcKegiatanProgress(
+    Map<String, dynamic> keg, {
+    ContractModel? contract,
+  }) =>
+      ProgressCalculator.calculateKegiatanProgress(keg, contract: contract);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ─── SIDEBAR DASHBOARD WEB ───

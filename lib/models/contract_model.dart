@@ -31,12 +31,14 @@ class ContractModel {
   double get progressFisik => ProgressCalculator.calculateContractProgressRatio(
         kegiatans,
         fallbackProgress: _storedProgressFisik,
+        contract: this,
       );
 
   /// Nilai persentase progres fisik (0.0 s.d. 100.0%).
   double get progressPercent => ProgressCalculator.calculateContractProgressPercent(
         kegiatans,
         fallbackProgress: _storedProgressFisik,
+        contract: this,
       );
   
   // Folders for administrasi

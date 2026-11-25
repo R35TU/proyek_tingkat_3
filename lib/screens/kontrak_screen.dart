@@ -29,8 +29,11 @@ class _KontrakScreenState extends State<KontrakScreen> {
     super.dispose();
   }
 
-  double _calcKegiatanProgress(Map<String, dynamic> keg) =>
-      ProgressCalculator.calculateKegiatanProgress(keg);
+  double _calcKegiatanProgress(
+    Map<String, dynamic> keg, {
+    ContractModel? contract,
+  }) =>
+      ProgressCalculator.calculateKegiatanProgress(keg, contract: contract);
 
   @override
   Widget build(BuildContext context) {
@@ -217,7 +220,7 @@ class _KontrakScreenState extends State<KontrakScreen> {
         final k = myKegiatans[idx];
         final parentContract = parentContracts[idx];
         final kIndex = kegIndices[idx];
-        final prog = _calcKegiatanProgress(k);
+        final prog = _calcKegiatanProgress(k, contract: parentContract);
 
         return Container(
           margin: const EdgeInsets.only(bottom: 14),

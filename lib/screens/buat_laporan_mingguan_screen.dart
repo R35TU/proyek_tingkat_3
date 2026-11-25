@@ -864,10 +864,12 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
 
     keg['laporanMingguan'] = existingWeekly;
 
-    // Sinkronisasi progress fisik kegiatan jika realisasi tersedia
-    if (reportObj.realisasiPersen > 0) {
-      keg['progressFisik'] = reportObj.realisasiPersen / 100.0;
-    }
+    // Sinkronisasi progress fisik kegiatan agar selalu selaras dengan ProgressCalculator
+    keg['progressFisik'] = ProgressCalculator.calculateKegiatanProgress(
+          keg,
+          contract: _selectedContract,
+        ) /
+        100.0;
 
     provider.updateContract(_selectedContract!);
 

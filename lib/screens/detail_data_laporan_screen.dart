@@ -11,7 +11,9 @@ import 'package:tata_saka_app/screens/buat_laporan_screen.dart';
 import 'package:tata_saka_app/screens/buat_laporan_mingguan_screen.dart';
 import 'package:tata_saka_app/widgets/lembar_laporan_mingguan_widget.dart';
 import 'package:tata_saka_app/widgets/lembar_boq_mingguan_widget.dart';
+import 'package:tata_saka_app/utils/execution_period_helper.dart';
 import 'package:tata_saka_app/utils/plat_nomor_util.dart';
+import 'package:tata_saka_app/utils/progress_calculator.dart';
 import 'package:pdf/pdf.dart';
 import 'package:tata_saka_app/screens/pdf_viewer_screen.dart';
 import 'package:tata_saka_app/services/pdf_report_service.dart';
@@ -2959,6 +2961,12 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
     final String namaKegiatan = kegiatan?['namaKegiatan'] ?? liveContract.namaKontrak;
     final String lokasi = kegiatan?['lokasi'] ?? '-';
     final String kontraktor = kegiatan?['kontraktor'] ?? '-';
+    final double kegProgress = kegiatan != null
+        ? ProgressCalculator.calculateKegiatanProgress(
+            kegiatan,
+            contract: liveContract,
+          )
+        : liveContract.progressPercent;
     final reportsOnSelectedDate = _getReportsForDate(_selectedDate);
 
     UserProfileProvider? userProf;
@@ -3071,7 +3079,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              widget.contract.namaKontrak,
+                              liveContract.namaKontrak,
                               style: const TextStyle(color: AppColors.textLight, fontSize: 13),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -3095,9 +3103,32 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                                 const Icon(Icons.circle, size: 7, color: AppColors.successGreen),
                                 const SizedBox(width: 4),
                                 Text(
-                                  widget.contract.status == 'Selesai' ? 'Selesai' : 'Progres',
+                                  liveContract.status == 'Selesai' ? 'Selesai' : 'Progres',
                                   style: const TextStyle(
                                     color: AppColors.successGreen,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFBFDBFE)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.trending_up, size: 12, color: AppColors.primaryBlue),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Progres: ${kegProgress.toStringAsFixed(2)}%',
+                                  style: const TextStyle(
+                                    color: AppColors.primaryBlue,
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -3475,11 +3506,124 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
     );
   }
 
+  WeeklyReportModel _resolveLiveWeeklyReport(
+    WeeklyReportModel report,
+    ContractModel contract,
+    Map<String, dynamic>? keg,
+  ) {
+    if (keg == null) return report;
+    if (ProgressCalculator.getActiveRkk(keg).isEmpty) return report;
+
+    final period = ExecutionPeriodHelper.resolveExecutionPeriod(keg, contract: contract);
+    final range = ExecutionPeriodHelper.calcWeekRange(
+      report.mingguKe,
+      period.startDate,
+      period.durationDays,
+    );
+    if (period.startDate != null &&
+        !ExecutionPeriodHelper.doesSavedWeeklyMatchRange(report, range)) {
+      return report;
+    }
+
+    final boqRes = ProgressCalculator.calculateBoqProgress(
+      kegMap: keg,
+      startDt: range.startDt,
+      endDt: range.endDt,
+      minStartDt: period.startDate,
+    );
+
+    final kegNilaiStr = keg['nilaiKontrak']?.toString().trim() ?? '';
+    final effectiveNilaiStr =
+        kegNilaiStr.isNotEmpty ? kegNilaiStr : contract.nilaiKontrak;
+    final parsedNilai = WeeklyReportModel.parseRupiah(effectiveNilaiStr);
+    final double nilaiNumeric = parsedNilai > 0 ? parsedNilai : report.nilaiKontrakNumeric;
+
+    final double liveRealisasiPersen = boqRes.totalBobotSdIni;
+    final double liveRealisasiNominal = (liveRealisasiPersen / 100.0) * nilaiNumeric;
+    final double liveRencanaNominal = (report.rencanaPersen / 100.0) * nilaiNumeric;
+    final double liveDeviasiPersen = liveRealisasiPersen - report.rencanaPersen;
+    final double liveDeviasiNominal = liveRealisasiNominal - liveRencanaNominal;
+
+    final List<WeeklyTableRow> syncedRows = report.tabelMingguan.map((row) {
+      final wRange = ExecutionPeriodHelper.calcWeekRange(
+        row.mingguKe,
+        period.startDate,
+        period.durationDays,
+      );
+      double? rowReal = row.realisasi;
+      if (row.mingguKe == report.mingguKe) {
+        rowReal = liveRealisasiPersen;
+      } else {
+        final wBoq = ProgressCalculator.calculateBoqProgress(
+          kegMap: keg,
+          startDt: wRange.startDt,
+          endDt: wRange.endDt,
+          minStartDt: period.startDate,
+        );
+        if (wBoq.totalBobotSdIni > 0 || row.realisasi != null) {
+          rowReal = wBoq.totalBobotSdIni;
+        }
+      }
+      return WeeklyTableRow(
+        status: row.status,
+        mingguKe: row.mingguKe,
+        tglMulai: wRange.tglMulaiSlash.isNotEmpty ? wRange.tglMulaiSlash : row.tglMulai,
+        tglSelesai: wRange.tglSelesaiSlash.isNotEmpty ? wRange.tglSelesaiSlash : row.tglSelesai,
+        rencana: row.rencana,
+        realisasi: rowReal,
+      );
+    }).toList();
+
+    return WeeklyReportModel(
+      id: report.id,
+      pekerjaan: report.pekerjaan,
+      lokasiProyek: report.lokasiProyek,
+      kontraktor: report.kontraktor,
+      jangkaWaktu: period.durationDays > 0 ? period.durationDays : report.jangkaWaktu,
+      nomorKontrak: report.nomorKontrak,
+      tanggalKontrak: report.tanggalKontrak,
+      nilaiKontrak: effectiveNilaiStr.isNotEmpty ? effectiveNilaiStr : report.nilaiKontrak,
+      nilaiKontrakNumeric: nilaiNumeric,
+      tanggalSpmk: period.startFormatted.isNotEmpty ? period.startFormatted : report.tanggalSpmk,
+      mingguKe: report.mingguKe,
+      totalMinggu: period.totalWeeks > 0 ? period.totalWeeks : report.totalMinggu,
+      periodeAwal: range.tglMulaiIndo.isNotEmpty ? range.tglMulaiIndo : report.periodeAwal,
+      periodeAkhir: range.tglSelesaiIndo.isNotEmpty ? range.tglSelesaiIndo : report.periodeAkhir,
+      rencanaPersen: report.rencanaPersen,
+      rencanaNominal: liveRencanaNominal,
+      realisasiPersen: liveRealisasiPersen,
+      realisasiNominal: liveRealisasiNominal,
+      deviasiPersen: liveDeviasiPersen,
+      deviasiNominal: liveDeviasiNominal,
+      waktuTerpakai: range.startDt != null ? range.elapsedDays : report.waktuTerpakai,
+      sisaWaktu: range.startDt != null ? range.remainingDays : report.sisaWaktu,
+      akhirMasaKontrak: period.endFormatted.isNotEmpty ? period.endFormatted : report.akhirMasaKontrak,
+      tabelMingguan: syncedRows,
+      boqProgressList: boqRes.divisiList,
+      createdAt: report.createdAt,
+      ttdList: report.ttdList,
+      ttdKontraktorNama: report.ttdKontraktorNama,
+      ttdKontraktorJabatan: report.ttdKontraktorJabatan,
+      ttdKontraktorSignature: report.ttdKontraktorSignature,
+      ttdKontraktorTanggal: report.ttdKontraktorTanggal,
+      ttdKonsultanNama: report.ttdKonsultanNama,
+      ttdKonsultanJabatan: report.ttdKonsultanJabatan,
+      ttdKonsultanSignature: report.ttdKonsultanSignature,
+      ttdKonsultanTanggal: report.ttdKonsultanTanggal,
+      ttdPpkNama: report.ttdPpkNama,
+      ttdPpkJabatan: report.ttdPpkJabatan,
+      ttdPpkSignature: report.ttdPpkSignature,
+      ttdPpkTanggal: report.ttdPpkTanggal,
+    );
+  }
+
   Widget _buildLaporanMingguanListSection({bool isKonsultan = true}) {
+    final live = _liveContract;
     final keg = _currentKegiatan;
     final List<dynamic> rawList = keg?['laporanMingguan'] ?? [];
     final List<WeeklyReportModel> weeklyReports = rawList
         .map((e) => WeeklyReportModel.fromJson(Map<String, dynamic>.from(e)))
+        .map((r) => _resolveLiveWeeklyReport(r, live, keg))
         .toList();
 
     weeklyReports.sort((a, b) => b.mingguKe.compareTo(a.mingguKe));
@@ -4023,7 +4167,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
           buildPdf: () => PdfReportService.generateLaporanMingguanPdf(
             report: report,
             kegiatan: _currentKegiatan ?? {},
-            contract: widget.contract,
+            contract: _liveContract,
           ),
         ),
       ),
@@ -4041,7 +4185,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
           buildPdf: () => PdfReportService.generateLembarBoqMingguanPdf(
             report: report,
             kegiatan: _currentKegiatan ?? {},
-            contract: widget.contract,
+            contract: _liveContract,
           ),
         ),
       ),

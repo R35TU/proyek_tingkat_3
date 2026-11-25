@@ -524,13 +524,13 @@ class ContractProvider with ChangeNotifier {
       }
     } catch (_) {}
 
-    cache
-      ..clear()
-      ..addAll(newCache);
-
     if (ops > 0) {
       await batch.commit();
     }
+
+    cache
+      ..clear()
+      ..addAll(newCache);
   }
 
   /// Ambil laporan dari subcollection & suntikkan kembali ke keg map agar
@@ -886,9 +886,6 @@ class ContractProvider with ChangeNotifier {
     _ensureKegiatanIds(updatedContract);
     final daily = _extractReports(updatedContract, 'laporans');
     final weekly = _extractReports(updatedContract, 'laporanMingguan');
-
-    _fillCache(updatedContract.id, daily, _reportDocCache);
-    _fillCache(updatedContract.id, weekly, _weeklyDocCache);
 
     try {
       // Sinkronkan subcollection terlebih dahulu sebelum menulis parent document

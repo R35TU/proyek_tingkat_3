@@ -1151,6 +1151,13 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
     final live = _resolveLiveContract(listen: true);
     if (!identical(live, _syncedContractRef)) {
       _loadData(live);
+    } else if (widget.kegiatanIndex >= 0 &&
+        widget.kegiatanIndex < live.kegiatans.length) {
+      _kegiatanMap =
+          Map<String, dynamic>.from(live.kegiatans[widget.kegiatanIndex]);
+      _kegiatan = KegiatanModel.fromJson(_kegiatanMap, fallbackContract: live);
+      _namaKegiatan = _kegiatan.namaKegiatan;
+      _lokasi = _kegiatan.lokasi;
     }
     UserProfileProvider? userProf;
     try {
@@ -2240,8 +2247,14 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
     );
   }
 
-  double get _currentProgresFisik =>
-      ProgressCalculator.calculateKegiatanProgress(_kegiatanMap);
+  double get _currentProgresFisik {
+    final live = _resolveLiveContract(listen: false);
+    final keg = (widget.kegiatanIndex >= 0 &&
+            widget.kegiatanIndex < live.kegiatans.length)
+        ? live.kegiatans[widget.kegiatanIndex]
+        : _kegiatanMap;
+    return ProgressCalculator.calculateKegiatanProgress(keg, contract: live);
+  }
 
   void _bukaLembarTambahKurangLatest() {
     if (!_kegiatan.hasAddendum) return;

@@ -1,4 +1,6 @@
+import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
+import 'package:tata_saka_app/utils/execution_period_helper.dart';
 
 /// Hasil agregasi rekapitulasi BOQ (14 kolom) berbasis laporan harian.
 class BoqAggregationResult {
@@ -52,23 +54,110 @@ class ProgressCalculator {
     return def.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 
+  static DateTime _dayOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  static DateTime? _parseReportDate(Map<dynamic, dynamic> rep) {
+    final repTglStr = rep['tanggal']?.toString() ?? '';
+    if (repTglStr.isNotEmpty) {
+      final dt = DateTime.tryParse(repTglStr) ??
+          WeeklyReportModel.parseIndonesianDate(repTglStr);
+      if (dt != null) return dt;
+    }
+    final fStr = rep['tanggalFormatted']?.toString() ?? '';
+    if (fStr.isNotEmpty) {
+      final dt = WeeklyReportModel.parseIndonesianDate(fStr);
+      if (dt != null) return dt;
+    }
+    final cStr = rep['createdAt']?.toString() ?? '';
+    if (cStr.isNotEmpty) {
+      return DateTime.tryParse(cStr) ??
+          WeeklyReportModel.parseIndonesianDate(cStr);
+    }
+    return null;
+  }
+
+  static bool _hasExplicitExecutionBounds(
+    Map<String, dynamic> kegMap,
+    ContractModel? contract,
+  ) {
+    if (contract != null &&
+        (contract.tglMulaiSpmk.trim().isNotEmpty ||
+            contract.tglSelesaiSpmk.trim().isNotEmpty)) {
+      return true;
+    }
+    const keys = [
+      'tglSpmkKontraktor',
+      'awalPelaksanaan',
+      'tglSpmkKonsultan',
+      'tglAkhirSpmkKontraktor',
+      'akhirPelaksanaan',
+    ];
+    return keys.any((k) => (kegMap[k]?.toString().trim() ?? '').isNotEmpty);
+  }
+
+  static double _resolveMatchedDailyVolume(
+    Map<dynamic, dynamic> rep, {
+    required String rkkId,
+    required String itId,
+    required String noMata,
+    required String uraian,
+  }) {
+    double matchedVol = 0.0;
+    final pList = (rep['pekerjaanList'] as List?) ?? [];
+    for (final p in pList) {
+      if (p is! Map) continue;
+      final pId = (p['rkkItemId'] ?? '').toString().trim();
+      final pNoMata = (p['noMataPembayaran'] ?? '').toString().trim();
+      final pUraian = (p['uraian'] ?? p['jenis'] ?? p['jenisPekerjaan'])
+              ?.toString()
+              .trim()
+              .toLowerCase() ??
+          '';
+
+      final matchId =
+          pId.isNotEmpty && (pId == rkkId || (itId.isNotEmpty && pId == itId));
+      final matchNoMata =
+          noMata.isNotEmpty && pNoMata.isNotEmpty && noMata == pNoMata;
+      final matchUraian = uraian.isNotEmpty &&
+          pUraian.isNotEmpty &&
+          (pUraian == uraian ||
+              uraian.contains(pUraian) ||
+              pUraian.contains(uraian));
+
+      if (matchId || matchNoMata || matchUraian) {
+        final vStr = (p['volume'] ?? '').toString();
+        final vNum =
+            double.tryParse(vStr.split(' ').first.replaceAll(',', '.')) ?? 0.0;
+        matchedVol += vNum;
+      }
+    }
+    return matchedVol;
+  }
+
   /// Menghitung persentase progres fisik suatu kegiatan (skala 0.0 s.d. 100.0%).
   ///
   /// Alur audit perhitungan:
-  /// 1. Real-time dari akumulasi seluruh laporan harian (laporans) terhadap RKK aktif.
-  ///    - Untuk setiap item RKK aktif, mencari target volume (volumeCCO jika ada addendum, atau volume awal)
-  ///      dan nilaiBobot item.
-  ///    - Menjumlahkan volume pekerjaan dari seluruh laporan harian yang cocok (melalui rkkItemId, noMataPembayaran, atau uraian).
-  ///    - Menghitung kontribusi bobot item: (volReal / volKontrak) * bobotItem.
-  ///    - Menjumlahkan seluruh kontribusi bobot menjadi total progres kegiatan.
-  /// 2. Fallback: Menggunakan realisasiPersen dari laporan mingguan terakhir jika laporan harian belum tersedia atau 0.
-  /// 3. Fallback: Menggunakan nilai statis progressFisik / progresFisik jika ada.
-  /// 4. Jika tidak ada data laporan, mengembalikan 0.0.
-  static double calculateKegiatanProgress(Map<String, dynamic> kegMap) {
+  /// 1. Jika RKK aktif tersedia, progres SELALU dihitung real-time dari akumulasi
+  ///    laporan harian (`laporans`) yang berada dalam periode pelaksanaan aktif.
+  ///    Tidak menggunakan fallback laporan mingguan/statis yang sudah usang.
+  /// 2. Jika RKK belum tersedia, fallback ke laporan mingguan yang selaras
+  ///    dengan jadwal aktif, lalu ke nilai manual `progressFisik`/`progresFisik`.
+  static double calculateKegiatanProgress(
+    Map<String, dynamic> kegMap, {
+    ContractModel? contract,
+  }) {
     final rawRkk = getActiveRkk(kegMap);
     final dailyReports = (kegMap['laporans'] as List?) ?? [];
+    final hasBounds = _hasExplicitExecutionBounds(kegMap, contract);
+    final period = hasBounds
+        ? ExecutionPeriodHelper.resolveExecutionPeriod(kegMap, contract: contract)
+        : null;
+    final DateTime? minStartDay =
+        period?.startDate != null ? _dayOnly(period!.startDate!) : null;
+    final DateTime? maxEndDay =
+        period?.endDate != null ? _dayOnly(period!.endDate!) : null;
 
-    if (dailyReports.isNotEmpty && rawRkk.isNotEmpty) {
+    if (rawRkk.isNotEmpty) {
       double totalProgress = 0.0;
       for (final div in rawRkk) {
         final items = (div['items'] as List?) ?? [];
@@ -77,58 +166,68 @@ class ProgressCalculator {
           if (rawIt is! Map) continue;
           final it = Map<String, dynamic>.from(rawIt);
           final noMata = (it['noMataPembayaran'] ?? '').toString().trim();
-          final uraian = (it['uraian'] ?? it['jenisPekerjaan'] ?? '').toString().trim().toLowerCase();
+          final uraian = (it['uraian'] ?? it['jenisPekerjaan'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase();
           final rkkId = '${romawi}_${it['uraian']}';
           final itId = (it['id'] ?? '').toString().trim();
-          final volKontrak = (it['volumeCCO'] ?? it['volume'] as num?)?.toDouble() ?? 0.0;
+          final volKontrak =
+              (it['volumeCCO'] ?? it['volume'] as num?)?.toDouble() ?? 0.0;
           final bbtKontrak = (it['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
           if (volKontrak <= 0 || bbtKontrak <= 0) continue;
 
           double volReal = 0.0;
           for (final rep in dailyReports) {
             if (rep is! Map) continue;
-            final pList = (rep['pekerjaanList'] as List?) ?? [];
-            for (final p in pList) {
-              if (p is! Map) continue;
-              final pId = (p['rkkItemId'] ?? '').toString().trim();
-              final pNoMata = (p['noMataPembayaran'] ?? '').toString().trim();
-              final pUraian = (p['uraian'] ?? p['jenis'] ?? p['jenisPekerjaan'])
-                      ?.toString()
-                      .trim()
-                      .toLowerCase() ??
-                  '';
-
-              final matchId = pId.isNotEmpty && (pId == rkkId || (itId.isNotEmpty && pId == itId));
-              final matchNoMata = noMata.isNotEmpty && pNoMata.isNotEmpty && noMata == pNoMata;
-              final matchUraian = uraian.isNotEmpty &&
-                  pUraian.isNotEmpty &&
-                  (pUraian == uraian || uraian.contains(pUraian) || pUraian.contains(uraian));
-
-              if (matchId || matchNoMata || matchUraian) {
-                final vStr = (p['volume'] ?? '').toString();
-                final vNum = double.tryParse(vStr.split(' ').first.replaceAll(',', '.')) ?? 0.0;
-                volReal += vNum;
+            final repDate = _parseReportDate(rep);
+            if (repDate != null && (minStartDay != null || maxEndDay != null)) {
+              final repDay = _dayOnly(repDate);
+              if (minStartDay != null && repDay.isBefore(minStartDay)) {
+                continue;
+              }
+              if (maxEndDay != null && repDay.isAfter(maxEndDay)) {
+                continue;
               }
             }
+            volReal += _resolveMatchedDailyVolume(
+              rep,
+              rkkId: rkkId,
+              itId: itId,
+              noMata: noMata,
+              uraian: uraian,
+            );
           }
 
-          final bbtItem = (volReal / volKontrak) * bbtKontrak;
-          totalProgress += bbtItem;
+          totalProgress += (volReal / volKontrak) * bbtKontrak;
         }
       }
 
-      if (totalProgress > 0) {
-        return totalProgress.clamp(0.0, 100.0);
-      }
+      return totalProgress.clamp(0.0, 100.0);
     }
 
-    // 2. Fallback: Laporan Mingguan terakhir
+    // 2. Fallback (hanya saat RKK belum diisi): Laporan Mingguan selaras jadwal aktif
     final rawMingguan = kegMap['laporanMingguan'];
     if (rawMingguan != null && rawMingguan is List && rawMingguan.isNotEmpty) {
-      final latest = rawMingguan.last;
-      if (latest is Map && latest['realisasiPersen'] != null) {
-        final val = (latest['realisasiPersen'] as num).toDouble();
-        if (val > 0) return val.clamp(0.0, 100.0);
+      final parsedWeekly = rawMingguan
+          .whereType<Map>()
+          .map((e) => WeeklyReportModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList()
+        ..sort((a, b) => a.mingguKe.compareTo(b.mingguKe));
+
+      for (int i = parsedWeekly.length - 1; i >= 0; i--) {
+        final w = parsedWeekly[i];
+        if (period != null && period.startDate != null) {
+          final wRange = ExecutionPeriodHelper.calcWeekRange(
+            w.mingguKe,
+            period.startDate,
+            period.durationDays,
+          );
+          if (!ExecutionPeriodHelper.doesSavedWeeklyMatchRange(w, wRange)) {
+            continue;
+          }
+        }
+        if (w.realisasiPersen > 0) return w.realisasiPersen.clamp(0.0, 100.0);
       }
     }
 
@@ -153,13 +252,14 @@ class ProgressCalculator {
   static double calculateContractProgressPercent(
     List<Map<String, dynamic>> kegiatans, {
     double fallbackProgress = 0.0,
+    ContractModel? contract,
   }) {
     if (kegiatans.isEmpty) {
       return (fallbackProgress > 1.0 ? fallbackProgress : fallbackProgress * 100.0).clamp(0.0, 100.0);
     }
     double sum = 0.0;
     for (final keg in kegiatans) {
-      sum += calculateKegiatanProgress(keg);
+      sum += calculateKegiatanProgress(keg, contract: contract);
     }
     return (sum / kegiatans.length).clamp(0.0, 100.0);
   }
@@ -168,8 +268,13 @@ class ProgressCalculator {
   static double calculateContractProgressRatio(
     List<Map<String, dynamic>> kegiatans, {
     double fallbackProgress = 0.0,
+    ContractModel? contract,
   }) {
-    final pct = calculateContractProgressPercent(kegiatans, fallbackProgress: fallbackProgress);
+    final pct = calculateContractProgressPercent(
+      kegiatans,
+      fallbackProgress: fallbackProgress,
+      contract: contract,
+    );
     return (pct / 100.0).clamp(0.0, 1.0);
   }
 
@@ -229,31 +334,13 @@ class ProgressCalculator {
 
         for (final rep in dailyReports) {
           if (rep is! Map) continue;
-          DateTime? repDate;
-          final repTglStr = rep['tanggal']?.toString() ?? '';
-          if (repTglStr.isNotEmpty) {
-            repDate = DateTime.tryParse(repTglStr) ??
-                WeeklyReportModel.parseIndonesianDate(repTglStr);
-          }
-          if (repDate == null) {
-            final fStr = rep['tanggalFormatted']?.toString() ?? '';
-            if (fStr.isNotEmpty) {
-              repDate = WeeklyReportModel.parseIndonesianDate(fStr);
-            }
-          }
-          if (repDate == null) {
-            final cStr = rep['createdAt']?.toString() ?? '';
-            if (cStr.isNotEmpty) {
-              repDate = DateTime.tryParse(cStr) ??
-                  WeeklyReportModel.parseIndonesianDate(cStr);
-            }
-          }
+          final repDate = _parseReportDate(rep);
 
           bool isLalu = false;
           bool isIni = false;
 
           if (repDate != null) {
-            final repDay = DateTime(repDate.year, repDate.month, repDate.day);
+            final repDay = _dayOnly(repDate);
             // Abaikan laporan historis yang tanggalnya berada sebelum tanggal mulai pelaksanaan aktif
             // agar tidak bocor sebagai 'Periode Lalu' saat tanggal kontrak/kegiatan dimajukan.
             if (minStartDayOnly != null && repDay.isBefore(minStartDayOnly)) {
@@ -276,32 +363,17 @@ class ProgressCalculator {
             isIni = true;
           }
 
-          final pList = (rep['pekerjaanList'] as List?) ?? [];
-          for (final p in pList) {
-            if (p is! Map) continue;
-            final pId = (p['rkkItemId'] ?? '').toString().trim();
-            final pNoMata = (p['noMataPembayaran'] ?? '').toString().trim();
-            final pUraian = (p['uraian'] ?? p['jenis'] ?? p['jenisPekerjaan'])
-                    ?.toString()
-                    .trim()
-                    .toLowerCase() ??
-                '';
-
-            final matchId = pId.isNotEmpty && (pId == rkkId || (itId.isNotEmpty && pId == itId));
-            final matchNoMata = noMata.isNotEmpty && pNoMata.isNotEmpty && noMata == pNoMata;
-            final matchUraian = uraian.isNotEmpty &&
-                pUraian.isNotEmpty &&
-                (pUraian == uraian || uraian.contains(pUraian) || pUraian.contains(uraian));
-
-            if (matchId || matchNoMata || matchUraian) {
-              final vStr = (p['volume'] ?? '').toString();
-              final vNum = double.tryParse(vStr.split(' ').first.replaceAll(',', '.')) ?? 0.0;
-              if (isIni) {
-                volIni += vNum;
-              } else if (isLalu) {
-                volLalu += vNum;
-              }
-            }
+          final matchedVol = _resolveMatchedDailyVolume(
+            rep,
+            rkkId: rkkId,
+            itId: itId,
+            noMata: noMata,
+            uraian: uraian,
+          );
+          if (isIni) {
+            volIni += matchedVol;
+          } else if (isLalu) {
+            volLalu += matchedVol;
           }
         }
 

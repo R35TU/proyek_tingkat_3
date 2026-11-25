@@ -1872,7 +1872,6 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
         : ((totalBobotVal - 100.0).abs() < 0.05);
     final bool isKurang = _nilaiKontrakKegiatan > 0 ? (!isSesuai && diff < 0) : (!isSesuai && totalBobotVal < 100.0);
     final bool isMelebihi = _nilaiKontrakKegiatan > 0 ? (!isSesuai && diff > 0) : (!isSesuai && totalBobotVal > 100.0);
-    final bool is100Percent = isSesuai;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),

@@ -20,6 +20,7 @@ import 'package:tata_saka_app/screens/tambah_kontrak_screen.dart';
 import 'package:tata_saka_app/screens/form_kegiatan_screen.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
+import 'package:tata_saka_app/utils/progress_calculator.dart';
 import 'package:tata_saka_app/utils/web_navigation.dart';
 
 class _DocumentData {
@@ -1284,6 +1285,12 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
   @override
   Widget build(BuildContext context) {
     final contractProvider = Provider.of<ContractProvider>(context);
+    if (_isContractAvailable) {
+      final live = _resolveLiveContract(listen: false);
+      if (live != null && !identical(live, _syncedContractRef)) {
+        _reloadFromContract(live);
+      }
+    }
 
     if (!_isContractAvailable) {
       if (contractProvider.isLoading) {
@@ -1821,6 +1828,16 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
   }
 
   Widget _buildKegiatanItem(_KegiatanData kegiatan, int index, {bool isKonsultan = true}) {
+    final liveContract = _resolveLiveContract(listen: false) ?? contract;
+    final Map<String, dynamic> liveKegMap =
+        (index >= 0 && index < liveContract.kegiatans.length)
+            ? liveContract.kegiatans[index]
+            : kegiatan.data;
+    final double kegProgress = ProgressCalculator.calculateKegiatanProgress(
+      liveKegMap,
+      contract: liveContract,
+    );
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -1945,6 +1962,35 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                           ),
                         ),
                       ],
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: (kegProgress / 100.0).clamp(0.0, 1.0),
+                                minHeight: 6,
+                                backgroundColor: AppColors.inputBackground,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  kegProgress > 0
+                                      ? AppColors.successGreen
+                                      : AppColors.primaryBlue,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${kegProgress.toStringAsFixed(2)}%',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
