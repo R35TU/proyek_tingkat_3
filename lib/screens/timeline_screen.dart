@@ -415,7 +415,20 @@ class _TimelineScreenState extends State<TimelineScreen> {
       grouped.putIfAbsent(key, () => []).add(event);
     }
 
-    final groupKeys = grouped.keys.toList();
+    // Urutkan grup: HARI INI & KEMARIN selalu di atas, sisanya dari periode
+    // terbaru ke terlama. Tanpa ini, grup HARI INI bisa tersisip di urutan
+    // kemunculan pertama dan jatuh di bawah seluruh event bulan berjalan.
+    const groupPriority = {'HARI INI': 0, 'KEMARIN': 1};
+    final groupKeys = grouped.keys.toList()
+      ..sort((a, b) {
+        final pa = groupPriority[a];
+        final pb = groupPriority[b];
+        if (pa != null || pb != null) {
+          return (pa ?? 2).compareTo(pb ?? 2);
+        }
+        return grouped[b]!.first.timestamp
+            .compareTo(grouped[a]!.first.timestamp);
+      });
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
