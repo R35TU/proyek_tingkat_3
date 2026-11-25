@@ -252,9 +252,16 @@ class TimelineProvider with ChangeNotifier {
     Map<String, dynamic> metadata = const {},
     DateTime? customTimestamp,
   }) async {
+    // Waktu event tidak boleh melewati waktu sekarang: aktivitas yang belum
+    // terjadi akan selalu nangkring di atas timeline dan menutupi aksi terbaru.
+    final now = DateTime.now();
+    final eventTime =
+        (customTimestamp == null || customTimestamp.isAfter(now))
+            ? now
+            : customTimestamp;
     final event = TimelineEventModel(
-      id: 'timeline_${DateTime.now().millisecondsSinceEpoch}_${_events.length + 1}',
-      timestamp: customTimestamp ?? DateTime.now(),
+      id: 'timeline_${now.millisecondsSinceEpoch}_${_events.length + 1}',
+      timestamp: eventTime,
       actorName: actorName,
       actorRole: actorRole,
       actionType: actionType,

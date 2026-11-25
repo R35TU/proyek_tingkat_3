@@ -1975,13 +1975,9 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         kegiatanName: kName,
         kontraktorName: kontraktor,
         dinasName: dinas,
-        customTimestamp: DateTime(
-          _selectedDate.year,
-          _selectedDate.month,
-          _selectedDate.day,
-          DateTime.now().hour,
-          DateTime.now().minute,
-        ),
+        // Waktu event = saat laporan benar-benar dibuat/diubah, bukan tanggal
+        // laporan. Tanggal laporan tetap tampil di judul & metadata. Dengan
+        // begitu aktivitas terbaru selalu berada di urutan teratas timeline.
         title: isEdit
             ? 'Pembaruan Laporan Harian: $kName ($dateFormatted)'
             : 'Pembuatan Laporan Harian: $kName ($dateFormatted)',
