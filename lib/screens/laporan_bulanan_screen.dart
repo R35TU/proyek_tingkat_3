@@ -342,7 +342,12 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
   }
 
   void _openTandaTanganBulananModal(BuildContext context, MonthlyReportModel report) {
-    if (_selectedContract == null) return;
+    if (_selectedContract == null ||
+        _selectedContract!.kegiatans.isEmpty ||
+        _selectedKegiatanIndex < 0 ||
+        _selectedKegiatanIndex >= _selectedContract!.kegiatans.length) {
+      return;
+    }
     final kegMap = _selectedContract!.kegiatans[_selectedKegiatanIndex];
 
     final existingKey = 'laporanBulanan_${report.bulanKe}';
@@ -699,14 +704,18 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
     );
   }
 
+  UserProfileProvider? _tryReadUserProfile(BuildContext context) {
+    try {
+      return Provider.of<UserProfileProvider>(context, listen: false);
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final contractProvider = Provider.of<ContractProvider>(context);
-    UserProfileProvider? userProf;
-    try {
-      userProf = Provider.of<UserProfileProvider>(context, listen: false);
-    } catch (_) {}
-    final activeUserProf = userProf;
+    final activeUserProf = _tryReadUserProfile(context);
     List<ContractModel> contracts = contractProvider.contracts;
     if (activeUserProf != null && activeUserProf.isDinas) {
       contracts = contracts.where((c) {
@@ -744,30 +753,60 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
       );
     }
 
-    // Selalu sinkronkan dengan instansi kontrak terbaru dari ContractProvider
-    if (_selectedContract != null) {
+    // Selalu sinkronkan dengan instansi kontrak terbaru dari ContractProvider,
+    // serta utamakan kontrak yang memiliki kegiatan bila belum dipilih/kosong.
+    if (_selectedContract != null &&
+        contracts.any((c) => c.id == _selectedContract!.id)) {
       _selectedContract = contracts.firstWhere(
         (c) => c.id == _selectedContract!.id,
-        orElse: () => contracts.first,
       );
     } else {
-      _selectedContract = contracts.first;
-    }
-    if (_selectedKegiatanIndex >= _selectedContract!.kegiatans.length) {
+      _selectedContract = contracts.firstWhere(
+        (c) => c.kegiatans.isNotEmpty,
+        orElse: () => contracts.first,
+      );
       _selectedKegiatanIndex = 0;
     }
 
     if (_selectedContract!.kegiatans.isEmpty) {
-      const emptyBody = Center(
-        child: Text('Kontrak terpilih belum memiliki kegiatan.'),
+      final nonEmptyContracts = contracts.where((c) => c.kegiatans.isNotEmpty);
+      if (nonEmptyContracts.isNotEmpty) {
+        _selectedContract = nonEmptyContracts.first;
+        _selectedKegiatanIndex = 0;
+      }
+    }
+
+    if (_selectedContract!.kegiatans.isEmpty) {
+      final emptyKegiatanBody = Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.assignment_late_outlined, size: 64, color: AppColors.textLight),
+              const SizedBox(height: 16),
+              Text(
+                'Belum Ada Kegiatan pada Kontrak "${_selectedContract!.namaKontrak}"',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textDark),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Tambahkan kegiatan terlebih dahulu pada menu Kontrak agar laporan bulanan dapat dibuat.',
+                style: TextStyle(fontSize: 13, color: AppColors.textLight),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
       );
-      if (widget.isEmbedded) return emptyBody;
+      if (widget.isEmbedded) return emptyKegiatanBody;
       if (isDesktop) {
-        return const WebDashboardLayout(
+        return WebDashboardLayout(
           title: 'Laporan Bulanan',
           activeMenu: 'laporan_bulanan',
           showBackButton: true,
-          child: emptyBody,
+          child: emptyKegiatanBody,
         );
       }
       return Scaffold(
@@ -778,8 +817,12 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
           foregroundColor: AppColors.textDark,
           elevation: 0,
         ),
-        body: emptyBody,
+        body: emptyKegiatanBody,
       );
+    }
+
+    if (_selectedKegiatanIndex < 0 || _selectedKegiatanIndex >= _selectedContract!.kegiatans.length) {
+      _selectedKegiatanIndex = 0;
     }
 
     final kegMap = _selectedContract!.kegiatans[_selectedKegiatanIndex];
@@ -1224,7 +1267,11 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      OutlinedButton.icon(
+                      // Role Dinas: tidak dapat menandatangani laporan.
+                      if (_tryReadUserProfile(context)?.isDinas ?? false)
+                        const SizedBox.shrink()
+                      else
+                        OutlinedButton.icon(
                         onPressed: () => _openTandaTanganBulananModal(context, report),
                         icon: const Icon(Icons.draw_outlined, size: 13, color: AppColors.primaryBlue),
                         label: const Text('Tanda Tangan', style: TextStyle(fontSize: 11, color: AppColors.primaryBlue)),

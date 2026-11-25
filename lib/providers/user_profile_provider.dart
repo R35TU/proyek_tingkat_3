@@ -76,6 +76,7 @@ class UserProfileProvider with ChangeNotifier {
   static List<String> get registeredAgencyNames => [];
 
   // ─── 1. ACTIVE USER PROFILE & ROLE ───
+  bool _isInitialized = false;
   String _uid = '';
   String _namaLengkap = '';
   String _username = '';
@@ -104,6 +105,8 @@ class UserProfileProvider with ChangeNotifier {
   final List<LoginActivityItem> _loginActivities = [];
 
   // Getters Profile & Roles
+  bool get isInitialized => _isInitialized;
+  bool get isAuthenticated => _username.isNotEmpty;
   String get uid => _uid.isNotEmpty ? _uid : (AuthService.currentUser?.uid ?? '');
   String get namaLengkap => _namaLengkap;
   String get username => _username;
@@ -187,8 +190,9 @@ class UserProfileProvider with ChangeNotifier {
         _lastBackupDate = s['lastBackupDate'] ?? _lastBackupDate;
         _cacheSize = s['cacheSize'] ?? _cacheSize;
       }
-      notifyListeners();
     } catch (_) {}
+    _isInitialized = true;
+    notifyListeners();
   }
 
   Future<void> _saveToPreferences() async {

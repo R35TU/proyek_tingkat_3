@@ -50,7 +50,9 @@ class ContractProvider with ChangeNotifier {
   FirebaseFirestore get _db => _injectedDb ?? FirebaseFirestore.instance;
 
   ContractProvider({FirebaseFirestore? db}) : _injectedDb = db {
-    _loadContracts();
+    _loadFromLocalFallback().then((_) {
+      _loadContracts();
+    });
     // Muat ulang dari Firestore begitu sesi login Firebase Auth tersedia
     // (sebelum login, rules menolak baca → fallback lokal dipakai sementara).
     try {

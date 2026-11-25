@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/screens/dashboard_screen.dart';
@@ -11,7 +13,8 @@ import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 
 class MainLayout extends StatefulWidget {
-  const MainLayout({super.key});
+  final String? initialMenu;
+  const MainLayout({super.key, this.initialMenu});
 
   @override
   State<MainLayout> createState() => _MainLayoutState();
@@ -19,6 +22,78 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   int _currentIndex = 0;
+  final List<int> _tabHistory = [0];
+
+  void _onTabTapped(int index) {
+    if (_currentIndex == index) return;
+    setState(() {
+      _tabHistory.add(index);
+      _currentIndex = index;
+    });
+  }
+
+  Future<void> _handleDashboardBack() async {
+    // 1. Cek apakah ada halaman tertumpuk di Navigator (detail kontrak, buat laporan, dsb)
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    // 2. Cek apakah ada riwayat tab navigasi di dashboard
+    if (_tabHistory.length > 1) {
+      setState(() {
+        _tabHistory.removeLast();
+        _currentIndex = _tabHistory.last;
+      });
+      return;
+    }
+
+    // 3. Pengguna berada di halaman utama dashboard (index 0).
+    // DILARANG mengembalikan pengguna yang sudah login ke Login / Landing Page!
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Anda berada di halaman utama Dashboard.'),
+          duration: Duration(milliseconds: 1200),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!kIsWeb) {
+      final exit = await showDialog<bool>(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          title: const Text(
+            'Keluar Aplikasi',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          content: const Text(
+            'Apakah Anda yakin ingin keluar dari aplikasi?',
+            style: TextStyle(fontSize: 13.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx, false),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(dialogCtx, true),
+              child: const Text('Keluar'),
+            ),
+          ],
+        ),
+      );
+      if (exit == true) {
+        SystemNavigator.pop();
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -26,8 +101,8 @@ class _MainLayoutState extends State<MainLayout> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final userProf = context.read<UserProfileProvider>();
-      final isAuth = AuthService.currentUser != null && userProf.username.isNotEmpty;
-      if (!isAuth) {
+      if (!userProf.isInitialized) return;
+      if (!userProf.isAuthenticated) {
         Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
         return;
       }
@@ -64,7 +139,7 @@ class _MainLayoutState extends State<MainLayout> {
     if (isKontraktor) {
       // Role Kontraktor: 4 Tab (Tab Laporan DITUTUP TOTAL sesuai Opsi A)
       screens = [
-        const DashboardScreen(),
+        DashboardScreen(initialMenu: widget.initialMenu),
         const KontrakScreen(), // Beroperasi dalam mode 'Kegiatan Saya'
         const TimelineScreen(),
         const SettingScreen(),
@@ -92,7 +167,7 @@ class _MainLayoutState extends State<MainLayout> {
     } else {
       // Role Konsultan & Dinas: 5 Tab
       screens = [
-        const DashboardScreen(),
+        DashboardScreen(initialMenu: widget.initialMenu),
         const KontrakScreen(),
         const LaporanScreen(),
         const TimelineScreen(),
@@ -131,38 +206,41 @@ class _MainLayoutState extends State<MainLayout> {
 
     final bool isWeb = ResponsiveBreakpoints.isDesktop(context);
 
-    return Scaffold(
-      body: screens[_currentIndex],
-      bottomNavigationBar: isWeb
-          ? null
-          : Container(
-              decoration: BoxDecoration(
-                color: navBg,
-                border: Border(top: BorderSide(color: navBorder, width: 0.8)),
-              ),
-              child: BottomNavigationBar(
-                elevation: 0,
-                currentIndex: _currentIndex,
-                onTap: (index) {
-                  setState(() {
-                    _currentIndex = index;
-                  });
-                },
-                type: BottomNavigationBarType.fixed,
-                backgroundColor: navBg,
-                selectedItemColor: selectedColor,
-                unselectedItemColor: unselectedColor,
-                selectedLabelStyle: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _handleDashboardBack();
+      },
+      child: Scaffold(
+        body: screens[_currentIndex],
+        bottomNavigationBar: isWeb
+            ? null
+            : Container(
+                decoration: BoxDecoration(
+                  color: navBg,
+                  border: Border(top: BorderSide(color: navBorder, width: 0.8)),
                 ),
-                unselectedLabelStyle: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 12,
+                child: BottomNavigationBar(
+                  elevation: 0,
+                  currentIndex: _currentIndex,
+                  onTap: _onTabTapped,
+                  type: BottomNavigationBarType.fixed,
+                  backgroundColor: navBg,
+                  selectedItemColor: selectedColor,
+                  unselectedItemColor: unselectedColor,
+                  selectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
+                  ),
+                  items: navItems,
                 ),
-                items: navItems,
               ),
-            ),
+      ),
     );
   }
 }

@@ -16,7 +16,7 @@
   -->
   <base href="$FLUTTER_BASE_HREF">
   <script>
-    if (window.location.pathname.endsWith('/') && !window.location.hash) {
+    if (window.location.pathname.endsWith('/') && (!window.location.hash || window.location.hash === '#' || window.location.hash === '#/')) {
       window.location.replace('landing/index.html');
     }
   </script>

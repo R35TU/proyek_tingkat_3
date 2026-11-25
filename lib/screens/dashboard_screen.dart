@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
@@ -14,7 +15,6 @@ import 'package:tata_saka_app/screens/data_laporan_screen.dart';
 import 'package:tata_saka_app/screens/laporan_screen.dart';
 import 'package:tata_saka_app/screens/login_screen.dart';
 
-import 'buat_laporan_mingguan_screen.dart';
 import 'laporan_mingguan_screen.dart';
 
 import 'package:tata_saka_app/screens/laporan_bulanan_screen.dart';
@@ -32,9 +32,11 @@ import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 import 'package:tata_saka_app/utils/progress_calculator.dart';
+import 'package:tata_saka_app/utils/web_navigation.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final String? initialMenu;
+  const DashboardScreen({super.key, this.initialMenu});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -45,6 +47,62 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Timer? _timer;
   int _currentPage = 0;
   String _activeWebMenu = 'dashboard';
+  final List<String> _webMenuHistory = ['dashboard'];
+
+  static String? _normalizeMenuFromUrl(String route) {
+    final clean = route.replaceAll('#', '').trim();
+    final uri = Uri.tryParse(clean);
+    if (uri == null) return null;
+    final path = uri.path.replaceAll('/', '').trim();
+    if (path.isEmpty || path == 'main' || path == 'dashboard') return 'dashboard';
+    const validMenus = {
+      'kontrak', 'kegiatan', 'laporan', 'data_laporan', 'data-laporan',
+      'laporan_harian', 'laporan-harian', 'laporan_mingguan', 'laporan-mingguan',
+      'laporan_bulanan', 'laporan-bulanan', 'timeline', 'pengaturan',
+      'keamanan', 'edit_profil', 'edit-profil', 'panduan_faq', 'panduan-faq'
+    };
+    if (validMenus.contains(path)) {
+      return path.replaceAll('-', '_');
+    }
+    final qMenu = uri.queryParameters['menu'];
+    if (qMenu != null && validMenus.contains(qMenu)) {
+      return qMenu.replaceAll('-', '_');
+    }
+    return null;
+  }
+
+  void _onWebMenuSelected(String menuKey) {
+    if (kIsWeb) {
+      replaceWebUrl('/#/$menuKey');
+    }
+    if (_activeWebMenu == menuKey) return;
+    setState(() {
+      _webMenuHistory.add(menuKey);
+      _activeWebMenu = menuKey;
+      WebDashboardLayout.activeWebMenu.value = menuKey;
+    });
+  }
+
+  void _onWebBack() {
+    if (_webMenuHistory.length > 1) {
+      setState(() {
+        _webMenuHistory.removeLast();
+        _activeWebMenu = _webMenuHistory.last;
+        WebDashboardLayout.activeWebMenu.value = _activeWebMenu;
+        if (kIsWeb) {
+          replaceWebUrl('/#/${_activeWebMenu}');
+        }
+      });
+    } else {
+      setState(() {
+        _activeWebMenu = 'dashboard';
+        WebDashboardLayout.activeWebMenu.value = 'dashboard';
+        if (kIsWeb) {
+          replaceWebUrl('/#/dashboard');
+        }
+      });
+    }
+  }
 
   void _navigateFromSidebar(
     String menuKey,
@@ -220,6 +278,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _startTimer();
+    final startMenu = widget.initialMenu ??
+        (kIsWeb ? _normalizeMenuFromUrl(getInitialWebRoute()) : null) ??
+        'dashboard';
+    _activeWebMenu = startMenu;
+    WebDashboardLayout.activeWebMenu.value = startMenu;
+    _webMenuHistory.clear();
+    _webMenuHistory.add(startMenu);
+    if (kIsWeb) {
+      replaceWebUrl('/#/$startMenu');
+    }
+
     WebDashboardLayout.activeWebMenu.addListener(_onWebDashboardMenuChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -232,10 +301,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _onWebDashboardMenuChanged() {
-    if (mounted && _activeWebMenu != WebDashboardLayout.activeWebMenu.value) {
+    final val = WebDashboardLayout.activeWebMenu.value;
+    if (kIsWeb) {
+      replaceWebUrl('/#/$val');
+    }
+    if (mounted && _activeWebMenu != val) {
       setState(() {
-        _activeWebMenu = WebDashboardLayout.activeWebMenu.value;
+        if (!_webMenuHistory.contains(val)) {
+          _webMenuHistory.add(val);
+        }
+        _activeWebMenu = val;
       });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant DashboardScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialMenu != null && widget.initialMenu != oldWidget.initialMenu) {
+      final newMenu = _normalizeMenuFromUrl(widget.initialMenu!) ?? 'dashboard';
+      if (_activeWebMenu != newMenu) {
+        setState(() {
+          _activeWebMenu = newMenu;
+          WebDashboardLayout.activeWebMenu.value = newMenu;
+          if (!_webMenuHistory.contains(newMenu)) {
+            _webMenuHistory.add(newMenu);
+          }
+        });
+        if (kIsWeb) {
+          replaceWebUrl('/#/$newMenu');
+        }
+      }
     }
   }
 
@@ -522,21 +618,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
 
     if (isWeb) {
-      return WebDashboardLayout(
-        title: _activeWebMenu != 'dashboard'
-            ? _getHeaderTitle(safeUserProf)
-            : safeUserProf.tr('nav_dashboard'),
-        activeMenu: _activeWebMenu,
-        onMenuSelected: (menuKey) {
-          setState(() {
-            _activeWebMenu = menuKey;
-          });
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+            return;
+          }
+          if (_webMenuHistory.length > 1) {
+            setState(() {
+              _webMenuHistory.removeLast();
+              _activeWebMenu = _webMenuHistory.last;
+              WebDashboardLayout.activeWebMenu.value = _activeWebMenu;
+            });
+          } else if (_activeWebMenu != 'dashboard') {
+            setState(() {
+              _activeWebMenu = 'dashboard';
+              WebDashboardLayout.activeWebMenu.value = 'dashboard';
+            });
+          }
         },
-        child: _buildActiveWebContent(
-          context,
-          safeUserProf,
-          contracts,
-          mainBody,
+        child: WebDashboardLayout(
+          title: _activeWebMenu != 'dashboard'
+              ? _getHeaderTitle(safeUserProf)
+              : safeUserProf.tr('nav_dashboard'),
+          activeMenu: _activeWebMenu,
+          showBackButton: _activeWebMenu != 'dashboard',
+          onBack: _onWebBack,
+          onMenuSelected: _onWebMenuSelected,
+          child: _buildActiveWebContent(
+            context,
+            safeUserProf,
+            contracts,
+            mainBody,
+          ),
         ),
       );
     }
@@ -1634,11 +1750,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ? _getHeaderTitle(userProf)
             : 'Dashboard Kontraktor',
         activeMenu: _activeWebMenu,
-        onMenuSelected: (menuKey) {
-          setState(() {
-            _activeWebMenu = menuKey;
-          });
-        },
+        showBackButton: _activeWebMenu != 'dashboard',
+        onBack: _onWebBack,
+        onMenuSelected: _onWebMenuSelected,
         child: _buildActiveWebContent(
           context,
           userProf,
@@ -1808,7 +1922,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'CV. TATA SAKA',
+                                'CV. TATA SAKA CONSULTANT',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 14,
@@ -1818,7 +1932,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               SizedBox(height: 2),
                               Text(
-                                'Consultant Engineer',
+                                'Engineering Consultant',
                                 style: TextStyle(
                                   color: isDrawer
                                       ? const Color(0xFF38BDF8)
@@ -2042,45 +2156,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         isDrawer: isDrawer,
                       ),
                     ),
-                    _buildSidebarItem(
-                      isDrawer: isDrawer,
-                      key: 'laporan_harian',
-                      label: 'Laporan Harian',
-                      icon: Icons.today_rounded,
-                      isActive: _activeWebMenu == 'laporan_harian',
-                      isCollapsed: isCollapsed,
-                      onTap: () => _navigateFromSidebar(
-                        'laporan_harian',
-                        const BuatLaporanScreen(),
+                    if (!userProf.isDinas) ...[
+                      _buildSidebarItem(
                         isDrawer: isDrawer,
+                        key: 'laporan_harian',
+                        label: 'Laporan Harian',
+                        icon: Icons.today_rounded,
+                        isActive: _activeWebMenu == 'laporan_harian',
+                        isCollapsed: isCollapsed,
+                        onTap: () => _navigateFromSidebar(
+                          'laporan_harian',
+                          const BuatLaporanScreen(),
+                          isDrawer: isDrawer,
+                        ),
                       ),
-                    ),
-                    _buildSidebarItem(
-                      isDrawer: isDrawer,
-                      key: 'laporan_mingguan',
-                      label: 'Laporan Mingguan',
-                      icon: Icons.date_range_rounded,
-                      isActive: _activeWebMenu == 'laporan_mingguan',
-                      isCollapsed: isCollapsed,
-                      onTap: () => _navigateFromSidebar(
-                        'laporan_mingguan',
-                        const LaporanMingguanScreen(),
+                      _buildSidebarItem(
                         isDrawer: isDrawer,
+                        key: 'laporan_mingguan',
+                        label: 'Laporan Mingguan',
+                        icon: Icons.date_range_rounded,
+                        isActive: _activeWebMenu == 'laporan_mingguan',
+                        isCollapsed: isCollapsed,
+                        onTap: () => _navigateFromSidebar(
+                          'laporan_mingguan',
+                          const LaporanMingguanScreen(),
+                          isDrawer: isDrawer,
+                        ),
                       ),
-                    ),
-                    _buildSidebarItem(
-                      isDrawer: isDrawer,
-                      key: 'laporan_bulanan',
-                      label: 'Laporan Bulanan',
-                      icon: Icons.calendar_month_rounded,
-                      isActive: _activeWebMenu == 'laporan_bulanan',
-                      isCollapsed: isCollapsed,
-                      onTap: () => _navigateFromSidebar(
-                        'laporan_bulanan',
-                        const LaporanBulananScreen(),
+                      _buildSidebarItem(
                         isDrawer: isDrawer,
+                        key: 'laporan_bulanan',
+                        label: 'Laporan Bulanan',
+                        icon: Icons.calendar_month_rounded,
+                        isActive: _activeWebMenu == 'laporan_bulanan',
+                        isCollapsed: isCollapsed,
+                        onTap: () => _navigateFromSidebar(
+                          'laporan_bulanan',
+                          const LaporanBulananScreen(),
+                          isDrawer: isDrawer,
+                        ),
                       ),
-                    ),
+                    ],
                     const SizedBox(height: 14),
                   ],
 

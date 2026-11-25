@@ -5,10 +5,12 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:tata_saka_app/firebase_options.dart';
 import 'package:tata_saka_app/services/auth_service.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/screens/landing_screen.dart';
 import 'package:tata_saka_app/screens/splash_screen.dart';
 import 'package:tata_saka_app/screens/admin_page.dart';
 import 'package:tata_saka_app/screens/login_screen.dart';
 import 'package:tata_saka_app/screens/main_layout.dart';
+import 'package:tata_saka_app/screens/detail_kontrak_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
@@ -137,12 +139,84 @@ class TataSakaApp extends StatelessWidget {
           initialRoute: '/',
           routes: {
             '/': (context) => const SplashScreen(),
+            '/landing': (context) => const LandingScreen(),
             '/login': (context) => const LoginScreen(),
-            '/main': (context) => const MainLayout(),
-            '/admin': (context) => const AdminPage(),
+            '/main': (context) => const _AuthGuard(child: MainLayout(initialMenu: 'dashboard')),
+            '/dashboard': (context) => const _AuthGuard(child: MainLayout(initialMenu: 'dashboard')),
+            '/admin': (context) => const _AuthGuard(child: AdminPage()),
+          },
+          onGenerateRoute: (settings) {
+            final uri = Uri.tryParse(settings.name ?? '') ?? Uri(path: '/');
+            final path = uri.path;
+
+            if (path == '/detail-kontrak') {
+              final contractId = uri.queryParameters['id'];
+              final tabIndex = int.tryParse(uri.queryParameters['tab'] ?? '0') ?? 0;
+              return MaterialPageRoute(
+                settings: settings,
+                builder: (_) => _AuthGuard(
+                  child: DetailKontrakScreen(
+                    contractId: contractId,
+                    initialTabIndex: tabIndex,
+                  ),
+                ),
+              );
+            }
+
+            const validMenus = {
+              'dashboard',
+              'kontrak',
+              'kegiatan',
+              'laporan',
+              'data_laporan',
+              'laporan_harian',
+              'laporan_mingguan',
+              'laporan_bulanan',
+              'timeline',
+              'pengaturan',
+              'keamanan',
+              'edit_profil',
+              'panduan_faq',
+            };
+            final cleanPath = path.startsWith('/') ? path.substring(1) : path;
+            if (validMenus.contains(cleanPath)) {
+              return MaterialPageRoute(
+                settings: settings,
+                builder: (_) => _AuthGuard(
+                  child: MainLayout(initialMenu: cleanPath),
+                ),
+              );
+            }
+
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const SplashScreen(),
+            );
           },
         );
       },
     );
+  }
+}
+
+class _AuthGuard extends StatelessWidget {
+  final Widget child;
+  const _AuthGuard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final userProf = context.watch<UserProfileProvider>();
+    if (!userProf.isInitialized) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    if (!userProf.isAuthenticated) {
+      return const LandingScreen();
+    }
+    return child;
   }
 }

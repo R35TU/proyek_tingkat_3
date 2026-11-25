@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/services/auth_service.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/utils/web_navigation.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 
 import 'admin_page.dart';
@@ -32,10 +34,32 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     _emailController = TextEditingController();
     _passwordController = TextEditingController();
-    // Bersihkan sesi lama saat berada di layar login
-    try {
-      AuthService.signOut();
-    } catch (_) {}
+    // Jika sudah ada sesi aktif, langsung arahkan ke dashboard yang sesuai
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final userProf = context.read<UserProfileProvider>();
+      if (!userProf.isInitialized) return;
+      final isAuth = AuthService.currentUser != null && userProf.username.isNotEmpty;
+      if (isAuth) {
+        if (userProf.role.toLowerCase() == 'admin') {
+          Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);
+        } else {
+          Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+        }
+      }
+    });
+  }
+
+  void _handleBack(BuildContext context) {
+    if (kIsWeb) {
+      navigateToWebLanding();
+    } else {
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      } else {
+        Navigator.pushReplacementNamed(context, '/landing');
+      }
+    }
   }
 
   @override
@@ -73,6 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoggingIn = false);
 
     if (success) {
+      replaceWebUrl(userProf.role.toLowerCase() == 'admin' ? '/#/admin' : '/#/dashboard');
       // Admin (role Admin) masuk ke dashboard manajemen akun.
       if (userProf.role.toLowerCase() == 'admin') {
         Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);
@@ -320,37 +345,55 @@ class _LoginScreenState extends State<LoginScreen> {
       ],
     );
 
-    return Scaffold(
-      // Web: latar abu-abu, Mobile: putih
-      backgroundColor: isDesktop ? AppColors.slateLighter : Colors.white,
-      body: isDesktop
-          // Versi web: card di tengah
-          ? Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: Card(
-                    elevation: 4,
-                    color: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: isiLogin,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          _handleBack(context);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: isDesktop ? AppColors.slateLighter : Colors.white,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.navySlate),
+            tooltip: 'Kembali ke Landing Page',
+            onPressed: () => _handleBack(context),
+          ),
+        ),
+        // Web: latar abu-abu, Mobile: putih
+        backgroundColor: isDesktop ? AppColors.slateLighter : Colors.white,
+        body: isDesktop
+            // Versi web: card di tengah
+            ? Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: Card(
+                      elevation: 4,
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: isiLogin,
+                      ),
                     ),
                   ),
                 ),
+              )
+            // Versi HP: tampilan seperti biasa
+            : SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24.0),
+                  child: isiLogin,
+                ),
               ),
-            )
-          // Versi HP: tampilan seperti biasa
-          : SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24.0),
-                child: isiLogin,
-              ),
-            ),
+      ),
     );
   }
 }

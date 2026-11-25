@@ -3,7 +3,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-/// Service Object Storage untuk Cloudflare R2 (S3-Compatible API).
+/// Service Object Storage untuk Sumopod/Cloudeka (S3-Compatible API).
 ///
 /// Digunakan untuk menyimpan:
 /// - Foto & tanda tangan laporan harian (`laporan-harian/{contractId}/{kegiatanId}/`)
@@ -18,7 +18,7 @@ class StorageService {
   // Jalankan build/run dengan:
   //   --dart-define=R2_ACCESS_KEY_ID=... --dart-define=R2_SECRET_ACCESS_KEY=...
   // atau pakai file config lokal (gitignored):
-  //   --dart-define-from-file=r2_local.json
+  //   --dart-define-from-file=sumopod_local.json
   //
   // Kredensial lama yang pernah di-commit sudah DI-ROTATE di Cloudflare —
   // kunci baru HANYA ada di GitHub Secrets (CI) & r2_local.json (lokal).
@@ -34,23 +34,22 @@ class StorageService {
   static String get _missingCredentialsMessage =>
       '[StorageService] Kredensial R2 belum dikonfigurasi. Jalankan build dengan '
       '--dart-define=R2_ACCESS_KEY_ID=... --dart-define=R2_SECRET_ACCESS_KEY=... '
-      '(lokal: gunakan --dart-define-from-file=r2_local.json; CI: GitHub Secrets '
+      '(lokal: gunakan --dart-define-from-file=sumopod_local.json; CI: GitHub Secrets '
       'R2_ACCESS_KEY_ID & R2_SECRET_ACCESS_KEY).';
 
-  static const String endpoint =
-      'ee37555d28507d9000c5c226461a5ca0.r2.cloudflarestorage.com';
-  static const String bucket = 'lapakdir-media';
-  static const String region = 'auto';
+  static const String endpoint = 'kencana.basic.box.cloudeka.id';
+  static const String bucket = 'tatasaka-media-rw4mpj';
+  static const String region = 'kencana';
   static const String publicBaseUrl =
-      'https://cdn.lapakdir.com';
+      'https://kencana.basic.box.cloudeka.id/tatasaka-media-rw4mpj';
 
-  /// Menghasilkan URL publik untuk file di bucket R2
+  /// Menghasilkan URL publik untuk file di object storage
   static String getPublicUrl(String remotePath) {
     final cleanPath = remotePath.startsWith('/') ? remotePath.substring(1) : remotePath;
     return '$publicBaseUrl/$cleanPath';
   }
 
-  /// Bersihkan kunci objek R2: hanya [a-zA-Z0-9._/-] yang diizinkan.
+  /// Bersihkan kunci objek: hanya [a-zA-Z0-9._/-] yang diizinkan.
   /// Spasi, kurung, dan karakter lain merusak URL & tanda tangan SigV4.
   /// (Nama asli tetap utuh di field `name` metadata untuk tampilan.)
   static String _safeObjectKey(String key) {
@@ -68,6 +67,55 @@ class StorageService {
         .where((s) => s.isNotEmpty)
         .toList();
     return cleaned.join('/');
+  }
+
+  /// Mendeteksi Content-Type (MIME) dari nama berkas atau ekstensi.
+  static String detectContentType(String nameOrExt) {
+    final clean = nameOrExt.split('?').first.split('#').first;
+    final ext = clean.contains('.')
+        ? clean.split('.').last.toLowerCase().trim()
+        : clean.toLowerCase().trim();
+    switch (ext) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'doc':
+        return 'application/msword';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'xls':
+        return 'application/vnd.ms-excel';
+      case 'xlsx':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'ppt':
+        return 'application/vnd.ms-powerpoint';
+      case 'pptx':
+        return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'svg':
+        return 'image/svg+xml';
+      case 'zip':
+        return 'application/zip';
+      case 'rar':
+        return 'application/vnd.rar';
+      case '7z':
+        return 'application/x-7z-compressed';
+      case 'txt':
+        return 'text/plain';
+      case 'csv':
+        return 'text/csv';
+      case 'img':
+        return 'image/jpeg';
+      default:
+        return 'application/octet-stream';
+    }
   }
 
   /// Mengunggah data bytes (Uint8List) langsung ke Cloudflare R2 menggunakan S3 Signature V4.
