@@ -564,16 +564,20 @@ class _KontrakScreenState extends State<KontrakScreen> {
               backgroundColor: Colors.red,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
+              final contractProv = Provider.of<ContractProvider>(context, listen: false);
+              final userProf = Provider.of<UserProfileProvider>(context, listen: false);
+              final timeline = Provider.of<TimelineProvider>(context, listen: false);
+              final messenger = ScaffoldMessenger.of(context);
+
+              final actorName = userProf.namaLengkap.trim().isNotEmpty
+                  ? userProf.namaLengkap.trim()
+                  : 'CV. Tata Saka Consultant';
+              final actorRole = userProf.role.trim().isNotEmpty ? userProf.role.trim() : 'Konsultan';
+
               try {
-                final userProf = Provider.of<UserProfileProvider>(context, listen: false);
-                final actorName = userProf.namaLengkap.trim().isNotEmpty
-                    ? userProf.namaLengkap.trim()
-                    : 'CV. Tata Saka Consultant';
-                final actorRole = userProf.role.trim().isNotEmpty ? userProf.role.trim() : 'Konsultan';
-                final timeline = Provider.of<TimelineProvider>(context, listen: false);
-                timeline.logEvent(
+                await timeline.logEvent(
                   actorName: actorName,
                   actorRole: actorRole,
                   actionType: 'DELETE',
@@ -582,13 +586,13 @@ class _KontrakScreenState extends State<KontrakScreen> {
                   contractName: contract.namaKontrak,
                   dinasName: contract.instansiDinas.isNotEmpty
                       ? contract.instansiDinas.first
-                      : 'DPU-PR Kab. Purbalingga',
+                      : null,
                   title: 'Penghapusan Kontrak: ${contract.namaKontrak}',
                   description: 'Kontrak "${contract.namaKontrak}" beserta seluruh kegiatan dan laporannya telah dihapus dari sistem.',
                 );
               } catch (_) {}
-              Provider.of<ContractProvider>(context, listen: false).deleteContract(contract.id);
-              ScaffoldMessenger.of(context).showSnackBar(
+              await contractProv.deleteContract(contract.id);
+              messenger.showSnackBar(
                 const SnackBar(content: Text('Kontrak berhasil dihapus')),
               );
             },
