@@ -464,13 +464,31 @@ class _AdminPageState extends State<AdminPage> {
   }
 
   void _confirmDelete(UserAccount account) {
+    // Tanpa paket Blaze, akun Auth tidak bisa dihapus dari aplikasi; menghapus
+    // dokumen sendiri berarti terkunci permanen dari panel Admin.
+    if (account.id == (AuthService.currentUser?.uid ?? '')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Akun yang sedang Anda pakai tidak bisa dihapus. Masuk dengan akun '
+            'admin lain bila ingin menghapusnya.',
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Hapus Akun?'),
         content: Text(
           'Apakah Anda yakin ingin menghapus akun "${account.name}" (${account.role})?\n\n'
-          'Pengguna tidak akan bisa login lagi ke aplikasi.',
+          'Profil akun di Firestore akan dihapus, sehingga akun ini langsung '
+          'tidak bisa login lagi.\n\n'
+          'Akun di Firebase Authentication tetap ada karena paket gratis tidak '
+          'mengizinkan aplikasi menghapus akun pengguna lain. Hapus manual di '
+          'Firebase Console → Authentication bila ingin menghilangkannya juga.',
         ),
         actions: [
           TextButton(
@@ -484,22 +502,26 @@ class _AdminPageState extends State<AdminPage> {
             ),
             onPressed: () async {
               Navigator.pop(ctx);
+              final messenger = ScaffoldMessenger.of(context);
               try {
                 await AuthService.deleteUserDoc(account.id);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Akun berhasil dihapus')),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Gagal menghapus: $e'),
-                      backgroundColor: Colors.red,
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Akun dihapus dari Firestore. Login akun ini kini ditolak.',
                     ),
-                  );
-                }
+                  ),
+                );
+              } catch (e) {
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Gagal menghapus akun: '
+                      '${e.toString().replaceAll('Exception: ', '')}',
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
               }
             },
             child: const Text('Hapus'),

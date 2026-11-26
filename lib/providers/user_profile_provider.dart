@@ -240,20 +240,25 @@ class UserProfileProvider with ChangeNotifier {
       final cred = await AuthService.signIn(cleanInput, cleanPassword);
       final uid = cred.user!.uid;
       final doc = await AuthService.fetchUserDoc(uid);
-      if (doc != null && doc['isActive'] == false) {
+      if (doc == null) {
+        // Akun Auth tanpa profil resmi (mis. sudah dihapus admin) → tolak.
+        await AuthService.signOut();
+        return false;
+      }
+      if (doc['isActive'] == false) {
         // Akun dinonaktifkan admin → tolak.
         await AuthService.signOut();
         return false;
       }
       _uid = uid;
       final fallbackUsername = cleanInput.contains('@') ? cleanInput.split('@').first : cleanInput;
-      _username = (doc?['username'] ?? fallbackUsername).toString();
-      _role = (doc?['role'] ?? roleHint ?? 'Konsultan').toString();
-      _namaLengkap = (doc?['namaLengkap'] ?? doc?['full_name'] ?? doc?['name'] ?? fallbackUsername).toString();
+      _username = (doc['username'] ?? fallbackUsername).toString();
+      _role = (doc['role'] ?? roleHint ?? 'Konsultan').toString();
+      _namaLengkap = (doc['namaLengkap'] ?? doc['full_name'] ?? doc['name'] ?? fallbackUsername).toString();
       if (_role.toLowerCase() == 'konsultan') {
         _companyOrAgency = 'CV. Tata Saka Consultant';
       } else {
-        _companyOrAgency = (doc?['companyOrAgency'] ?? '').toString();
+        _companyOrAgency = (doc['companyOrAgency'] ?? '').toString();
       }
       _currentPassword = cleanPassword;
       _profileImagePath = null;
