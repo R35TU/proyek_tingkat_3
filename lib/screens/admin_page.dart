@@ -556,9 +556,13 @@ class _AdminPageState extends State<AdminPage> {
             ),
             onPressed: () async {
               Navigator.pop(ctx);
-              try {
-                await AuthService.signOut();
-              } catch (_) {}
+              if (!mounted) return;
+              final userProf =
+                  Provider.of<UserProfileProvider>(context, listen: false);
+              // Harus lewat provider: signOut() saja tidak mengosongkan state
+              // profil, sehingga router menganggap sesi Admin masih aktif dan
+              // mengalihkan /login kembali ke /admin.
+              await userProf.logout();
               if (!mounted) return;
               context.go('/login');
             },
