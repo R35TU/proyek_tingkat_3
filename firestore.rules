@@ -2,17 +2,48 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Profil pengguna: izinkan read publik agar pencarian username saat login
-    // dan validasi keunikan username saat registrasi dapat berjalan.
-    // Pembuatan, pengubahan, dan penghapusan akun tetap dibatasi untuk sesi terautentikasi (Admin).
-    match /users/{uid} {
-      allow read: if true;
-      allow create, update, delete: if request.auth != null;
+    // True bila pemanggil sudah login.
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // Data proyek: hanya sesi login Firebase Auth yang diizinkan.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    // True bila dokumen profil pemanggil ber-role Admin (huruf besar, sesuai
+    // data yang dipakai aplikasi).
+    function isAdmin() {
+      return isSignedIn() &&
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+    }
+
+    // Profil pengguna: read publik agar pencarian username saat login dan
+    // validasi keunikan username saat pembuatan akun tetap berjalan.
+    // - create/delete: hanya Admin (menu Tambah/Hapus Akun).
+    // - update: Admin boleh semua field; pemilik hanya boleh mengubah
+    //   namaLengkap sehingga tidak bisa menaikkan role atau mengubah status.
+    match /users/{uid} {
+      allow read: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() ||
+          (isSignedIn() && request.auth.uid == uid &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['namaLengkap']));
+      allow delete: if isAdmin();
+    }
+
+    // Data proyek. Sengaja dicacah per koleksi, bukan memakai
+    // match /{document=**}: recursive wildcard juga mencakup users, dan semua
+    // match yang cocok digabung dengan OR sehingga aturan ketat di atas akan
+    // batal bila catch-all dibiarkan.
+    match /contracts/{contractId} {
+      allow read, write: if isSignedIn();
+
+      // Subkoleksi kontrak: dokumen, laporans, laporanMingguan, dan lainnya.
+      match /{subcollection=**} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    match /timeline_events/{eventId} {
+      allow read, write: if isSignedIn();
     }
   }
 }

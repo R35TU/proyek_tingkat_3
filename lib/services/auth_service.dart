@@ -14,6 +14,11 @@ import 'package:tata_saka_app/firebase_options.dart';
 ///
 /// Profil & role disimpan di Firestore collection `users` (dokumen id = uid),
 /// sehingga Admin dapat mengatur role/status aktif tanpa menyentuh Auth.
+///
+/// Penghapusan akun memakai paket gratis (tanpa Cloud Functions): Admin hanya
+/// menghapus dokumen `users/{uid}`, lalu login akun itu ditolak karena profilnya
+/// tidak ada. Akun Firebase Authentication tetap ada dan hanya bisa dihapus
+/// manual lewat Firebase Console.
 class AuthService {
   AuthService._();
 
@@ -182,8 +187,13 @@ class AuthService {
     await _db.collection('users').doc(uid).update(data);
   }
 
-  /// Hapus dokumen profil — login akun itu otomatis ditolak
-  /// (akun Auth-nya tetap ada; hapus permanen butuh backend/Admin SDK).
+  /// Hapus profil akun dari Firestore `users/{uid}` (jalur paket gratis).
+  ///
+  /// Setelah dokumen ini hilang, login akun tersebut ditolak oleh pemeriksaan
+  /// profil di UserProfileProvider walau akun Firebase Authentication masih
+  /// ada. Akun Authentication hanya bisa dihapus manual lewat Firebase Console
+  /// → Authentication, karena client SDK tidak boleh menghapus akun pengguna
+  /// lain dan Admin SDK memerlukan paket Blaze.
   static Future<void> deleteUserDoc(String uid) async {
     await _db.collection('users').doc(uid).delete();
   }
