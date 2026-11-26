@@ -29,66 +29,80 @@ import 'package:tata_saka_app/screens/tambah_kontrak_screen.dart';
 import 'package:tata_saka_app/screens/timeline_screen.dart';
 import 'package:tata_saka_app/widgets/app_shell_layout.dart';
 
-/// Navigasi antar-menu dengan mencatat riwayat berurutan tanpa duplikasi rute yang sama.
+/// Navigasi antar-menu dengan menjaga URL dan riwayat browser tetap sinkron.
 void goTopLevelRoute(BuildContext context, String location) {
+  final router = GoRouter.maybeOf(context);
+  if (router == null) return;
   try {
     final current = GoRouterState.of(context).uri.toString();
     if (current != location) {
-      context.push(location);
+      router.go(location);
     }
   } catch (_) {
-    context.push(location);
+    router.go(location);
   }
 }
 
 /// Navigasi deklaratif ke sub-route detail (menjaga hierarki agar Back kembali ke parent).
 void goSubRoute(BuildContext context, String location, {Object? extra}) {
-  context.go(location, extra: extra);
+  final router = GoRouter.maybeOf(context);
+  if (router != null) {
+    router.go(location, extra: extra);
+  }
 }
 
 /// Kembali secara aman: pop jika ada tumpukan rute, atau kembali ke rute induk.
 void goBackOrParent(BuildContext context, String parentLocation) {
-  try {
-    if (context.canPop()) {
-      context.pop();
+  final router = GoRouter.maybeOf(context);
+  if (router != null) {
+    if (router.canPop()) {
+      router.pop();
     } else {
-      goTopLevelRoute(context, parentLocation);
+      router.go(parentLocation);
     }
-  } catch (_) {
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    }
+    return;
+  }
+  if (Navigator.canPop(context)) {
+    Navigator.pop(context);
   }
 }
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> shellNavigatorKey = GlobalKey<NavigatorState>();
 
-GoRouter createAppRouter(UserProfileProvider userProf) {
+GoRouter createAppRouter(
+  UserProfileProvider userProf, {
+  String initialLocation = '/',
+}) {
+  GoRouter.optionURLReflectsImperativeAPIs = true;
   return GoRouter(
     navigatorKey: rootNavigatorKey,
-    initialLocation: '/',
+    initialLocation: initialLocation,
     refreshListenable: userProf,
     redirect: (BuildContext context, GoRouterState state) {
-      // Tunggu prefs / sesi selesai dimuat agar reload tidak melempar user ke Landing
+      // Tunggu prefs / sesi selesai dimuat agar reload tidak melempar user keluar
       if (!userProf.isInitialized) {
         return null;
       }
 
       final loc = state.uri.path;
+      // Biarkan SplashScreen pada '/' mengatur transisi awalnya secara mandiri di Flutter
+      if (loc == '/') {
+        return null;
+      }
+
       final isAuth = userProf.isAuthenticated;
       final isAdmin = userProf.role.toLowerCase() == 'admin';
 
       const publicPaths = {'/', '/landing', '/login', '/panduan-umum'};
 
       if (!isAuth) {
-        if (loc == '/') return '/landing';
         if (publicPaths.contains(loc)) return null;
-        return '/landing';
+        return '/login';
       }
 
       // Sudah terautentikasi
-      if (loc == '/' || loc == '/landing' || loc == '/login') {
+      if (loc == '/landing' || loc == '/login') {
         return isAdmin ? '/admin' : '/dashboard';
       }
 
@@ -209,9 +223,13 @@ GoRouter createAppRouter(UserProfileProvider userProf) {
                       final extraContract = state.extra is ContractModel
                           ? state.extra as ContractModel
                           : null;
-                      return TambahKontrakScreen(
-                        contractToEdit: extraContract,
+                      return _ContractResolver(
                         contractId: id,
+                        extraContract: extraContract,
+                        builder: (contract) => TambahKontrakScreen(
+                          contractToEdit: contract,
+                          contractId: id,
+                        ),
                       );
                     },
                   ),

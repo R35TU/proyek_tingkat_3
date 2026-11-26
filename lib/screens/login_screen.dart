@@ -1,14 +1,9 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
-import 'package:tata_saka_app/services/auth_service.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
-import 'package:tata_saka_app/utils/web_navigation.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
-
-import 'admin_page.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,14 +13,9 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  String selectedRole = 'Konsultan';
-  final roles = [
-    'Konsultan',
-    'Kontraktor',
-    'Dinas',
-  ]; // Eksternal dihapus sesuai instruksi
   bool obscurePassword = true;
   bool rememberMe = true;
+  bool _isLoggingIn = false;
 
   late TextEditingController _emailController;
   late TextEditingController _passwordController;
@@ -40,26 +30,31 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       final userProf = context.read<UserProfileProvider>();
       if (!userProf.isInitialized) return;
-      final isAuth = AuthService.currentUser != null && userProf.username.isNotEmpty;
+      final isAuth = userProf.isAuthenticated;
       if (isAuth) {
-        if (userProf.role.toLowerCase() == 'admin') {
-          context.go('/admin');
-        } else {
-          context.go('/dashboard');
+        final target = userProf.role.toLowerCase() == 'admin'
+            ? '/admin'
+            : '/dashboard';
+        final router = GoRouter.maybeOf(context);
+        if (router != null) {
+          Router.neglect(context, () => router.go(target));
         }
       }
     });
   }
 
   void _handleBack(BuildContext context) {
-    if (kIsWeb) {
-      navigateToWebLanding();
-    } else {
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
+    final router = GoRouter.maybeOf(context);
+    if (router != null) {
+      if (router.canPop()) {
+        router.pop();
       } else {
-        Navigator.pushReplacementNamed(context, '/landing');
+        router.go('/landing');
       }
+      return;
+    }
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
     }
   }
 
@@ -69,16 +64,6 @@ class _LoginScreenState extends State<LoginScreen> {
     _passwordController.dispose();
     super.dispose();
   }
-
-  void _onRoleChanged(String role) {
-    setState(() {
-      selectedRole = role;
-      _emailController.clear();
-      _passwordController.clear();
-    });
-  }
-
-  bool _isLoggingIn = false;
 
   Future<void> _performLogin() async {
     final username = _emailController.text.trim();
@@ -91,22 +76,22 @@ class _LoginScreenState extends State<LoginScreen> {
     final success = await userProf.login(
       username,
       password,
-      roleHint: selectedRole,
     );
 
     if (!mounted) return;
     setState(() => _isLoggingIn = false);
 
     if (success) {
-      if (userProf.role.toLowerCase() == 'admin') {
-        context.go('/admin');
-        return;
-      }
-      context.go('/dashboard');
+      final target = userProf.role.toLowerCase() == 'admin'
+          ? '/admin'
+          : '/dashboard';
+      Router.neglect(context, () => context.go(target));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Username/Email atau password salah. Silakan coba kembali.'),
+          content: Text(
+            'Username/Email atau password salah. Silakan coba kembali.',
+          ),
           backgroundColor: AppColors.primaryRed,
         ),
       );
@@ -120,20 +105,21 @@ class _LoginScreenState extends State<LoginScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(height: 36),
+        SizedBox(height: isDesktop ? 4 : 8),
         // Logo
         Center(
           child: Image.asset(
             'assets/images/logoRev.png',
-            height: 110,
+            height: isDesktop ? 92 : 88,
+            cacheHeight: 276,
             errorBuilder: (context, error, stackTrace) => const Icon(
               Icons.business,
-              size: 80,
+              size: 76,
               color: AppColors.primaryBlue,
             ),
           ),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 20),
 
         // Welcome Text
         const Text(
@@ -147,61 +133,15 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 6),
         const Text(
-          'Silahkan pilih role & masuk ke akun Anda\nuntuk melanjutkan sistem monitoring proyek.',
+          'Silakan masuk ke akun Anda\nuntuk melanjutkan sistem monitoring proyek.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 13.5,
             color: AppColors.textLight,
-            height: 1.4,
+            height: 1.45,
           ),
         ),
-        const SizedBox(height: 28),
-
-        // Role Selector Tabs (Konsultan, Kontraktor, Dinas)
-        Row(
-          children: roles.map((role) {
-            final isSelected = selectedRole == role;
-            return Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                child: InkWell(
-                  onTap: () => _onRoleChanged(role),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.navySlate
-                          : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isSelected
-                            ? AppColors.navySlate
-                            : const Color(0xFFE2E8F0),
-                      ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        role,
-                        style: TextStyle(
-                          color: isSelected
-                              ? Colors.white
-                              : const Color(0xFF475569),
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
 
         // Username atau Email Field
         const Text(
@@ -215,6 +155,7 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 6),
         TextFormField(
           controller: _emailController,
+          textInputAction: TextInputAction.next,
           decoration: InputDecoration(
             hintText: 'Masukkan username atau email',
             prefixIcon: const Icon(
@@ -257,8 +198,15 @@ class _LoginScreenState extends State<LoginScreen> {
         TextFormField(
           controller: _passwordController,
           obscureText: obscurePassword,
+          textInputAction: TextInputAction.done,
+          onFieldSubmitted: (_) => _performLogin(),
           decoration: InputDecoration(
             hintText: '••••••',
+            prefixIcon: const Icon(
+              Icons.lock_outline,
+              size: 20,
+              color: Color(0xFF64748B),
+            ),
             filled: true,
             fillColor: AppColors.inputBackground,
             contentPadding: const EdgeInsets.symmetric(
@@ -321,26 +269,38 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 22),
 
         // Login Button
         ElevatedButton(
-          onPressed: _performLogin,
+          onPressed: _isLoggingIn ? null : _performLogin,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primaryBlue,
+            disabledBackgroundColor:
+                AppColors.primaryBlue.withValues(alpha: 0.65),
             foregroundColor: Colors.white,
+            disabledForegroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
             elevation: 0,
           ),
-          child: const Text(
-            'Masuk ke Sistem',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-          ),
+          child: _isLoggingIn
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text(
+                  'Masuk ke Sistem',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: isDesktop ? 4 : 8),
       ],
     );
 
@@ -364,34 +324,45 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         // Web: latar abu-abu, Mobile: putih
         backgroundColor: isDesktop ? AppColors.slateLighter : Colors.white,
-        body: isDesktop
-            // Versi web: card di tengah
-            ? Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
-                    child: Card(
-                      elevation: 4,
-                      color: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isDesktop ? 24 : 24,
+                  vertical: isDesktop ? 24 : 16,
+                ),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight:
+                        (constraints.maxHeight - (isDesktop ? 48 : 32))
+                            .clamp(0.0, double.infinity),
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: isDesktop ? 420 : 440,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: isiLogin,
-                      ),
+                      child: isDesktop
+                          ? Card(
+                              elevation: 4,
+                              color: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(32),
+                                child: isiLogin,
+                              ),
+                            )
+                          : isiLogin,
                     ),
                   ),
                 ),
-              )
-            // Versi HP: tampilan seperti biasa
-            : SafeArea(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24.0),
-                  child: isiLogin,
-                ),
-              ),
+              );
+            },
+          ),
+        ),
       ),
     );
   }

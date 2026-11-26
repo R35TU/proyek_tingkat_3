@@ -716,7 +716,17 @@ class PanduanFaqScreen extends StatelessWidget {
           if (Navigator.canPop(context)) {
             Navigator.pop(context);
           } else {
-            context.go('/dashboard');
+            final router = GoRouter.maybeOf(context);
+            if (router != null) {
+              final path = GoRouterState.of(context).uri.path;
+              if (path == '/panduan-umum') {
+                router.go('/landing');
+              } else if (path.startsWith('/admin')) {
+                router.go('/admin');
+              } else {
+                router.go('/dashboard');
+              }
+            }
           }
         },
       ),

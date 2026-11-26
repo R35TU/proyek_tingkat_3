@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/services/auth_service.dart';
 import 'package:tata_saka_app/router/app_router.dart';
@@ -90,11 +91,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _onWebMenuSelected(String menuKey) {
     if (_activeWebMenu == menuKey) return;
-    goTopLevelRoute(context, WebDashboardLayout.routeForMenu(menuKey));
+    if (GoRouter.maybeOf(context) != null) {
+      goTopLevelRoute(context, WebDashboardLayout.routeForMenu(menuKey));
+      return;
+    }
+    setState(() {
+      _activeWebMenu = menuKey;
+    });
   }
 
   void _onWebBack() {
-    goTopLevelRoute(context, '/dashboard');
+    if (GoRouter.maybeOf(context) != null) {
+      goTopLevelRoute(context, '/dashboard');
+      return;
+    }
+    setState(() {
+      _activeWebMenu = 'dashboard';
+    });
   }
 
   void _navigateFromSidebar(
@@ -103,7 +116,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     bool isDrawer = false,
   }) {
     if (isDrawer) Navigator.pop(context);
-    goTopLevelRoute(context, WebDashboardLayout.routeForMenu(menuKey));
+    if (GoRouter.maybeOf(context) != null) {
+      goTopLevelRoute(context, WebDashboardLayout.routeForMenu(menuKey));
+      return;
+    }
+    if (ResponsiveBreakpoints.isDesktop(context)) {
+      setState(() {
+        _activeWebMenu = menuKey;
+      });
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => destination),
+      );
+    }
   }
 
   String _getHeaderTitle(UserProfileProvider userProf) {
@@ -237,11 +263,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 await userProf.logout();
               } catch (_) {}
               if (!context.mounted) return;
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/login',
-                (route) => false,
-              );
+              final router = GoRouter.maybeOf(context);
+              if (router != null) {
+                Router.neglect(context, () => router.go('/login'));
+              } else {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/login',
+                  (route) => false,
+                );
+              }
             },
             child: const Text('Keluar'),
           ),
@@ -443,6 +474,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Image.asset(
                   'assets/images/logoRev.png',
                   fit: BoxFit.contain,
+                  cacheWidth: 160,
                   errorBuilder: (context, error, stackTrace) => Icon(
                     Icons.business,
                     color: AppColors.getTextDark(context),
@@ -574,7 +606,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             return;
           }
           if (_activeWebMenu != 'dashboard') {
-            goTopLevelRoute(context, '/dashboard');
+            if (GoRouter.maybeOf(context) != null) {
+              goTopLevelRoute(context, '/dashboard');
+            } else {
+              setState(() => _activeWebMenu = 'dashboard');
+            }
           }
         },
         child: WebDashboardLayout(
@@ -1101,7 +1137,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             if (hasActivities)
               InkWell(
-                onTap: () => goTopLevelRoute(context, '/timeline'),
+                onTap: () {
+                  if (GoRouter.maybeOf(context) != null) {
+                    goTopLevelRoute(context, '/timeline');
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const TimelineScreen()),
+                    );
+                  }
+                },
                 child: const Text(
                   'Lihat Semua',
                   style: TextStyle(
@@ -1622,15 +1667,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const SizedBox(height: 10),
                       InkWell(
                         onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => DetailKegiatanScreen(
-                                contract: parentContract,
-                                kegiatanIndex: kIndex,
+                          final router = GoRouter.maybeOf(context);
+                          if (router != null) {
+                            router.go(
+                              '/kegiatan/${parentContract.id}/$kIndex',
+                              extra: parentContract,
+                            );
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => DetailKegiatanScreen(
+                                  contract: parentContract,
+                                  kegiatanIndex: kIndex,
+                                ),
                               ),
-                            ),
-                          );
+                            );
+                          }
                         },
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.end,
@@ -1786,6 +1839,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: Image.asset(
                             'assets/images/logoRev.png',
                             fit: BoxFit.contain,
+                            cacheWidth: 160,
                             errorBuilder: (_, __, ___) => Icon(
                               Icons.business,
                               color: sidebarBackground,
@@ -1827,6 +1881,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: Image.asset(
                             'assets/images/logoRev.png',
                             fit: BoxFit.contain,
+                            cacheWidth: 160,
                             errorBuilder: (_, __, ___) => Icon(
                               Icons.business,
                               color: sidebarBackground,

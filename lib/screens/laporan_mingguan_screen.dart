@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:provider/provider.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/kegiatan_model.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
@@ -735,67 +736,74 @@ class _LaporanMingguanScreenState extends State<LaporanMingguanScreen> {
       ),
     ];
 
-    final mainBody = SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Project Selector & Schedule Info Card
-          _buildKegiatanSelectorCard(kegModel, period, contracts),
-          const SizedBox(height: 16),
+    final mainBody = CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Project Selector & Schedule Info Card
+                _buildKegiatanSelectorCard(kegModel, period, contracts),
+                const SizedBox(height: 16),
 
-          // Section Header
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Daftar Periode Mingguan',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textDark,
+                // Section Header
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Daftar Periode Mingguan',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textDark,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${weeklyPeriods.length} Minggu Pelaksanaan (${period.durationDays} Hari Kalender)',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textLight,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${weeklyPeriods.length} Minggu Pelaksanaan (${period.durationDays} Hari Kalender)',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textLight,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.blueLight,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Otomatis Realisasi Harian',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryBlue,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.blueLight,
-                  borderRadius: BorderRadius.circular(12),
+                  ],
                 ),
-                child: const Text(
-                  'Otomatis Realisasi Harian',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primaryBlue,
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-
-          // List of Week Cards
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
+        ),
+        // List of Week Cards (lazy/virtualized)
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
+          sliver: SliverList.separated(
             itemCount: weeklyPeriods.length,
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
@@ -808,9 +816,8 @@ class _LaporanMingguanScreenState extends State<LaporanMingguanScreen> {
               );
             },
           ),
-          const SizedBox(height: 24),
-        ],
-      ),
+        ),
+      ],
     );
 
     if (widget.isEmbedded) {
@@ -843,17 +850,7 @@ class _LaporanMingguanScreenState extends State<LaporanMingguanScreen> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/main',
-                (route) => false,
-              );
-            }
-          },
+          onPressed: () => goBackOrParent(context, '/laporan'),
         ),
         actions: headerActions,
       ),

@@ -11,6 +11,7 @@ import 'package:flutter/cupertino.dart'
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/kegiatan_model.dart';
@@ -20,6 +21,7 @@ import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/services/storage_service.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/utils/execution_period_helper.dart';
+import 'package:tata_saka_app/utils/image_memory_cache.dart';
 import 'package:tata_saka_app/utils/plat_nomor_util.dart';
 import 'package:tata_saka_app/widgets/clean_text_form_field.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
@@ -1998,7 +2000,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
       ),
     );
 
-    Navigator.pop(context, true);
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context, true);
+    } else {
+      goBackOrParent(context, '/laporan');
+    }
   }
 
   @override
@@ -2225,17 +2231,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF111827)),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/main',
-                (route) => false,
-              );
-            }
-          },
+          onPressed: () => goBackOrParent(context, '/laporan'),
         ),
         title: Text(
           pageTitle,
@@ -4136,7 +4132,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
             ),
             clipBehavior: Clip.antiAlias,
             child: isBase64
-                ? _buildImageFromBase64(fotoStr)
+                ? _buildImageFromBase64(fotoStr, cacheWidth: 280)
                 : Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -4211,38 +4207,18 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     BoxFit fit = BoxFit.cover,
     double? width,
     double? height,
+    int? cacheWidth,
   }) {
-    if (b64.startsWith('http')) {
-      return Image.network(
-        b64,
-        fit: fit,
-        width: width,
-        height: height,
-        errorBuilder: (context, error, stackTrace) => const Center(
-          child: Icon(Icons.broken_image, size: 24, color: Colors.grey),
-        ),
-      );
-    }
-    try {
-      String clean = b64;
-      if (clean.contains(',')) {
-        clean = clean.split(',').last;
-      }
-      final bytes = base64Decode(clean.trim());
-      return Image.memory(
-        bytes,
-        fit: fit,
-        width: width,
-        height: height,
-        errorBuilder: (context, error, stackTrace) => const Center(
-          child: Icon(Icons.broken_image, size: 24, color: Colors.grey),
-        ),
-      );
-    } catch (_) {
-      return const Center(
-        child: Icon(Icons.image_not_supported, color: Colors.grey),
-      );
-    }
+    return buildCachedImageWidget(
+      b64,
+      fit: fit,
+      width: width,
+      height: height,
+      cacheWidth: cacheWidth,
+      errorWidget: const Center(
+        child: Icon(Icons.broken_image, size: 24, color: Colors.grey),
+      ),
+    );
   }
 
   void _showPhotoPreviewDialog(int idx, String fotoStr) {
@@ -4292,7 +4268,11 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
                 maxWidth: 600,
               ),
               child: isBase64
-                  ? _buildImageFromBase64(fotoStr, fit: BoxFit.contain)
+                  ? _buildImageFromBase64(
+                      fotoStr,
+                      fit: BoxFit.contain,
+                      cacheWidth: 1200,
+                    )
                   : Padding(
                       padding: const EdgeInsets.all(40),
                       child: Column(

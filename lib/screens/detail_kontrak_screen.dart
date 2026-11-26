@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -1287,8 +1288,13 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                 debugPrint('Gagal mencatat timeline penghapusan kontrak: $e');
               }
               await contractProv.deleteContract(deletedContract.id);
+              if (!mounted || !ctx.mounted) return;
               Navigator.pop(ctx);
-              nav.pop();
+              if (GoRouter.maybeOf(context) != null) {
+                goBackOrParent(context, '/kontrak');
+              } else {
+                nav.pop();
+              }
               messenger.showSnackBar(
                 const SnackBar(content: Text('Kontrak berhasil dihapus')),
               );
@@ -1360,16 +1366,21 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
           onSelected: (value) async {
             if (value == 'edit') {
               final live = _resolveLiveContract(listen: false) ?? contract;
-              final updated = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TambahKontrakScreen(contractToEdit: live),
-                ),
-              );
-              if (updated == true && mounted) {
-                setState(() {
-                  _reloadFromContract(_resolveLiveContract(listen: false) ?? contract);
-                });
+              final router = GoRouter.maybeOf(context);
+              if (router != null) {
+                router.go('/kontrak/${live.id}/edit', extra: live);
+              } else {
+                final updated = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TambahKontrakScreen(contractToEdit: live),
+                  ),
+                );
+                if (updated == true && mounted) {
+                  setState(() {
+                    _reloadFromContract(_resolveLiveContract(listen: false) ?? contract);
+                  });
+                }
               }
             } else if (value == 'delete') {
               _confirmDeleteContract();
@@ -1468,14 +1479,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () {
-            if (kIsWeb) replaceWebUrl('/#/kontrak');
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
-            }
-          },
+          onPressed: () => goBackOrParent(context, '/kontrak'),
         ),
         title: const Text(
           'Detail Kontrak',
@@ -1846,6 +1850,14 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
           borderRadius: BorderRadius.circular(16),
           onTap: () async {
             final live = _resolveLiveContract(listen: false) ?? contract;
+            final router = GoRouter.maybeOf(context);
+            if (router != null) {
+              router.go(
+                '/kontrak/${live.id}/kegiatan/$index',
+                extra: live,
+              );
+              return;
+            }
             await Navigator.push(
               context,
               MaterialPageRoute(

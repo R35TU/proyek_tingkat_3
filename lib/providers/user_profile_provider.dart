@@ -401,11 +401,11 @@ class UserProfileProvider with ChangeNotifier {
     _companyOrAgency = '';
     _profileImagePath = null;
     _currentPassword = '';
-    notifyListeners();
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_prefProfileKey);
     } catch (_) {}
+    notifyListeners();
   }
 
   void logoutFromAllOtherDevices() {

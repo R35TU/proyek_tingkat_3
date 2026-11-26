@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:tata_saka_app/utils/image_memory_cache.dart';
 import 'clean_text_form_field.dart';
 
 /// Widget Kanvas Tanda Tangan Digital interaktif
@@ -342,25 +343,18 @@ class SignaturePadWidgetState extends State<SignaturePadWidget> {
   }
 
   Widget _buildSignatureImage(String b64) {
-    if (b64.startsWith('http')) {
-      return Image.network(b64, fit: BoxFit.contain, height: 130);
-    }
-    try {
-      String clean = b64;
-      if (clean.contains(',')) {
-        clean = clean.split(',').last;
-      }
-      final bytes = base64Decode(clean.trim());
-      return Image.memory(
-        bytes,
-        fit: BoxFit.contain,
-        height: 130,
-      );
-    } catch (_) {
-      return const Center(
-        child: Text('Tanda tangan tersimpan', style: TextStyle(color: Colors.grey, fontSize: 12)),
-      );
-    }
+    return buildCachedImageWidget(
+      b64,
+      fit: BoxFit.contain,
+      height: 130,
+      cacheHeight: 300,
+      errorWidget: const Center(
+        child: Text(
+          'Tanda tangan tersimpan',
+          style: TextStyle(color: Colors.grey, fontSize: 12),
+        ),
+      ),
+    );
   }
 }
 

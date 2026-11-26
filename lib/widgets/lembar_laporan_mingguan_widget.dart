@@ -1,6 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
+import 'package:tata_saka_app/utils/image_memory_cache.dart';
 import 'package:tata_saka_app/widgets/horizontal_drag_scroll_area.dart';
 
 class LembarLaporanMingguanWidget extends StatelessWidget {
@@ -656,14 +656,16 @@ class LembarLaporanMingguanWidget extends StatelessWidget {
           if (instansi.isNotEmpty) headerLines.add(instansi);
 
           Widget? sigWidget;
-          if (sigStr != null && sigStr.isNotEmpty) {
-            try {
-              if (sigStr.startsWith('data:image')) {
-                final base64Content = sigStr.split(',').last;
-                final bytes = base64Decode(base64Content);
-                sigWidget = Image.memory(bytes, height: 36, fit: BoxFit.contain);
-              }
-            } catch (_) {}
+          if (sigStr != null &&
+              sigStr.isNotEmpty &&
+              (sigStr.startsWith('data:image') || sigStr.startsWith('http'))) {
+            sigWidget = buildCachedImageWidget(
+              sigStr,
+              height: 36,
+              cacheHeight: 108,
+              fit: BoxFit.contain,
+              errorWidget: const SizedBox(height: 36),
+            );
           }
 
           return Expanded(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
@@ -1903,7 +1904,11 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                     TextButton(
                       onPressed: () {
                         Navigator.pop(ctx);
-                        Navigator.pop(context);
+                        if (Navigator.canPop(context)) {
+                          Navigator.pop(context);
+                        } else {
+                          goBackOrParent(context, '/kontrak/${widget.contract.id}/kegiatan/${widget.kegiatanIndex}');
+                        }
                       },
                       child: const Text(
                         'Tinggalkan',
@@ -1927,7 +1932,11 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                 ),
               );
             } else {
-              Navigator.pop(context);
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              } else {
+                goBackOrParent(context, '/kontrak/${widget.contract.id}/kegiatan/${widget.kegiatanIndex}');
+              }
             }
           },
         ),
@@ -1981,9 +1990,14 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
           final keg = widget.contract.kegiatans[widget.kegiatanIndex];
           final adds = (keg['addendums'] as List?) ?? [];
 
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
+          return CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
               // ─── BANNER INFORMASI JIKA SUDAH ADA ADDENDUM CCO ───
               if (adds.isNotEmpty) ...[
                 Container(
@@ -2481,17 +2495,26 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                     ],
                   ),
                 ),
+                    ],
+                  ),
+                ),
+              ),
 
-              ..._rkkDivisiList.asMap().entries.map((divEntry) {
-                final divIndex = divEntry.key;
-                final div = divEntry.value;
-                final items = div['items'] as List<Map<String, dynamic>>? ?? [];
-                final romawi =
-                    div['nomorRomawi']?.toString().toUpperCase() ??
-                    toRoman(divIndex + 1);
-                final namaDiv = div['namaDivisi'] ?? 'DIVISI $romawi';
-                final subtotalHarga = _getDivisiSubtotalHarga(div);
-                final subtotalBobot = _getDivisiSubtotalBobot(div);
+              if (_rkkDivisiList.isNotEmpty)
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverList.builder(
+                    itemCount: _rkkDivisiList.length,
+                    itemBuilder: (context, divIndex) {
+                      final div = _rkkDivisiList[divIndex];
+                      final items =
+                          div['items'] as List<Map<String, dynamic>>? ?? [];
+                      final romawi =
+                          div['nomorRomawi']?.toString().toUpperCase() ??
+                          toRoman(divIndex + 1);
+                      final namaDiv = div['namaDivisi'] ?? 'DIVISI $romawi';
+                      final subtotalHarga = _getDivisiSubtotalHarga(div);
+                      final subtotalBobot = _getDivisiSubtotalBobot(div);
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 18),
@@ -2602,15 +2625,8 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                           ),
                         )
                       else
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: items.length,
-                          separatorBuilder: (ctx, i) => const Divider(
-                            height: 1,
-                            color: Color(0xFFF1F5F9),
-                          ),
-                          itemBuilder: (ctx, itemIndex) {
+                        Column(
+                          children: List.generate(items.length, (itemIndex) {
                             final item = items[itemIndex];
                             final noMata =
                                 item['noMataPembayaran']?.toString() ?? '';
@@ -2629,7 +2645,14 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                             final bbt =
                                 (item['nilaiBobot'] as num?)?.toDouble() ?? 0.0;
 
-                            return InkWell(
+                            return Column(
+                              children: [
+                                if (itemIndex > 0)
+                                  const Divider(
+                                    height: 1,
+                                    color: Color(0xFFF1F5F9),
+                                  ),
+                                InkWell(
                               onTap: isReadOnly
                                   ? null
                                   : () => _showAddEditItemSheet(
@@ -2768,8 +2791,10 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                                   ],
                                 ),
                               ),
+                            ),
+                              ],
                             );
-                          },
+                          }),
                         ),
 
                       // Button Tambah Item ke Divisi
@@ -2808,31 +2833,45 @@ class _KelolaRkkScreenState extends State<KelolaRkkScreen> {
                     ],
                   ),
                 );
-              }),
-
-              // ─── 4. TOMBOL TAMBAH DIVISI BARU ───
-              if (_rkkDivisiList.isNotEmpty && !isReadOnly)
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF0F172A),
-                    side: const BorderSide(
-                      color: Color(0xFFCBD5E1),
-                      width: 1.2,
-                    ),
-                    backgroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: () => _showAddEditDivisiSheet(),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text(
-                    'Tambah Divisi Pekerjaan',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    },
                   ),
                 ),
-              const SizedBox(height: 36),
+
+              // ─── 4. TOMBOL TAMBAH DIVISI BARU ───
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 36),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_rkkDivisiList.isNotEmpty && !isReadOnly)
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF0F172A),
+                            side: const BorderSide(
+                              color: Color(0xFFCBD5E1),
+                              width: 1.2,
+                            ),
+                            backgroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () => _showAddEditDivisiSheet(),
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text(
+                            'Tambah Divisi Pekerjaan',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           );
         },
