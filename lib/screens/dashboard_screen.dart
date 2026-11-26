@@ -56,12 +56,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final uri = Uri.tryParse(clean);
     if (uri == null) return null;
     final path = uri.path.replaceAll('/', '').trim();
-    if (path.isEmpty || path == 'main' || path == 'dashboard') return 'dashboard';
+    if (path.isEmpty || path == 'main' || path == 'dashboard')
+      return 'dashboard';
     const validMenus = {
-      'kontrak', 'kegiatan', 'laporan', 'data_laporan', 'data-laporan',
-      'laporan_harian', 'laporan-harian', 'laporan_mingguan', 'laporan-mingguan',
-      'laporan_bulanan', 'laporan-bulanan', 'timeline', 'pengaturan',
-      'keamanan', 'edit_profil', 'edit-profil', 'panduan_faq', 'panduan-faq'
+      'kontrak',
+      'kegiatan',
+      'laporan',
+      'data_laporan',
+      'data-laporan',
+      'laporan_harian',
+      'laporan-harian',
+      'laporan_mingguan',
+      'laporan-mingguan',
+      'laporan_bulanan',
+      'laporan-bulanan',
+      'timeline',
+      'pengaturan',
+      'keamanan',
+      'edit_profil',
+      'edit-profil',
+      'panduan_faq',
+      'panduan-faq',
     };
     if (validMenus.contains(path)) {
       return path.replaceAll('-', '_');
@@ -183,8 +198,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           role: userProf.isKontraktor
               ? 'kontraktor'
               : (userProf.role.toLowerCase() == 'konsultan'
-                  ? 'konsultan'
-                  : null),
+                    ? 'konsultan'
+                    : null),
         );
       case 'dashboard':
       default:
@@ -239,7 +254,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _startTimer();
-    final startMenu = widget.initialMenu ??
+    final startMenu =
+        widget.initialMenu ??
         (kIsWeb ? _normalizeMenuFromUrl(getInitialWebRoute()) : null) ??
         'dashboard';
     _activeWebMenu = startMenu;
@@ -258,7 +274,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void didUpdateWidget(covariant DashboardScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialMenu != null && widget.initialMenu != oldWidget.initialMenu) {
+    if (widget.initialMenu != null &&
+        widget.initialMenu != oldWidget.initialMenu) {
       final newMenu = _normalizeMenuFromUrl(widget.initialMenu!) ?? 'dashboard';
       if (_activeWebMenu != newMenu) {
         _activeWebMenu = newMenu;
@@ -586,17 +603,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         surfaceTintColor: Colors.transparent,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Divider(
-            height: 1,
-            color: AppColors.getBorder(context),
-          ),
+          child: Divider(height: 1, color: AppColors.getBorder(context)),
         ),
         leading: Builder(
           builder: (scaffoldCtx) => IconButton(
-            icon: Icon(
-              Icons.menu,
-              color: AppColors.getTextDark(context),
-            ),
+            icon: Icon(Icons.menu, color: AppColors.getTextDark(context)),
             tooltip: 'Buka Menu',
             onPressed: () {
               Scaffold.of(scaffoldCtx).openDrawer();
@@ -649,8 +660,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               'desc':
                   '${rep['tanggalFormatted'] ?? rep['tanggal'] ?? 'Laporan'} - ${keg['namaKegiatan'] ?? c.namaKontrak}',
               'time': _relativeTimeLabel(tglStr, rep['jam']?.toString()),
-              'sortTs':
-                  DateTime.tryParse(tglStr)?.millisecondsSinceEpoch ?? 0,
+              'sortTs': DateTime.tryParse(tglStr)?.millisecondsSinceEpoch ?? 0,
             });
           }
         }
@@ -658,7 +668,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         for (final m in mingguan) {
           if (m is Map) {
             final periode = m['periodeAkhir']?.toString() ?? '';
-            final periodeTs = DateTime.tryParse(periode)?.millisecondsSinceEpoch ??
+            final periodeTs =
+                DateTime.tryParse(periode)?.millisecondsSinceEpoch ??
                 (DateTime.tryParse(m['docCreateTime']?.toString() ?? '')
                         ?.millisecondsSinceEpoch ??
                     0);
@@ -677,7 +688,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             final docs = f['documents'] as List? ?? [];
             for (final d in docs) {
               if (d is Map) {
-                final upTs = DateTime.tryParse(d['uploadDate']?.toString() ?? '')
+                final upTs =
+                    DateTime.tryParse(d['uploadDate']?.toString() ?? '')
                         ?.millisecondsSinceEpoch ??
                     (d['sortTs'] as num?)?.toInt() ??
                     0;
@@ -694,14 +706,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
     // Urutkan: terbaru di atas (konsisten dengan Timeline & Histori).
-    list.sort((a, b) =>
-        ((b['sortTs'] as num?) ?? 0).compareTo((a['sortTs'] as num?) ?? 0));
+    list.sort(
+      (a, b) =>
+          ((b['sortTs'] as num?) ?? 0).compareTo((a['sortTs'] as num?) ?? 0),
+    );
     return list
-        .map((e) => {
-              'title': e['title']?.toString() ?? '',
-              'desc': e['desc']?.toString() ?? '',
-              'time': e['time']?.toString() ?? '',
-            })
+        .map(
+          (e) => {
+            'title': e['title']?.toString() ?? '',
+            'desc': e['desc']?.toString() ?? '',
+            'time': e['time']?.toString() ?? '',
+          },
+        )
         .toList();
   }
 
@@ -935,8 +951,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _formatTimelineEventTime(TimelineEventModel event) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final eventDay =
-        DateTime(event.timestamp.year, event.timestamp.month, event.timestamp.day);
+    final eventDay = DateTime(
+      event.timestamp.year,
+      event.timestamp.month,
+      event.timestamp.day,
+    );
     final timeStr = DateFormat('HH:mm').format(event.timestamp);
 
     if (eventDay == today) {
@@ -955,8 +974,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final timeLabel = _formatTimelineEventTime(event);
     final actorLabel = event.actorName.isNotEmpty
         ? (event.actorRole.isNotEmpty
-            ? 'Oleh: ${event.actorName} (${event.actorRole})'
-            : 'Oleh: ${event.actorName}')
+              ? 'Oleh: ${event.actorName} (${event.actorRole})'
+              : 'Oleh: ${event.actorName}')
         : 'Oleh: CV. Tata Saka (Konsultan)';
 
     return Container(
@@ -982,11 +1001,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: event.actionColor.withOpacity(0.12),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              event.icon,
-              color: event.actionColor,
-              size: 20,
-            ),
+            child: Icon(event.icon, color: event.actionColor, size: 20),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -1129,10 +1144,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           )
         else
           Container(
-            padding: const EdgeInsets.symmetric(
-              vertical: 24,
-              horizontal: 16,
-            ),
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
             width: double.infinity,
             decoration: BoxDecoration(
               color: Colors.white,
@@ -1272,7 +1284,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         bool isMine = false;
 
         // FIRST: try matching by kontraktorUid (Firebase Auth UID)
-        if (currentUserUid.isNotEmpty && kKontraktorUid.isNotEmpty && kKontraktorUid == currentUserUid) {
+        if (currentUserUid.isNotEmpty &&
+            kKontraktorUid.isNotEmpty &&
+            kKontraktorUid == currentUserUid) {
           isMine = true;
         }
 
@@ -1681,17 +1695,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         surfaceTintColor: Colors.transparent,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Divider(
-            height: 1,
-            color: AppColors.border,
-          ),
+          child: Divider(height: 1, color: AppColors.border),
         ),
         leading: Builder(
           builder: (scaffoldCtx) => IconButton(
-            icon: const Icon(
-              Icons.menu,
-              color: AppColors.navySlate,
-            ),
+            icon: const Icon(Icons.menu, color: AppColors.navySlate),
             tooltip: 'Buka Menu',
             onPressed: () {
               Scaffold.of(scaffoldCtx).openDrawer();
@@ -1710,10 +1718,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             Text(
               userProf.namaLengkap,
-              style: const TextStyle(
-                color: AppColors.slate,
-                fontSize: 11,
-              ),
+              style: const TextStyle(color: AppColors.slate, fontSize: 11),
             ),
           ],
         ),
@@ -1727,8 +1732,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _calcKegiatanProgress(
     Map<String, dynamic> keg, {
     ContractModel? contract,
-  }) =>
-      ProgressCalculator.calculateKegiatanProgress(keg, contract: contract);
+  }) => ProgressCalculator.calculateKegiatanProgress(keg, contract: contract);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ─── SIDEBAR DASHBOARD WEB ───
@@ -1839,14 +1843,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 'CV. TATA SAKA CONSULTANT',
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 14,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 0.5,
                                 ),
                               ),
                               SizedBox(height: 2),
                               Text(
-                                'Engineering Consultant',
+                                'KONSULTAN TEKNIS',
                                 style: TextStyle(
                                   color: isDrawer
                                       ? const Color(0xFF38BDF8)
@@ -2115,7 +2119,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
 
                   // 3. KATEGORI DOKUMEN & HISTORI
-                  _buildSidebarCategory('DOKUMEN & HISTORI', isCollapsed, isDrawer),
+                  _buildSidebarCategory(
+                    'DOKUMEN & HISTORI',
+                    isCollapsed,
+                    isDrawer,
+                  ),
                   _buildSidebarItem(
                     isDrawer: isDrawer,
                     key: 'timeline',
