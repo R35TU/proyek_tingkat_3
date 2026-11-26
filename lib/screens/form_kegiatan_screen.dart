@@ -263,15 +263,19 @@ class _FormKegiatanScreenState extends State<FormKegiatanScreen> {
 
   Future<void> _loadKontraktorUsers() async {
     try {
-      final snapshot = await FirebaseFirestore.instance.collection('users').get();
+      // Filter di server agar hanya akun kontraktor yang dibaca (role
+      // tersimpan berkapital: 'Kontraktor' / 'kontraktor').
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', whereIn: const ['Kontraktor', 'kontraktor'])
+          .get();
       if (mounted) {
         setState(() {
           _kontraktorUsers = snapshot.docs
               .where((doc) {
                 final data = doc.data();
-                final role = (data['role'] ?? '').toString().toLowerCase();
                 final isActive = data['isActive'] ?? true;
-                return role == 'kontraktor' && isActive != false;
+                return isActive != false;
               })
               .map((doc) {
                 final data = doc.data();

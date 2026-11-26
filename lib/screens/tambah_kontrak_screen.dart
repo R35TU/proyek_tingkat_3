@@ -118,15 +118,19 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
 
   Future<void> _loadDinasUsers() async {
     try {
-      final snapshot = await FirebaseFirestore.instance.collection('users').get();
+      // Filter di server agar hanya akun dinas yang dibaca (role tersimpan
+      // berkapital: 'Dinas' / 'dinas').
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', whereIn: const ['Dinas', 'dinas'])
+          .get();
       if (mounted) {
         setState(() {
           _dinasUsers = snapshot.docs
               .where((doc) {
                 final data = doc.data();
-                final role = (data['role'] ?? '').toString().toLowerCase();
                 final isActive = data['isActive'] ?? true;
-                return role == 'dinas' && isActive != false;
+                return isActive != false;
               })
               .map((doc) {
                 final data = doc.data();

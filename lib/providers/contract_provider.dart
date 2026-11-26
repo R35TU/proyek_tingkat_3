@@ -40,25 +40,52 @@ class ContractProvider with ChangeNotifier {
   /// cid -> {docId} yang di-soft-delete oleh perangkat ini
   final Map<String, Set<String>> _deletedDocIds = {};
 
+  /// cid -> JSON terakhir yang DITULIS perangkat ini. Dipakai untuk mengenali
+  /// pantulan tulisan sendiri pada listener `contracts`, supaya tidak memicu
+  /// pembacaan ulang laporan & dokumen kontrak yang tidak berubah.
+  final Map<String, String> _lastWrittenJson = {};
+
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _contractsSub;
   final Map<String, StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>
       _dokumenSubs = {};
   bool _snapshotRebuilding = false;
 
+  /// UID yang datanya sudah dimuat penuh pada sesi ini — mencegah pembacaan
+  /// ulang seluruh koleksi (kontrak + laporan + dokumen) di sesi yang sama.
+  String? _loadedUid;
+  bool _loadInFlight = false;
+  Future<void>? _loadFuture;
+  bool _disposed = false;
+  StreamSubscription<User?>? _authSub;
+
   bool get isLoading => _isLoading;
 
   FirebaseFirestore get _db => _injectedDb ?? FirebaseFirestore.instance;
 
+  /// UID sesi Firebase Auth saat ini ('' bila belum login / belum init).
+  String get _currentUid {
+    try {
+      return FirebaseAuth.instance.currentUser?.uid ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   ContractProvider({FirebaseFirestore? db}) : _injectedDb = db {
     _loadFromLocalFallback().then((_) {
-      _loadContracts();
+      _loadFuture = _loadContracts();
     });
     // Muat ulang dari Firestore begitu sesi login Firebase Auth tersedia
     // (sebelum login, rules menolak baca → fallback lokal dipakai sementara).
     try {
-      FirebaseAuth.instance.authStateChanges().listen((user) {
+      _authSub = FirebaseAuth.instance.authStateChanges().listen((user) async {
         if (user != null) {
-          _loadContracts();
+          // Tunggu pembacaan awal selesai agar tidak berjalan bersamaan.
+          if (_loadInFlight && _loadFuture != null) await _loadFuture;
+          _loadFuture = _loadContracts();
+        } else {
+          // Logout → sesi berikutnya boleh memuat ulang datanya sendiri.
+          _loadedUid = null;
         }
       });
     } catch (_) {
@@ -87,6 +114,7 @@ class ContractProvider with ChangeNotifier {
     try {
       // Kumpulkan kontrak yang benar-benar berubah isinya.
       final changed = <String, Map<String, dynamic>>{};
+      final changedJson = <String, String>{};
       final removedIds = <String>{};
       bool anyRealChange = false;
 
@@ -105,6 +133,7 @@ class ContractProvider with ChangeNotifier {
         final candidate = ContractModel.fromJson(data);
         final json = _comparisonJson(candidate);
         changed[id] = data;
+        changedJson[id] = json;
 
         final idx = _contracts.indexWhere((x) => x.id == id);
         if (idx < 0) {
@@ -127,6 +156,12 @@ class ContractProvider with ChangeNotifier {
       // Terapkan: hydrate HANYA kontrak yang berubah.
       for (final id in changed.keys) {
         final data = changed[id]!;
+        // Pantulan tulisan perangkat ini sendiri → memori sudah paling baru,
+        // jadi tidak perlu membaca ulang laporan & dokumen kontrak tersebut.
+        if (_lastWrittenJson[id] != null &&
+            _lastWrittenJson[id] == changedJson[id]) {
+          continue;
+        }
         final c = ContractModel.fromJson(data);
         _ensureKegiatanIds(c);
         await _hydrateReports(c);
@@ -175,9 +210,18 @@ class ContractProvider with ChangeNotifier {
   // ═════════════════════════════════════════════════════════════════════
 
   Future<void> _loadContracts() async {
+    final uid = _currentUid;
+    if (_loadInFlight) return;
+    // Sesi ini sudah dimuat penuh → jangan baca ulang seluruh data.
+    if (uid.isNotEmpty && _loadedUid == uid) {
+      _attachDokumenListeners();
+      return;
+    }
+    _loadInFlight = true;
     _isLoading = true;
     notifyListeners();
 
+    bool loaded = false;
     try {
       final snap = await _db.collection('contracts').get();
       if (snap.docs.isEmpty) {
@@ -196,13 +240,16 @@ class ContractProvider with ChangeNotifier {
         }
         _contracts = list;
       }
+      loaded = true;
     } catch (e) {
       debugPrint('[ContractProvider] Firestore gagal, pakai data lokal: $e');
       await _loadFromLocalFallback();
     }
 
+    if (loaded && uid.isNotEmpty) _loadedUid = uid;
     _isLoading = false;
-    notifyListeners();
+    _loadInFlight = false;
+    if (!_disposed) notifyListeners();
     _attachDokumenListeners();
   }
 
@@ -218,11 +265,14 @@ class ContractProvider with ChangeNotifier {
             .doc(c.id)
             .collection('dokumen')
             .snapshots()
-            .listen((_) {
+            .listen((snap) {
           if (_isLoading || _snapshotRebuilding) return;
           for (final x in _contracts) {
             if (x.id != c.id) continue;
-            _hydrateDokumen(x).then((_) => notifyListeners());
+            // Pakai isi snapshot yang sudah diterima — tanpa `.get()` tambahan.
+            _hydrateDokumen(x, snapshot: snap).then((_) {
+              if (!_disposed) notifyListeners();
+            });
           }
         }, onError: (e) {
           debugPrint('[ContractProvider] Dokumen snapshot error: $e');
@@ -432,13 +482,23 @@ class ContractProvider with ChangeNotifier {
     });
 
     // Hapus dokumen yang hilang dari memori ATAU tak dikenal cache
-    // (mis. sisa data versi lama).
+    // (mis. sisa data versi lama). Bila isi cloud sudah diketahui dari cache
+    // (hasil hidrasi/sinkron sebelumnya), koleksi tidak perlu dibaca ulang.
     try {
-      final existing = await cRef.collection(subName).get();
-      for (final d in existing.docs) {
-        if (!seenIds.contains(d.id)) {
-          batch.delete(d.reference);
-          ops++;
+      if (cache.isEmpty) {
+        final existing = await cRef.collection(subName).get();
+        for (final d in existing.docs) {
+          if (!seenIds.contains(d.id)) {
+            batch.delete(d.reference);
+            ops++;
+          }
+        }
+      } else {
+        for (final id in List<String>.from(cache.keys)) {
+          if (!seenIds.contains(id)) {
+            batch.delete(cRef.collection(subName).doc(id));
+            ops++;
+          }
         }
       }
     } catch (_) {}
@@ -610,13 +670,17 @@ class ContractProvider with ChangeNotifier {
   /// Ambil dokumen dari subcollection & suntikkan ke folder yang sesuai
   /// (level kontrak dan level kegiatan), menyatu dengan dokumen lokal yang
   /// belum sempat ke cloud (mencegah hilang saat snapshot rebuild).
-  Future<void> _hydrateDokumen(ContractModel c) async {
+  Future<void> _hydrateDokumen(
+    ContractModel c, {
+    QuerySnapshot<Map<String, dynamic>>? snapshot,
+  }) async {
     try {
-      final snap = await _db
-          .collection('contracts')
-          .doc(c.id)
-          .collection('dokumen')
-          .get();
+      final snap = snapshot ??
+          await _db
+              .collection('contracts')
+              .doc(c.id)
+              .collection('dokumen')
+              .get();
       final cache = _dokumenDocCache.putIfAbsent(c.id, () => {});
       cache.clear();
 
@@ -777,6 +841,7 @@ class ContractProvider with ChangeNotifier {
 
     try {
       final cRef = _db.collection('contracts').doc(newContract.id);
+      _lastWrittenJson[newContract.id] = _comparisonJson(newContract);
       await cRef.set(_sanitizeForWrite(newContract));
       await _syncReports(newContract.id, daily, _reportDocCache, 'laporans');
       await _syncReports(newContract.id, weekly, _weeklyDocCache, 'laporanMingguan');
@@ -812,10 +877,15 @@ class ContractProvider with ChangeNotifier {
       await _syncReports(updatedContract.id, daily, _reportDocCache, 'laporans');
       await _syncReports(updatedContract.id, weekly, _weeklyDocCache, 'laporanMingguan');
       await _syncDokumen(updatedContract);
-      await _db
-          .collection('contracts')
-          .doc(updatedContract.id)
-          .set(_sanitizeForWrite(updatedContract));
+      // Tulis dokumen induk hanya bila isinya benar-benar berubah.
+      final writeJson = _comparisonJson(updatedContract);
+      if (_lastWrittenJson[updatedContract.id] != writeJson) {
+        _lastWrittenJson[updatedContract.id] = writeJson;
+        await _db
+            .collection('contracts')
+            .doc(updatedContract.id)
+            .set(_sanitizeForWrite(updatedContract));
+      }
     } catch (e) {
       debugPrint('[ContractProvider] updateContract gagal: $e');
     }
@@ -828,6 +898,7 @@ class ContractProvider with ChangeNotifier {
     _weeklyDocCache.remove(id);
     _dokumenDocCache.remove(id);
     _deletedDocIds.remove(id);
+    _lastWrittenJson.remove(id);
     notifyListeners();
 
     try {
@@ -873,6 +944,8 @@ class ContractProvider with ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    _authSub?.cancel();
     _contractsSub?.cancel();
     for (final sub in _dokumenSubs.values) {
       sub.cancel();

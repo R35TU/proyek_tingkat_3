@@ -322,7 +322,8 @@ class _TimelineScreenState extends State<TimelineScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : filteredEvents.isEmpty
                     ? _buildEmptyState(context, userProf, isDark)
-                    : _buildGroupedTimelineList(context, filteredEvents, userProf, isDark),
+                    : _buildGroupedTimelineList(
+                        context, filteredEvents, userProf, isDark, timelineProv),
           ),
         ],
       ),
@@ -407,6 +408,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
     List<TimelineEventModel> events,
     UserProfileProvider userProf,
     bool isDark,
+    TimelineProvider timelineProv,
   ) {
     // Kelompokkan berdasarkan Bulan & Tahun atau Hari Ini / Kemarin
     final Map<String, List<TimelineEventModel>> grouped = {};
@@ -430,10 +432,33 @@ class _TimelineScreenState extends State<TimelineScreen> {
             .compareTo(grouped[a]!.first.timestamp);
       });
 
+    // Hanya halaman terbaru yang dibaca dari Firestore; sisanya dimuat saat
+    // tombol ini ditekan (read hanya keluar bila benar-benar diminta).
+    final bool showLoadMore = timelineProv.hasMoreEvents;
+
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      itemCount: groupKeys.length,
+      itemCount: groupKeys.length + (showLoadMore ? 1 : 0),
       itemBuilder: (context, gIdx) {
+        if (gIdx >= groupKeys.length) {
+          final loading = timelineProv.isLoadingMoreEvents;
+          return Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 24),
+            child: Center(
+              child: OutlinedButton.icon(
+                onPressed: loading ? null : () => timelineProv.loadMoreEvents(),
+                icon: loading
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.expand_more, size: 18),
+                label: Text(loading ? 'Memuat...' : 'Muat lebih banyak'),
+              ),
+            ),
+          );
+        }
         final groupTitle = groupKeys[gIdx];
         final groupEvents = grouped[groupTitle]!;
 
