@@ -33,6 +33,31 @@ class TimelineProvider with ChangeNotifier {
   StreamSubscription<User?>? _authSub;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _eventsSub;
 
+  /// UID yang timeline-nya sudah dimuat penuh pada sesi ini — mencegah
+  /// pembacaan ulang seluruh koleksi `timeline_events`.
+  String? _loadedUid;
+  bool _loadInFlight = false;
+  bool _disposed = false;
+
+  /// Jumlah event per halaman. Timeline hanya membaca halaman terbaru; sisa
+  /// riwayat dimuat saat pengguna menekan "Muat lebih banyak".
+  static const int _pageSize = 100;
+  DocumentSnapshot<Map<String, dynamic>>? _pageCursor;
+  bool _hasMore = true;
+  bool _loadingMore = false;
+
+  bool get hasMoreEvents => _hasMore;
+  bool get isLoadingMoreEvents => _loadingMore;
+
+  /// UID sesi Firebase Auth saat ini ('' bila belum login / belum init).
+  String get _currentUid {
+    try {
+      return FirebaseAuth.instance.currentUser?.uid ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   bool get isLoading => _isLoading;
   List<TimelineEventModel> get allEvents => List.unmodifiable(_events);
 
@@ -41,10 +66,17 @@ class TimelineProvider with ChangeNotifier {
     // Muat ulang & berlangganan realtime begitu sesi login Firebase Auth
     // tersedia (sebelum login, rules menolak baca → timeline hanya terisi lokal).
     try {
-      _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
+      _authSub = FirebaseAuth.instance.authStateChanges().listen((user) async {
         if (user != null) {
+          // Tunggu pembacaan awal selesai agar tidak berjalan bersamaan.
+          if (_loadInFlight) await ensureLoaded();
           _loadFuture = loadEvents();
           _listenCloud();
+        } else {
+          // Logout → sesi berikutnya boleh memuat ulang timeline-nya sendiri.
+          _loadedUid = null;
+          _pageCursor = null;
+          _hasMore = true;
         }
       });
     } catch (_) {
@@ -62,6 +94,8 @@ class TimelineProvider with ChangeNotifier {
     try {
       _eventsSub = db
           .collection(_cloudCollection)
+          .orderBy('timestamp', descending: true)
+          .limit(_pageSize)
           .snapshots()
           .listen(_onCloudSnapshot, onError: (e) {
         debugPrint('[TimelineProvider] Snapshot error: $e');
@@ -93,6 +127,7 @@ class TimelineProvider with ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _authSub?.cancel();
     _eventsSub?.cancel();
     super.dispose();
@@ -111,11 +146,29 @@ class TimelineProvider with ChangeNotifier {
   /// Memuat riwayat timeline: utama dari Firestore, fallback ke SharedPreferences
   /// (mode offline / lingkungan test). Data lokal lama otomatis dimigrasikan ke cloud.
   Future<void> loadEvents({bool seedDefaultIfEmpty = false}) async {
+    final uid = _currentUid;
+    if (_loadInFlight) {
+      // Pemuatan sedang berjalan → tunggu, agar pemanggil tetap mendapat data.
+      await ensureLoaded();
+      return;
+    }
+    // Sesi ini sudah dimuat penuh → cukup pastikan listener realtime hidup.
+    if (uid.isNotEmpty && _loadedUid == uid) {
+      if (_eventsSub == null) _listenCloud();
+      return;
+    }
+    _loadInFlight = true;
     _isLoading = true;
+    _pageCursor = null;
+    _hasMore = true;
     try {
       final db = _db;
       if (db != null) {
-        final snap = await db.collection(_cloudCollection).get();
+        final snap = await db
+            .collection(_cloudCollection)
+            .orderBy('timestamp', descending: true)
+            .limit(_pageSize)
+            .get();
         if (snap.docs.isNotEmpty) {
           var cloudEvents = snap.docs.map((d) {
             final data = Map<String, dynamic>.from(d.data());
@@ -128,6 +181,9 @@ class TimelineProvider with ChangeNotifier {
             _events = cloudEvents;
             _sortEvents();
             _saveEvents(); // mirror lokal tanpa menunggu
+            if (uid.isNotEmpty) _loadedUid = uid;
+            _pageCursor = snap.docs.isNotEmpty ? snap.docs.last : null;
+            _hasMore = snap.docs.length >= _pageSize;
             return;
           }
         }
@@ -136,8 +192,9 @@ class TimelineProvider with ChangeNotifier {
       await _loadFromLocal(seedDefaultIfEmpty: seedDefaultIfEmpty);
       // Migrasikan isi lokal ke cloud agar lintas perangkat
       final db2 = _db;
-      if (db2 != null && _events.isNotEmpty && !seedDefaultIfEmpty) {
-        await _pushEventsToCloud(_events);
+      if (db2 != null && !seedDefaultIfEmpty) {
+        if (uid.isNotEmpty) _loadedUid = uid;
+        if (_events.isNotEmpty) await _pushEventsToCloud(_events);
       }
     } catch (e) {
       // Jangan kosongkan timeline hanya karena baca cloud gagal (offline /
@@ -150,11 +207,47 @@ class TimelineProvider with ChangeNotifier {
         _events = seedDefaultIfEmpty ? _generateInitialSeedEvents() : [];
       }
     } finally {
+      _loadInFlight = false;
       _isLoading = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       // Setelah baca awal selesai, jaga data tetap sinkron secara realtime.
       if (_eventsSub == null) _listenCloud();
     }
+  }
+
+  /// Muat halaman berikutnya (event yang lebih lama). Hanya membaca 100
+  /// dokumen saat tombol "Muat lebih banyak" benar-benar ditekan.
+  Future<void> loadMoreEvents() async {
+    final db = _db;
+    if (db == null || _loadingMore || !_hasMore) return;
+    _loadingMore = true;
+    if (!_disposed) notifyListeners();
+    try {
+      var query = db
+          .collection(_cloudCollection)
+          .orderBy('timestamp', descending: true);
+      if (_pageCursor != null) {
+        query = query.startAfterDocument(_pageCursor!);
+      }
+      final snap = await query.limit(_pageSize).get();
+      final merged = <String, TimelineEventModel>{
+        for (final e in _events) e.id: e,
+      };
+      for (final d in snap.docs) {
+        final data = Map<String, dynamic>.from(d.data());
+        data['id'] = d.id;
+        merged[d.id] = TimelineEventModel.fromJson(data);
+      }
+      _events = merged.values.toList();
+      _sortEvents();
+      await _saveEvents();
+      if (snap.docs.isNotEmpty) _pageCursor = snap.docs.last;
+      _hasMore = snap.docs.length >= _pageSize;
+    } catch (e) {
+      debugPrint('Gagal memuat halaman timeline berikutnya: $e');
+    }
+    _loadingMore = false;
+    if (!_disposed) notifyListeners();
   }
 
   /// Muat dari SharedPreferences (perilaku lama).
@@ -315,6 +408,17 @@ class TimelineProvider with ChangeNotifier {
   /// Memastikan seluruh laporan harian (misal tanggal 21, 22, 23), mingguan, addendum, dan dokumen
   /// terdaftar lengkap di Timeline dengan tanggal & waktu yang akurat.
   Future<void> syncWithContracts(List<ContractModel> contracts) async {
+    var totalLaporan = 0;
+    for (final c in contracts) {
+      for (final keg in c.kegiatans) {
+        totalLaporan += ((keg['laporans'] as List?)?.length ?? 0) +
+            ((keg['laporanMingguan'] as List?)?.length ?? 0);
+      }
+    }
+    // Rekonsiliasi (hapus event laporan basi) hanya boleh berjalan bila data
+    // kontrak DAN laporan benar-benar sudah termuat. Bila belum, daftar
+    // "diharapkan" kosong dan SEMUA event laporan akan terhapus massal.
+    final canReconcile = contracts.isNotEmpty && totalLaporan > 0;
     await ensureLoaded();
     bool hasNewEvents = false;
     final Set<String> existingIds = _events.map((e) => e.id).toSet();
@@ -637,12 +741,14 @@ class TimelineProvider with ChangeNotifier {
     // sudah dihapus user, dsb.) yang tidak lagi cocok dengan daftar
     // laporan sekarang. Hanya menyentuh event berpola laporan — event
     // aksi user (logEvent) dan event lain tidak tersentuh.
-    final staleReportEvents = _events
-        .where((e) =>
-            (e.id.startsWith('timeline_daily_') ||
-                e.id.startsWith('timeline_weekly_')) &&
-            !expectedReportEventIds.contains(e.id))
-        .toList();
+    final staleReportEvents = !canReconcile
+        ? <TimelineEventModel>[]
+        : _events
+            .where((e) =>
+                (e.id.startsWith('timeline_daily_') ||
+                    e.id.startsWith('timeline_weekly_')) &&
+                !expectedReportEventIds.contains(e.id))
+            .toList();
     if (staleReportEvents.isNotEmpty) {
       final db = _db;
       if (db == null) return;
