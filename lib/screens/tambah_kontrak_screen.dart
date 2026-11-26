@@ -16,8 +16,13 @@ import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 
 class TambahKontrakScreen extends StatefulWidget {
   final ContractModel? contractToEdit;
+  final String? contractId;
 
-  const TambahKontrakScreen({super.key, this.contractToEdit});
+  const TambahKontrakScreen({
+    super.key,
+    this.contractToEdit,
+    this.contractId,
+  });
 
   @override
   State<TambahKontrakScreen> createState() => _TambahKontrakScreenState();

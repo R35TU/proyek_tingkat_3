@@ -86,8 +86,8 @@ class DetailKegiatanScreen extends StatefulWidget {
   final int kegiatanIndex;
 
   const DetailKegiatanScreen({
-    super.key, 
-    required this.contract, 
+    super.key,
+    required this.contract,
     required this.kegiatanIndex,
   });
 

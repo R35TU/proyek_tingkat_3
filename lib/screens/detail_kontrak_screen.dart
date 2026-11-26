@@ -20,6 +20,7 @@ import 'package:tata_saka_app/screens/tambah_kontrak_screen.dart';
 import 'package:tata_saka_app/screens/form_kegiatan_screen.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/utils/progress_calculator.dart';
 import 'package:tata_saka_app/utils/web_navigation.dart';
 
@@ -181,16 +182,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
     _tabController = TabController(length: 2, vsync: this, initialIndex: initTab);
     _tabController.addListener(() {
       setState(() {}); // Rebuild to update FAB visibility
-      if (kIsWeb && _isContractAvailable) {
-        replaceWebUrl('/#/detail-kontrak?id=${contract.id}&tab=${_tabController.index}');
-      }
     });
-
-    if (kIsWeb && _isContractAvailable) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        replaceWebUrl('/#/detail-kontrak?id=${contract.id}&tab=${_tabController.index}');
-      });
-    }
   }
 
   @override
@@ -206,9 +198,6 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
         setState(() {
           _reloadFromContract(found);
         });
-        if (kIsWeb) {
-          replaceWebUrl('/#/detail-kontrak?id=${_contract!.id}&tab=${_tabController.index}');
-        }
       }
     }
   }
@@ -1332,14 +1321,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              if (kIsWeb) replaceWebUrl('/#/kontrak');
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
-              } else {
-                Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
-              }
-            },
+            onPressed: () => goBackOrParent(context, '/kontrak'),
           ),
           title: const Text('Detail Kontrak'),
         ),
@@ -1352,14 +1334,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
               const Text('Data kontrak tidak ditemukan atau belum dimuat.'),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () {
-                  if (kIsWeb) replaceWebUrl('/#/kontrak');
-                  if (Navigator.canPop(context)) {
-                    Navigator.pop(context);
-                  } else {
-                    Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
-                  }
-                },
+                onPressed: () => goBackOrParent(context, '/kontrak'),
                 child: const Text('Kembali ke Daftar Kontrak'),
               ),
             ],
@@ -1477,27 +1452,9 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
         title: 'Detail Kontrak: ${contract.namaKontrak}',
         activeMenu: 'kontrak',
         showBackButton: true,
-        onBack: () {
-          if (kIsWeb) replaceWebUrl('/#/kontrak');
-          if (Navigator.canPop(context)) {
-            Navigator.pop(context);
-          } else {
-            Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
-          }
-        },
-        onMenuSelected: (menuKey) {
-          if (kIsWeb) pushWebUrl('/#/$menuKey');
-          WebDashboardLayout.activeWebMenu.value = menuKey;
-          if (Navigator.canPop(context)) {
-            Navigator.pop(context);
-          } else {
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              '/$menuKey',
-              (route) => false,
-            );
-          }
-        },
+        onBack: () => goBackOrParent(context, '/kontrak'),
+        onMenuSelected: (menuKey) =>
+            goTopLevelRoute(context, WebDashboardLayout.routeForMenu(menuKey)),
         actions: headerActions,
         floatingActionButton: fab,
         child: mainBody,

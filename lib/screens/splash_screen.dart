@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/screens/admin_page.dart';
@@ -35,13 +36,13 @@ class _SplashScreenState extends State<SplashScreen> {
       final isAuth = AuthService.currentUser != null && userProf.username.isNotEmpty;
       if (isAuth) {
         if (userProf.role.toLowerCase() == 'admin') {
-          Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);
+          context.go('/admin');
         } else {
-          Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+          context.go('/dashboard');
         }
         return;
       }
-      Navigator.pushNamedAndRemoveUntil(context, '/landing', (route) => false);
+      context.go('/landing');
     });
   }
 
