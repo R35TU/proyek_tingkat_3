@@ -1486,7 +1486,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
           }
         },
         onMenuSelected: (menuKey) {
-          if (kIsWeb) replaceWebUrl('/#/$menuKey');
+          if (kIsWeb) pushWebUrl('/#/$menuKey');
           WebDashboardLayout.activeWebMenu.value = menuKey;
           if (Navigator.canPop(context)) {
             Navigator.pop(context);

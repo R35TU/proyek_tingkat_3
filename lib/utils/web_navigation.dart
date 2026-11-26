@@ -10,10 +10,17 @@ void navigateToWebLanding() {
   }
 }
 
-/// Ganti URL browser tanpa menambah entri tumpukan riwayat (mencegah loop back).
+/// Ganti URL browser tanpa menambah entri history (untuk inisialisasi/koreksi).
 void replaceWebUrl(String path) {
   if (kIsWeb) {
     replaceWebUrlImpl(path);
+  }
+}
+
+/// Tambahkan entri baru ke browser history (agar tombol Back bekerja).
+void pushWebUrl(String path) {
+  if (kIsWeb) {
+    pushWebUrlImpl(path);
   }
 }
 
@@ -25,4 +32,16 @@ String getInitialWebRoute() {
   return '/';
 }
 
+/// Mendaftarkan listener popstate browser (Back/Forward button).
+void listenPopState(void Function(String route) callback) {
+  if (kIsWeb) {
+    listenPopStateImpl(callback);
+  }
+}
 
+/// Hapus listener popstate.
+void disposePopState() {
+  if (kIsWeb) {
+    disposePopStateImpl();
+  }
+}
