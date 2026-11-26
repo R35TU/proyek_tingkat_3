@@ -243,7 +243,10 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
           children: [
             if (hasActions)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   border: Border(
@@ -354,9 +357,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
-        ),
+        border: Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
       ),
       child: const Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -401,11 +402,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
       automaticallyImplyLeading: false,
       bottom: const PreferredSize(
         preferredSize: Size.fromHeight(1),
-        child: Divider(
-          height: 1,
-          thickness: 1,
-          color: Color(0xFFE2E8F0),
-        ),
+        child: Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
       ),
       titleSpacing: 16,
       title: Row(
@@ -428,7 +425,10 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                   height: 38,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+                    border: Border.all(
+                      color: const Color(0xFFE2E8F0),
+                      width: 1,
+                    ),
                   ),
                   alignment: Alignment.center,
                   child: Icon(
@@ -450,13 +450,17 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
               child: InkWell(
                 borderRadius: BorderRadius.circular(8),
                 hoverColor: const Color(0xFFE2E8F0),
-                onTap: widget.onBack ??
+                onTap:
+                    widget.onBack ??
                     () {
                       if (Navigator.canPop(context)) {
                         Navigator.pop(context);
                       } else {
                         try {
-                          Router.neglect(context, () => context.go('/dashboard'));
+                          Router.neglect(
+                            context,
+                            () => context.go('/dashboard'),
+                          );
                         } catch (_) {}
                       }
                     },
@@ -559,7 +563,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
               Text(
                 userProf.role.isNotEmpty
                     ? (userProf.role[0].toUpperCase() +
-                        userProf.role.substring(1).toLowerCase())
+                          userProf.role.substring(1).toLowerCase())
                     : 'User',
                 style: const TextStyle(
                   color: Color(0xFF64748B),
@@ -676,27 +680,19 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                                 'CV. TATA SAKA CONSULTANT',
                                 style: TextStyle(
                                   color: Color(0xFF0F172A),
-                                  fontSize: 14,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 0.5,
                                 ),
                               ),
                               SizedBox(height: 2),
                               Text(
-                                'KONSULTAN PENGAWAS',
+                                'KONSULTAN TEKNIS',
                                 style: TextStyle(
                                   color: Color(0xFF64748B),
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.3,
-                                ),
-                              ),
-                              Text(
-                                'Engineering Consultant',
-                                style: TextStyle(
-                                  color: Color(0xFF94A3B8),
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ],
@@ -717,7 +713,9 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                   // 1. KATEGORI UTAMA
                   _buildSidebarCategory('UTAMA', isCollapsed, isDrawer),
                   _SidebarItemWidget(
-                    key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}dashboard'),
+                    key: ValueKey(
+                      'sidebar_${isDrawer ? "drawer_" : ""}dashboard',
+                    ),
                     isDrawer: isDrawer,
                     menuKey: 'dashboard',
                     label: userProf.tr('nav_dashboard'),
@@ -731,7 +729,9 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                   ),
                   if (!userProf.isKontraktor)
                     _SidebarItemWidget(
-                      key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}kontrak'),
+                      key: ValueKey(
+                        'sidebar_${isDrawer ? "drawer_" : ""}kontrak',
+                      ),
                       isDrawer: isDrawer,
                       menuKey: 'kontrak',
                       label: userProf.tr('nav_kontrak'),
@@ -745,7 +745,9 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                     )
                   else
                     _SidebarItemWidget(
-                      key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}kegiatan'),
+                      key: ValueKey(
+                        'sidebar_${isDrawer ? "drawer_" : ""}kegiatan',
+                      ),
                       isDrawer: isDrawer,
                       menuKey: 'kegiatan',
                       label: userProf.tr('nav_kegiatan_saya'),
@@ -764,7 +766,9 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                   if (!userProf.isKontraktor) ...[
                     _buildSidebarCategory('PELAPORAN', isCollapsed, isDrawer),
                     _SidebarItemWidget(
-                      key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}laporan'),
+                      key: ValueKey(
+                        'sidebar_${isDrawer ? "drawer_" : ""}laporan',
+                      ),
                       isDrawer: isDrawer,
                       menuKey: 'laporan',
                       label: 'Laporan',
@@ -777,7 +781,9 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                       },
                     ),
                     _SidebarItemWidget(
-                      key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}data_laporan'),
+                      key: ValueKey(
+                        'sidebar_${isDrawer ? "drawer_" : ""}data_laporan',
+                      ),
                       isDrawer: isDrawer,
                       menuKey: 'data_laporan',
                       label: 'Data Laporan',
@@ -792,7 +798,9 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                     // Menu pintas buat laporan disembunyikan untuk Dinas (view-only)
                     if (!userProf.isDinas) ...[
                       _SidebarItemWidget(
-                        key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}laporan_harian'),
+                        key: ValueKey(
+                          'sidebar_${isDrawer ? "drawer_" : ""}laporan_harian',
+                        ),
                         isDrawer: isDrawer,
                         menuKey: 'laporan_harian',
                         label: 'Laporan Harian',
@@ -805,7 +813,9 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                         },
                       ),
                       _SidebarItemWidget(
-                        key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}laporan_mingguan'),
+                        key: ValueKey(
+                          'sidebar_${isDrawer ? "drawer_" : ""}laporan_mingguan',
+                        ),
                         isDrawer: isDrawer,
                         menuKey: 'laporan_mingguan',
                         label: 'Laporan Mingguan',
@@ -818,7 +828,9 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                         },
                       ),
                       _SidebarItemWidget(
-                        key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}laporan_bulanan'),
+                        key: ValueKey(
+                          'sidebar_${isDrawer ? "drawer_" : ""}laporan_bulanan',
+                        ),
                         isDrawer: isDrawer,
                         menuKey: 'laporan_bulanan',
                         label: 'Laporan Bulanan',
@@ -841,7 +853,9 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                     isDrawer,
                   ),
                   _SidebarItemWidget(
-                    key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}timeline'),
+                    key: ValueKey(
+                      'sidebar_${isDrawer ? "drawer_" : ""}timeline',
+                    ),
                     isDrawer: isDrawer,
                     menuKey: 'timeline',
                     label: 'Timeline & Histori',
@@ -863,7 +877,9 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                     isDrawer,
                   ),
                   _SidebarItemWidget(
-                    key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}pengaturan'),
+                    key: ValueKey(
+                      'sidebar_${isDrawer ? "drawer_" : ""}pengaturan',
+                    ),
                     isDrawer: isDrawer,
                     menuKey: 'pengaturan',
                     label: 'Pengaturan Akun',
@@ -876,7 +892,9 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                     },
                   ),
                   _SidebarItemWidget(
-                    key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}keamanan'),
+                    key: ValueKey(
+                      'sidebar_${isDrawer ? "drawer_" : ""}keamanan',
+                    ),
                     isDrawer: isDrawer,
                     menuKey: 'keamanan',
                     label: 'Keamanan & Sandi',
@@ -889,7 +907,9 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                     },
                   ),
                   _SidebarItemWidget(
-                    key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}edit_profil'),
+                    key: ValueKey(
+                      'sidebar_${isDrawer ? "drawer_" : ""}edit_profil',
+                    ),
                     isDrawer: isDrawer,
                     menuKey: 'edit_profil',
                     label: 'Edit Profil',
@@ -907,7 +927,9 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                   // 5. KATEGORI BANTUAN
                   _buildSidebarCategory('BANTUAN', isCollapsed, isDrawer),
                   _SidebarItemWidget(
-                    key: ValueKey('sidebar_${isDrawer ? "drawer_" : ""}panduan_faq'),
+                    key: ValueKey(
+                      'sidebar_${isDrawer ? "drawer_" : ""}panduan_faq',
+                    ),
                     isDrawer: isDrawer,
                     menuKey: 'panduan_faq',
                     label: 'Panduan & FAQ',
@@ -1063,18 +1085,11 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
     );
   }
 
-  Widget _buildSidebarCategory(
-    String title,
-    bool isCollapsed,
-    bool isDrawer,
-  ) {
+  Widget _buildSidebarCategory(String title, bool isCollapsed, bool isDrawer) {
     if (isCollapsed) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 6),
-        child: Divider(
-          color: Color(0xFFE2E8F0),
-          height: 1,
-        ),
+        child: Divider(color: Color(0xFFE2E8F0), height: 1),
       );
     }
     return Padding(
@@ -1307,7 +1322,9 @@ class _SidebarItemWidgetState extends State<_SidebarItemWidget> {
                         fontSize: 13.5,
                         fontWeight: isItemActive
                             ? FontWeight.w700
-                            : (isItemHovered ? FontWeight.w600 : FontWeight.w500),
+                            : (isItemHovered
+                                  ? FontWeight.w600
+                                  : FontWeight.w500),
                       ),
                     ),
                   ),
