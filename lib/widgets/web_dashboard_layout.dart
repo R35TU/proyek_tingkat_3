@@ -1,10 +1,31 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
-import 'package:tata_saka_app/utils/web_navigation.dart';
+
+/// Penanda bahwa subtree sudah berada di dalam `ShellRoute` WebDashboardLayout,
+/// mencegah double sidebar jika child screen masih memanggil WebDashboardLayout.
+class WebShellScope extends InheritedWidget {
+  final bool isInsideShell;
+
+  const WebShellScope({
+    super.key,
+    required this.isInsideShell,
+    required super.child,
+  });
+
+  static bool isInside(BuildContext context) {
+    final scope = context.dependOnInheritedWidgetOfExactType<WebShellScope>();
+    return scope?.isInsideShell ?? false;
+  }
+
+  @override
+  bool updateShouldNotify(WebShellScope oldWidget) =>
+      isInsideShell != oldWidget.isInsideShell;
+}
 
 /// Reusable Web Dashboard Layout Shell for Tata Saka Consultant.
 ///
@@ -27,9 +48,56 @@ class WebDashboardLayout extends StatefulWidget {
   /// Global notifier so collapse/expand state is remembered across all screens.
   static final ValueNotifier<bool> isSidebarOpen = ValueNotifier<bool>(true);
 
-  /// Global notifier for active menu across all web screens.
-  static final ValueNotifier<String> activeWebMenu =
-      ValueNotifier<String>('dashboard');
+  /// Menentukan key menu aktif langsung dari URL GoRouter aktif.
+  static String menuKeyFromPath(String path) {
+    final clean = path.split('?').first;
+    if (clean.startsWith('/kontrak')) return 'kontrak';
+    if (clean.startsWith('/kegiatan')) return 'kegiatan';
+    if (clean.startsWith('/laporan/data')) return 'data_laporan';
+    if (clean.startsWith('/laporan/harian')) return 'laporan_harian';
+    if (clean.startsWith('/laporan/mingguan')) return 'laporan_mingguan';
+    if (clean.startsWith('/laporan/bulanan')) return 'laporan_bulanan';
+    if (clean.startsWith('/laporan')) return 'laporan';
+    if (clean.startsWith('/timeline')) return 'timeline';
+    if (clean.startsWith('/akun/keamanan')) return 'keamanan';
+    if (clean.startsWith('/akun/profil')) return 'edit_profil';
+    if (clean.startsWith('/akun')) return 'pengaturan';
+    if (clean.startsWith('/panduan')) return 'panduan_faq';
+    return 'dashboard';
+  }
+
+  /// Pemetaan menuKey sidebar ke path URL deklaratif GoRouter.
+  static String routeForMenu(String menuKey) {
+    switch (menuKey) {
+      case 'kontrak':
+        return '/kontrak';
+      case 'kegiatan':
+        return '/kegiatan';
+      case 'laporan':
+        return '/laporan';
+      case 'data_laporan':
+        return '/laporan/data';
+      case 'laporan_harian':
+        return '/laporan/harian';
+      case 'laporan_mingguan':
+        return '/laporan/mingguan';
+      case 'laporan_bulanan':
+        return '/laporan/bulanan';
+      case 'timeline':
+        return '/timeline';
+      case 'pengaturan':
+        return '/akun/pengaturan';
+      case 'keamanan':
+        return '/akun/keamanan';
+      case 'edit_profil':
+        return '/akun/profil';
+      case 'panduan_faq':
+        return '/panduan';
+      case 'dashboard':
+      default:
+        return '/dashboard';
+    }
+  }
 
   /// Daftar konstanta ikon eksplisit agar Flutter font tree-shaker tidak pernah
   /// membuang glyph Material Icons yang digunakan di Web Dashboard saat release build.
@@ -78,18 +146,29 @@ class WebDashboardLayout extends StatefulWidget {
 }
 
 class _WebDashboardLayoutState extends State<WebDashboardLayout> {
-  void _handleMenuClick(String menuKey) {
-    if (kIsWeb) {
-      pushWebUrl('/#/$menuKey');
+  String _resolveActiveMenu(BuildContext context) {
+    try {
+      final uriStr = GoRouterState.of(context).uri.toString();
+      return WebDashboardLayout.menuKeyFromPath(uriStr);
+    } catch (_) {
+      return widget.activeMenu;
     }
-    WebDashboardLayout.activeWebMenu.value = menuKey;
+  }
+
+  void _handleMenuClick(String menuKey) {
     if (widget.onMenuSelected != null) {
       widget.onMenuSelected!(menuKey);
-    } else {
+      return;
+    }
+    final targetRoute = WebDashboardLayout.routeForMenu(menuKey);
+    try {
+      final current = GoRouterState.of(context).uri.toString();
+      if (current != targetRoute) {
+        context.push(targetRoute);
+      }
+    } catch (_) {
       if (Navigator.canPop(context)) {
         Navigator.pop(context);
-      } else {
-        Navigator.pushReplacementNamed(context, '/$menuKey');
       }
     }
   }
@@ -124,11 +203,15 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                 await userProf.logout();
               } catch (_) {}
               if (!context.mounted) return;
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/login',
-                (route) => false,
-              );
+              try {
+                Router.neglect(context, () => context.go('/login'));
+              } catch (_) {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/login',
+                  (route) => false,
+                );
+              }
             },
             child: const Text('Keluar'),
           ),
@@ -141,10 +224,63 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
   Widget build(BuildContext context) {
     final isDesktop = ResponsiveBreakpoints.isDesktop(context);
 
-    // On mobile screens (< 900px), return the child directly with mobile scaffold if needed
+    // On mobile screens (< 900px), return the child directly
     if (!isDesktop) {
       return widget.child;
     }
+
+    // Jika sudah berada di dalam ShellRoute WebDashboardLayout, hindari double sidebar!
+    if (WebShellScope.isInside(context)) {
+      final hasActions = widget.actions != null && widget.actions!.isNotEmpty;
+      final hasFab = widget.floatingActionButton != null;
+      if (!hasActions && !hasFab) {
+        return widget.child;
+      }
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        floatingActionButton: widget.floatingActionButton,
+        body: Column(
+          children: [
+            if (hasActions)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(
+                    bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    IconTheme(
+                      data: const IconThemeData(color: Color(0xFF0F172A)),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: widget.actions!,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Expanded(child: widget.child),
+          ],
+        ),
+      );
+    }
+
+    final activeMenuKey = _resolveActiveMenu(context);
 
     UserProfileProvider userProf;
     try {
@@ -178,6 +314,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                       child: _buildWebSidebar(
                         context,
                         userProf,
+                        activeMenuKey: activeMenuKey,
                         isCollapsed: !isOpen,
                       ),
                     ),
@@ -194,7 +331,12 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                   color: AppColors.background,
                   child: Column(
                     children: [
-                      Expanded(child: widget.child),
+                      Expanded(
+                        child: WebShellScope(
+                          isInsideShell: true,
+                          child: widget.child,
+                        ),
+                      ),
                       _buildWebFooter(),
                     ],
                   ),
@@ -313,11 +455,9 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                       if (Navigator.canPop(context)) {
                         Navigator.pop(context);
                       } else {
-                        Navigator.pushNamedAndRemoveUntil(
-                          context,
-                          '/main',
-                          (route) => false,
-                        );
+                        try {
+                          Router.neglect(context, () => context.go('/dashboard'));
+                        } catch (_) {}
                       }
                     },
                 child: Tooltip(
@@ -438,6 +578,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
   Widget _buildWebSidebar(
     BuildContext context,
     UserProfileProvider userProf, {
+    required String activeMenuKey,
     bool isCollapsed = false,
     bool isDrawer = false,
   }) {
@@ -581,7 +722,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                     menuKey: 'dashboard',
                     label: userProf.tr('nav_dashboard'),
                     icon: Icons.dashboard,
-                    isActive: widget.activeMenu == 'dashboard',
+                    isActive: activeMenuKey == 'dashboard',
                     isCollapsed: isCollapsed,
                     onTap: () {
                       if (isDrawer) Navigator.pop(context);
@@ -595,7 +736,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                       menuKey: 'kontrak',
                       label: userProf.tr('nav_kontrak'),
                       icon: Icons.folder_outlined,
-                      isActive: widget.activeMenu == 'kontrak',
+                      isActive: activeMenuKey == 'kontrak',
                       isCollapsed: isCollapsed,
                       onTap: () {
                         if (isDrawer) Navigator.pop(context);
@@ -609,7 +750,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                       menuKey: 'kegiatan',
                       label: userProf.tr('nav_kegiatan_saya'),
                       icon: Icons.assignment_outlined,
-                      isActive: widget.activeMenu == 'kegiatan',
+                      isActive: activeMenuKey == 'kegiatan',
                       isCollapsed: isCollapsed,
                       onTap: () {
                         if (isDrawer) Navigator.pop(context);
@@ -628,7 +769,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                       menuKey: 'laporan',
                       label: 'Laporan',
                       icon: Icons.description_outlined,
-                      isActive: widget.activeMenu == 'laporan',
+                      isActive: activeMenuKey == 'laporan',
                       isCollapsed: isCollapsed,
                       onTap: () {
                         if (isDrawer) Navigator.pop(context);
@@ -641,7 +782,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                       menuKey: 'data_laporan',
                       label: 'Data Laporan',
                       icon: Icons.folder_open,
-                      isActive: widget.activeMenu == 'data_laporan',
+                      isActive: activeMenuKey == 'data_laporan',
                       isCollapsed: isCollapsed,
                       onTap: () {
                         if (isDrawer) Navigator.pop(context);
@@ -656,7 +797,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                         menuKey: 'laporan_harian',
                         label: 'Laporan Harian',
                         icon: Icons.today_outlined,
-                        isActive: widget.activeMenu == 'laporan_harian',
+                        isActive: activeMenuKey == 'laporan_harian',
                         isCollapsed: isCollapsed,
                         onTap: () {
                           if (isDrawer) Navigator.pop(context);
@@ -669,7 +810,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                         menuKey: 'laporan_mingguan',
                         label: 'Laporan Mingguan',
                         icon: Icons.date_range_outlined,
-                        isActive: widget.activeMenu == 'laporan_mingguan',
+                        isActive: activeMenuKey == 'laporan_mingguan',
                         isCollapsed: isCollapsed,
                         onTap: () {
                           if (isDrawer) Navigator.pop(context);
@@ -682,7 +823,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                         menuKey: 'laporan_bulanan',
                         label: 'Laporan Bulanan',
                         icon: Icons.calendar_month_outlined,
-                        isActive: widget.activeMenu == 'laporan_bulanan',
+                        isActive: activeMenuKey == 'laporan_bulanan',
                         isCollapsed: isCollapsed,
                         onTap: () {
                           if (isDrawer) Navigator.pop(context);
@@ -705,7 +846,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                     menuKey: 'timeline',
                     label: 'Timeline & Histori',
                     icon: Icons.timeline,
-                    isActive: widget.activeMenu == 'timeline',
+                    isActive: activeMenuKey == 'timeline',
                     isCollapsed: isCollapsed,
                     onTap: () {
                       if (isDrawer) Navigator.pop(context);
@@ -727,7 +868,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                     menuKey: 'pengaturan',
                     label: 'Pengaturan Akun',
                     icon: Icons.settings_outlined,
-                    isActive: widget.activeMenu == 'pengaturan',
+                    isActive: activeMenuKey == 'pengaturan',
                     isCollapsed: isCollapsed,
                     onTap: () {
                       if (isDrawer) Navigator.pop(context);
@@ -740,7 +881,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                     menuKey: 'keamanan',
                     label: 'Keamanan & Sandi',
                     icon: Icons.security_outlined,
-                    isActive: widget.activeMenu == 'keamanan',
+                    isActive: activeMenuKey == 'keamanan',
                     isCollapsed: isCollapsed,
                     onTap: () {
                       if (isDrawer) Navigator.pop(context);
@@ -753,7 +894,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                     menuKey: 'edit_profil',
                     label: 'Edit Profil',
                     icon: Icons.person_outline_rounded,
-                    isActive: widget.activeMenu == 'edit_profil',
+                    isActive: activeMenuKey == 'edit_profil',
                     isCollapsed: isCollapsed,
                     onTap: () {
                       if (isDrawer) Navigator.pop(context);
@@ -771,7 +912,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                     menuKey: 'panduan_faq',
                     label: 'Panduan & FAQ',
                     icon: Icons.help_outline,
-                    isActive: widget.activeMenu == 'panduan_faq',
+                    isActive: activeMenuKey == 'panduan_faq',
                     isCollapsed: isCollapsed,
                     onTap: () {
                       if (isDrawer) Navigator.pop(context);

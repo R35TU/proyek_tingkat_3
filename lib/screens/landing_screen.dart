@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:tata_saka_app/screens/panduan_faq_screen.dart';
+import 'package:go_router/go_router.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 
@@ -71,7 +71,7 @@ class LandingScreen extends StatelessWidget {
             padding: EdgeInsets.only(right: isDesktop ? 32 : 16),
             child: ElevatedButton.icon(
               onPressed: () {
-                Navigator.pushNamed(context, '/login');
+                context.go('/login');
               },
               iconAlignment: IconAlignment.end,
               icon: const Icon(Icons.arrow_forward, size: 16),
@@ -202,7 +202,7 @@ class LandingScreen extends StatelessWidget {
           children: [
             ElevatedButton(
               onPressed: () {
-                Navigator.pushNamed(context, '/login');
+                context.go('/login');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0F172A),
@@ -227,12 +227,7 @@ class LandingScreen extends StatelessWidget {
             ),
             OutlinedButton(
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const PanduanFaqScreen(),
-                  ),
-                );
+                context.go('/panduan-umum');
               },
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF1E293B),

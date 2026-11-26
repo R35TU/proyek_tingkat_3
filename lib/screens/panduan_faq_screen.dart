@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// Langkah panduan: langkah bernomor, sub-bullet, atau sub-heading (A./B./C.).
 class _GuideStep {
@@ -715,11 +716,7 @@ class PanduanFaqScreen extends StatelessWidget {
           if (Navigator.canPop(context)) {
             Navigator.pop(context);
           } else {
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              '/main',
-              (route) => false,
-            );
+            context.go('/dashboard');
           }
         },
       ),

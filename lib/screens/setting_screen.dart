@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
@@ -245,7 +246,7 @@ class _SettingScreenState extends State<SettingScreen> {
               final userProf = context.read<UserProfileProvider>();
               await userProf.logout();
               if (!mounted) return;
-              Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+              context.go('/login');
             },
             child: const Text('Keluar'),
           ),

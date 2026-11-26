@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/services/auth_service.dart';
@@ -42,9 +43,9 @@ class _LoginScreenState extends State<LoginScreen> {
       final isAuth = AuthService.currentUser != null && userProf.username.isNotEmpty;
       if (isAuth) {
         if (userProf.role.toLowerCase() == 'admin') {
-          Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);
+          context.go('/admin');
         } else {
-          Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+          context.go('/dashboard');
         }
       }
     });
@@ -97,13 +98,11 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoggingIn = false);
 
     if (success) {
-      replaceWebUrl(userProf.role.toLowerCase() == 'admin' ? '/#/admin' : '/#/dashboard');
-      // Admin (role Admin) masuk ke dashboard manajemen akun.
       if (userProf.role.toLowerCase() == 'admin') {
-        Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);
+        context.go('/admin');
         return;
       }
-      Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+      context.go('/dashboard');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

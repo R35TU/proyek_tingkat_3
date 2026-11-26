@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/services/auth_service.dart';
@@ -81,7 +82,7 @@ class _AdminPageState extends State<AdminPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (!widget.bypassAuthCheck && AuthService.currentUser == null) {
-        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+        context.go('/login');
         return;
       }
       // Hanya role Admin yang boleh mengelola akun — role lain ditolak.
@@ -90,7 +91,7 @@ class _AdminPageState extends State<AdminPage> {
             .role
             .toLowerCase();
         if (role != 'admin') {
-          Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
+          context.go('/dashboard');
         }
       } catch (_) {}
     });
@@ -537,11 +538,7 @@ class _AdminPageState extends State<AdminPage> {
                 await AuthService.signOut();
               } catch (_) {}
               if (!mounted) return;
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/login',
-                (route) => false,
-              );
+              context.go('/login');
             },
             child: const Text('Keluar'),
           ),

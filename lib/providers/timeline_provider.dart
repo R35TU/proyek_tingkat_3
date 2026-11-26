@@ -763,8 +763,10 @@ class TimelineProvider with ChangeNotifier {
     }).toList();
   }
 
-  /// Data bawaan kronologi proyek (Seed Default MT Haryono)
-  List<TimelineEventModel> _generateInitialSeedEvents() {
+  /// Data bawaan kronologi proyek (MT Haryono dinonaktifkan permanen)
+  List<TimelineEventModel> _generateInitialSeedEvents() => [];
+
+  List<TimelineEventModel> _unusedSeedEventsRemoved() {
     const cId = 'kontrak-mt-haryono-demo';
     const cName = 'PEMELIHARAAN BERKALA JL. MT HARYONO';
     const dinas = 'DPU-PR Kab. Purbalingga';

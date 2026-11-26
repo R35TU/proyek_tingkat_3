@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
@@ -393,22 +394,7 @@ class _KontrakScreenState extends State<KontrakScreen> {
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
               onTap: () {
-                if (kIsWeb) {
-                  pushWebUrl('/#/detail-kontrak?id=${contract.id}&tab=0');
-                }
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    settings: RouteSettings(
-                      name: '/detail-kontrak?id=${contract.id}&tab=0',
-                    ),
-                    builder: (context) => DetailKontrakScreen(contract: contract),
-                  ),
-                ).then((_) {
-                  if (kIsWeb && mounted) {
-                    replaceWebUrl('/#/kontrak');
-                  }
-                });
+                context.go('/kontrak/${contract.id}?tab=0', extra: contract);
               },
               onLongPress: isKonsultan ? () => _showContractOptions(context, contract) : null,
               child: Padding(

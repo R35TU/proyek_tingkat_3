@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/services/auth_service.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/screens/buat_laporan_screen.dart';
@@ -73,35 +75,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _onWebMenuSelected(String menuKey) {
     if (_activeWebMenu == menuKey) return;
-    if (kIsWeb) {
-      pushWebUrl('/#/$menuKey');
-    }
-    setState(() {
-      _webMenuHistory.add(menuKey);
-      _activeWebMenu = menuKey;
-      WebDashboardLayout.activeWebMenu.value = menuKey;
-    });
+    goTopLevelRoute(context, WebDashboardLayout.routeForMenu(menuKey));
   }
 
   void _onWebBack() {
-    if (_webMenuHistory.length > 1) {
-      setState(() {
-        _webMenuHistory.removeLast();
-        _activeWebMenu = _webMenuHistory.last;
-        WebDashboardLayout.activeWebMenu.value = _activeWebMenu;
-        if (kIsWeb) {
-          replaceWebUrl('/#/${_activeWebMenu}');
-        }
-      });
-    } else {
-      setState(() {
-        _activeWebMenu = 'dashboard';
-        WebDashboardLayout.activeWebMenu.value = 'dashboard';
-        if (kIsWeb) {
-          replaceWebUrl('/#/dashboard');
-        }
-      });
-    }
+    goTopLevelRoute(context, '/dashboard');
   }
 
   void _navigateFromSidebar(
@@ -110,24 +88,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     bool isDrawer = false,
   }) {
     if (isDrawer) Navigator.pop(context);
-    final isWeb = ResponsiveBreakpoints.isDesktop(context);
-    WebDashboardLayout.activeWebMenu.value = menuKey;
-    if (isWeb) {
-      setState(() {
-        _activeWebMenu = menuKey;
-      });
-    } else {
-      setState(() => _activeWebMenu = menuKey);
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => destination),
-      ).then((_) {
-        if (mounted) {
-          setState(() => _activeWebMenu = 'dashboard');
-          WebDashboardLayout.activeWebMenu.value = 'dashboard';
-        }
-      });
-    }
+    goTopLevelRoute(context, WebDashboardLayout.routeForMenu(menuKey));
   }
 
   String _getHeaderTitle(UserProfileProvider userProf) {
@@ -282,57 +243,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         (kIsWeb ? _normalizeMenuFromUrl(getInitialWebRoute()) : null) ??
         'dashboard';
     _activeWebMenu = startMenu;
-    WebDashboardLayout.activeWebMenu.value = startMenu;
     _webMenuHistory.clear();
     _webMenuHistory.add(startMenu);
-    if (kIsWeb) {
-      replaceWebUrl('/#/$startMenu');
-    }
-
-    WebDashboardLayout.activeWebMenu.addListener(_onWebDashboardMenuChanged);
-
-    // Listen browser Back/Forward button
-    listenPopState(_onBrowserPopState);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        try {
-          final contracts = context.read<ContractProvider>().contracts;
-          context.read<TimelineProvider>().syncWithContracts(contracts);
-        } catch (_) {}
-      }
+      if (!mounted) return;
+      try {
+        final contracts = context.read<ContractProvider>().contracts;
+        context.read<TimelineProvider>().syncWithContracts(contracts);
+      } catch (_) {}
     });
-  }
-
-  /// Called when user presses browser Back/Forward button.
-  void _onBrowserPopState(String route) {
-    if (!mounted) return;
-    final menu = _normalizeMenuFromUrl(route) ?? 'dashboard';
-    if (_activeWebMenu != menu) {
-      setState(() {
-        _activeWebMenu = menu;
-        WebDashboardLayout.activeWebMenu.value = menu;
-        // Rebuild history to match.
-        if (!_webMenuHistory.contains(menu)) {
-          _webMenuHistory.add(menu);
-        }
-      });
-    }
-  }
-
-  void _onWebDashboardMenuChanged() {
-    final val = WebDashboardLayout.activeWebMenu.value;
-    if (mounted && _activeWebMenu != val) {
-      if (kIsWeb) {
-        pushWebUrl('/#/$val');
-      }
-      setState(() {
-        if (!_webMenuHistory.contains(val)) {
-          _webMenuHistory.add(val);
-        }
-        _activeWebMenu = val;
-      });
-    }
   }
 
   @override
@@ -341,16 +261,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (widget.initialMenu != null && widget.initialMenu != oldWidget.initialMenu) {
       final newMenu = _normalizeMenuFromUrl(widget.initialMenu!) ?? 'dashboard';
       if (_activeWebMenu != newMenu) {
-        setState(() {
-          _activeWebMenu = newMenu;
-          WebDashboardLayout.activeWebMenu.value = newMenu;
-          if (!_webMenuHistory.contains(newMenu)) {
-            _webMenuHistory.add(newMenu);
-          }
-        });
-        if (kIsWeb) {
-          replaceWebUrl('/#/$newMenu');
-        }
+        _activeWebMenu = newMenu;
       }
     }
   }
@@ -385,8 +296,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
-    WebDashboardLayout.activeWebMenu.removeListener(_onWebDashboardMenuChanged);
-    disposePopState();
     _timer?.cancel();
     _pageController.dispose();
     super.dispose();
@@ -647,17 +556,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Navigator.of(context).pop();
             return;
           }
-          if (_webMenuHistory.length > 1) {
-            setState(() {
-              _webMenuHistory.removeLast();
-              _activeWebMenu = _webMenuHistory.last;
-              WebDashboardLayout.activeWebMenu.value = _activeWebMenu;
-            });
-          } else if (_activeWebMenu != 'dashboard') {
-            setState(() {
-              _activeWebMenu = 'dashboard';
-              WebDashboardLayout.activeWebMenu.value = 'dashboard';
-            });
+          if (_activeWebMenu != 'dashboard') {
+            goTopLevelRoute(context, '/dashboard');
           }
         },
         child: WebDashboardLayout(
@@ -1186,20 +1086,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             if (hasActivities)
               InkWell(
-                onTap: () {
-                  final isWeb = ResponsiveBreakpoints.isDesktop(context);
-                  WebDashboardLayout.activeWebMenu.value = 'timeline';
-                  if (isWeb) {
-                    setState(() => _activeWebMenu = 'timeline');
-                  } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const TimelineScreen(),
-                      ),
-                    );
-                  }
-                },
+                onTap: () => goTopLevelRoute(context, '/timeline'),
                 child: const Text(
                   'Lihat Semua',
                   style: TextStyle(

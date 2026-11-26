@@ -288,92 +288,11 @@ class ContractProvider with ChangeNotifier {
     return false;
   }
 
-  /// Tulis kontrak demo + seluruh laporannya ke Firestore.
-  Future<void> _seedDemoData({bool addToList = false}) async {
-    final demo = SampleContractData.getDemoContract();
-    if (demo.id.isEmpty) demo.id = generateId();
-    _ensureKegiatanIds(demo);
+  /// Demo data MT Haryono dinonaktifkan permanen.
+  Future<void> _seedDemoData({bool addToList = false}) async {}
 
-    final daily = _extractReports(demo, 'laporans');
-    final weekly = _extractReports(demo, 'laporanMingguan');
-
-    try {
-      final batch = _db.batch();
-      final cRef = _db.collection('contracts').doc(demo.id);
-      batch.set(cRef, _sanitizeForWrite(demo));
-
-      daily.forEach((_, reps) {
-        for (final r in reps) {
-          batch.set(cRef.collection('laporans').doc(r['id'].toString()), r);
-        }
-      });
-      weekly.forEach((_, reps) {
-        for (final r in reps) {
-          batch.set(cRef.collection('laporanMingguan').doc(r['id'].toString()), r);
-        }
-      });
-      await batch.commit();
-
-      // Isi cache diff agar tulisan berikutnya minimal.
-      _fillCache(demo.id, daily, _reportDocCache);
-      _fillCache(demo.id, weekly, _weeklyDocCache);
-
-      if (addToList && !_contracts.any((c) => c.id == demo.id)) {
-        _contracts.add(demo);
-      }
-    } catch (e) {
-      debugPrint('[ContractProvider] Seed gagal: $e');
-    }
-    await _saveLocalBackup();
-  }
-
-  /// Ganti kontrak demo lama dengan dataset terbaru dari aplikasi.
-  Future<void> _refreshDemoData() async {
-    final demo = SampleContractData.getDemoContract();
-    if (demo.id.isEmpty) demo.id = generateId();
-    _ensureKegiatanIds(demo);
-    _contracts.removeWhere((c) => c.id == demo.id);
-
-    final daily = _extractReports(demo, 'laporans');
-    final weekly = _extractReports(demo, 'laporanMingguan');
-
-    try {
-      final cRef = _db.collection('contracts').doc(demo.id);
-      // Bersihkan laporan lama milik demo sebelum menulis yang baru.
-      for (final sub in const ['laporans', 'laporanMingguan']) {
-        final snap = await cRef.collection(sub).get();
-        if (snap.docs.isNotEmpty) {
-          final del = _db.batch();
-          for (final d in snap.docs) {
-            del.delete(d.reference);
-          }
-          await del.commit();
-        }
-      }
-
-      final batch = _db.batch();
-      batch.set(cRef, _sanitizeForWrite(demo));
-      daily.forEach((_, reps) {
-        for (final r in reps) {
-          batch.set(cRef.collection('laporans').doc(r['id'].toString()), r);
-        }
-      });
-      weekly.forEach((_, reps) {
-        for (final r in reps) {
-          batch.set(cRef.collection('laporanMingguan').doc(r['id'].toString()), r);
-        }
-      });
-      await batch.commit();
-
-      _fillCache(demo.id, daily, _reportDocCache);
-      _fillCache(demo.id, weekly, _weeklyDocCache);
-      _contracts.add(demo);
-      notifyListeners(); // UI harus bangun ulang dengan objek demo yang baru
-    } catch (e) {
-      debugPrint('[ContractProvider] Refresh demo gagal: $e');
-    }
-    await _saveLocalBackup();
-  }
+  /// Demo data MT Haryono dinonaktifkan permanen.
+  Future<void> _refreshDemoData() async {}
 
   // ═════════════════════════════════════════════════════════════════════
   // HELPER STRUKTUR DATA
