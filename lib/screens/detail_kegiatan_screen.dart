@@ -2,6 +2,8 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -103,6 +105,26 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
   late List<_FolderData> _folders;
   bool _isExecutiveInfoExpanded = true;
   ContractModel? _syncedContractRef;
+
+  String _kegiatanBaseRoute(BuildContext context) {
+    try {
+      final path = GoRouterState.of(context).uri.path;
+      if (path.startsWith('/kegiatan/')) {
+        return '/kegiatan/${widget.contract.id}/${widget.kegiatanIndex}';
+      }
+    } catch (_) {}
+    return '/kontrak/${widget.contract.id}/kegiatan/${widget.kegiatanIndex}';
+  }
+
+  String _kegiatanParentRoute(BuildContext context) {
+    try {
+      final path = GoRouterState.of(context).uri.path;
+      if (path.startsWith('/kegiatan/')) {
+        return '/kegiatan';
+      }
+    } catch (_) {}
+    return '/kontrak/${widget.contract.id}';
+  }
 
   ContractModel _resolveLiveContract({bool listen = false}) {
     try {
@@ -1134,7 +1156,11 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                 );
               } catch (_) {}
               Navigator.pop(ctx);
-              Navigator.pop(context);
+              if (GoRouter.maybeOf(context) != null) {
+                goBackOrParent(context, _kegiatanParentRoute(context));
+              } else {
+                Navigator.pop(context);
+              }
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Kegiatan berhasil dihapus')),
               );
@@ -1369,13 +1395,7 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
-            }
-          },
+          onPressed: () => goBackOrParent(context, _kegiatanParentRoute(context)),
         ),
         title: const Text(
           'Detail Kegiatan',
@@ -1542,16 +1562,24 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                     if (folder.name.toLowerCase().contains('mingguan')) ...[
                       ElevatedButton.icon(
                         onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => DetailDataLaporanScreen(
-                                contract: _resolveLiveContract(listen: false),
-                                kegiatanIndex: widget.kegiatanIndex,
-                                initialTab: 1,
+                          final router = GoRouter.maybeOf(context);
+                          if (router != null) {
+                            router.go(
+                              '${_kegiatanBaseRoute(context)}/laporan?tab=1',
+                              extra: _resolveLiveContract(listen: false),
+                            );
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => DetailDataLaporanScreen(
+                                  contract: _resolveLiveContract(listen: false),
+                                  kegiatanIndex: widget.kegiatanIndex,
+                                  initialTab: 1,
+                                ),
                               ),
-                            ),
-                          );
+                            );
+                          }
                         },
                         icon: const Icon(Icons.analytics_outlined, size: 18),
                         label: const Text('Buka Data Ringkasan Mingguan'),
@@ -1566,16 +1594,24 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                     ] else if (folder.name.toLowerCase().contains('harian')) ...[
                       ElevatedButton.icon(
                         onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => DetailDataLaporanScreen(
-                                contract: _resolveLiveContract(listen: false),
-                                kegiatanIndex: widget.kegiatanIndex,
-                                initialTab: 0,
+                          final router = GoRouter.maybeOf(context);
+                          if (router != null) {
+                            router.go(
+                              '${_kegiatanBaseRoute(context)}/laporan?tab=0',
+                              extra: _resolveLiveContract(listen: false),
+                            );
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => DetailDataLaporanScreen(
+                                  contract: _resolveLiveContract(listen: false),
+                                  kegiatanIndex: widget.kegiatanIndex,
+                                  initialTab: 0,
+                                ),
                               ),
-                            ),
-                          );
+                            );
+                          }
                         },
                         icon: const Icon(Icons.calendar_today, size: 16),
                         label: const Text('Buka Data Buku Harian'),
@@ -2455,6 +2491,14 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 10),
                   ),
                   onPressed: () async {
+                    final router = GoRouter.maybeOf(context);
+                    if (router != null) {
+                      router.go(
+                        '${_kegiatanBaseRoute(context)}/rkk',
+                        extra: _resolveLiveContract(listen: false),
+                      );
+                      return;
+                    }
                     final changed = await Navigator.push<bool>(
                       context,
                       MaterialPageRoute(
@@ -2494,6 +2538,14 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                       elevation: 0,
                     ),
                     onPressed: () async {
+                      final router = GoRouter.maybeOf(context);
+                      if (router != null) {
+                        router.go(
+                          '${_kegiatanBaseRoute(context)}/addendum',
+                          extra: _resolveLiveContract(listen: false),
+                        );
+                        return;
+                      }
                       final changed = await Navigator.push<bool>(
                         context,
                         MaterialPageRoute(

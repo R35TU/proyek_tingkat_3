@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/kegiatan_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
@@ -384,7 +385,13 @@ class _KelolaAddendumScreenState extends State<KelolaAddendumScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0F172A), size: 18),
-          onPressed: () => Navigator.pop(context, _isModified),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context, _isModified);
+            } else {
+              goBackOrParent(context, '/kontrak/${widget.contract.id}/kegiatan/${widget.kegiatanIndex}');
+            }
+          },
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

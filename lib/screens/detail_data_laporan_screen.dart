@@ -1,6 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:tata_saka_app/utils/image_memory_cache.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
@@ -1839,29 +1841,13 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
   }
 
   Widget _buildSignatureImagePreview(String b64) {
-    if (b64.startsWith('http')) {
-      return Image.network(
-        b64,
-        fit: BoxFit.contain,
-        height: 34,
-        errorBuilder: (context, error, stackTrace) => const SizedBox(height: 20),
-      );
-    }
-    try {
-      String clean = b64;
-      if (clean.contains(',')) {
-        clean = clean.split(',').last;
-      }
-      final bytes = base64Decode(clean.trim());
-      return Image.memory(
-        bytes,
-        fit: BoxFit.contain,
-        height: 34,
-        errorBuilder: (context, error, stackTrace) => const SizedBox(height: 20),
-      );
-    } catch (_) {
-      return const SizedBox(height: 20);
-    }
+    return buildCachedImageWidget(
+      b64,
+      fit: BoxFit.contain,
+      height: 34,
+      cacheHeight: 108,
+      errorWidget: const SizedBox(height: 20),
+    );
   }
 
   Widget _buildDocSectionFoto(List<dynamic> fotoList) {
@@ -1893,7 +1879,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
             ? Stack(
                 fit: StackFit.expand,
                 children: [
-                  _buildPhotoWidget(foto, fit: BoxFit.cover),
+                  _buildPhotoWidget(foto, fit: BoxFit.cover, cacheWidth: 360),
                   Positioned(
                     bottom: 0,
                     left: 0,
@@ -1931,32 +1917,19 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
     );
   }
 
-  Widget _buildPhotoWidget(String b64, {BoxFit fit = BoxFit.cover}) {
-    if (b64.startsWith('http')) {
-      return Image.network(
-        b64,
-        fit: fit,
-        errorBuilder: (context, error, stackTrace) => const Center(
-          child: Icon(Icons.broken_image, size: 28, color: Colors.grey),
-        ),
-      );
-    }
-    try {
-      String clean = b64;
-      if (clean.contains(',')) {
-        clean = clean.split(',').last;
-      }
-      final bytes = base64Decode(clean.trim());
-      return Image.memory(
-        bytes,
-        fit: fit,
-        errorBuilder: (context, error, stackTrace) => const Center(
-          child: Icon(Icons.broken_image, size: 28, color: Colors.grey),
-        ),
-      );
-    } catch (_) {
-      return const Center(child: Icon(Icons.image_not_supported, color: Colors.grey));
-    }
+  Widget _buildPhotoWidget(
+    String b64, {
+    BoxFit fit = BoxFit.cover,
+    int? cacheWidth,
+  }) {
+    return buildCachedImageWidget(
+      b64,
+      fit: fit,
+      cacheWidth: cacheWidth,
+      errorWidget: const Center(
+        child: Icon(Icons.broken_image, size: 28, color: Colors.grey),
+      ),
+    );
   }
 
   void _showDocPhotoDialog(int idx, String foto) {
@@ -1996,7 +1969,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
                 maxWidth: 650,
               ),
               child: isBase64
-                  ? _buildPhotoWidget(foto, fit: BoxFit.contain)
+                  ? _buildPhotoWidget(foto, fit: BoxFit.contain, cacheWidth: 1200)
                   : Padding(
                       padding: const EdgeInsets.all(40),
                       child: Column(
@@ -3407,13 +3380,7 @@ class _DetailDataLaporanScreenState extends State<DetailDataLaporanScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
-            }
-          },
+          onPressed: () => goBackOrParent(context, '/laporan/data'),
         ),
         title: const Text(
           'Data Laporan',

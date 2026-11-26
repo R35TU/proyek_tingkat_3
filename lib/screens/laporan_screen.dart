@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/screens/data_laporan_screen.dart';
 import 'package:tata_saka_app/screens/buat_laporan_screen.dart';
@@ -32,12 +34,17 @@ class LaporanScreen extends StatelessWidget {
             iconBgColor: AppColors.blueLight,
             iconColor: AppColors.primaryBlue,
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const DataLaporanScreen(),
-                ),
-              );
+              final router = GoRouter.maybeOf(context);
+              if (router != null) {
+                router.go('/laporan/data');
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const DataLaporanScreen(),
+                  ),
+                );
+              }
             },
           ),
           if (!isDinas) ...[
@@ -50,12 +57,17 @@ class LaporanScreen extends StatelessWidget {
             iconBgColor: const Color(0xFFE6F4EA),
             iconColor: AppColors.successGreen,
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const BuatLaporanScreen(),
-                ),
-              );
+              final router = GoRouter.maybeOf(context);
+              if (router != null) {
+                router.go('/laporan/harian');
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const BuatLaporanScreen(),
+                  ),
+                );
+              }
             },
           ),
           const SizedBox(height: 16),
@@ -67,12 +79,17 @@ class LaporanScreen extends StatelessWidget {
             iconBgColor: const Color(0xFFFEF3C7),
             iconColor: const Color(0xFFD97706),
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const LaporanMingguanScreen(),
-                ),
-              );
+              final router = GoRouter.maybeOf(context);
+              if (router != null) {
+                router.go('/laporan/mingguan');
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const LaporanMingguanScreen(),
+                  ),
+                );
+              }
             },
           ),
           const SizedBox(height: 16),
@@ -84,12 +101,17 @@ class LaporanScreen extends StatelessWidget {
             iconBgColor: const Color(0xFFEDE9FE),
             iconColor: const Color(0xFF7C3AED),
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const LaporanBulananScreen(),
-                ),
-              );
+              final router = GoRouter.maybeOf(context);
+              if (router != null) {
+                router.go('/laporan/bulanan');
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const LaporanBulananScreen(),
+                  ),
+                );
+              }
             },
           ),
           ] else ...[
@@ -120,17 +142,7 @@ class LaporanScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/main',
-                (route) => false,
-              );
-            }
-          },
+          onPressed: () => goBackOrParent(context, '/dashboard'),
         ),
         title: const Text(
           'Laporan Proyek',

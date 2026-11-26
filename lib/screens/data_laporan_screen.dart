@@ -1,8 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/screens/detail_data_laporan_screen.dart';
@@ -82,15 +84,23 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
     }
 
     if (visibleIndices.length == 1) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DetailDataLaporanScreen(
-            contract: contract,
-            kegiatanIndex: visibleIndices.first,
+      final router = GoRouter.maybeOf(context);
+      if (router != null) {
+        router.go(
+          '/laporan/data/${contract.id}/${visibleIndices.first}',
+          extra: contract,
+        );
+      } else {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DetailDataLaporanScreen(
+              contract: contract,
+              kegiatanIndex: visibleIndices.first,
+            ),
           ),
-        ),
-      );
+        );
+      }
       return;
     }
 
@@ -204,15 +214,23 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
                         ),
                         onTap: () {
                           Navigator.pop(ctx);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => DetailDataLaporanScreen(
-                                contract: contract,
-                                kegiatanIndex: originalIndex,
+                          final router = GoRouter.maybeOf(context);
+                          if (router != null) {
+                            router.go(
+                              '/laporan/data/${contract.id}/$originalIndex',
+                              extra: contract,
+                            );
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => DetailDataLaporanScreen(
+                                  contract: contract,
+                                  kegiatanIndex: originalIndex,
+                                ),
                               ),
-                            ),
-                          );
+                            );
+                          }
                         },
                       );
                     },
@@ -382,17 +400,7 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/main',
-                (route) => false,
-              );
-            }
-          },
+          onPressed: () => goBackOrParent(context, '/laporan'),
         ),
         title: const Text(
           'Data Laporan',

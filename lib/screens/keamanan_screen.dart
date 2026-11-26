@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 
 class KeamananScreen extends StatefulWidget {
   final bool isEmbedded;
@@ -276,13 +277,7 @@ class _KeamananScreenState extends State<KeamananScreen> {
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
-            }
-          },
+          onPressed: () => goBackOrParent(context, '/akun'),
         ),
         title: const Text(
           'Keamanan',

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemNavigator;
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/screens/dashboard_screen.dart';
@@ -103,11 +104,21 @@ class _MainLayoutState extends State<MainLayout> {
       final userProf = context.read<UserProfileProvider>();
       if (!userProf.isInitialized) return;
       if (!userProf.isAuthenticated) {
-        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+        final router = GoRouter.maybeOf(context);
+        if (router != null) {
+          Router.neglect(context, () => router.go('/login'));
+        } else {
+          Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+        }
         return;
       }
       if (userProf.role.toLowerCase() == 'admin') {
-        Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);
+        final router = GoRouter.maybeOf(context);
+        if (router != null) {
+          Router.neglect(context, () => router.go('/admin'));
+        } else {
+          Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);
+        }
       }
     });
   }

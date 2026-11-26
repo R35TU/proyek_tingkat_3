@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/kegiatan_model.dart';
 import 'package:tata_saka_app/models/monthly_report_model.dart';
@@ -843,73 +844,73 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
     ];
 
     final mainBody = SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Project Selector Card
-            _buildKegiatanSelectorCard(kegModel, contracts),
-            const SizedBox(height: 16),
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Project Selector Card
+          _buildKegiatanSelectorCard(kegModel, contracts),
+          const SizedBox(height: 16),
 
-            // Section Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Rekapitulasi Periode 4 Mingguan',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textDark,
-                        ),
+          // Section Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Rekapitulasi Periode 4 Mingguan',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textDark,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${monthlyReports.length} Periode Bulan Tersedia',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textLight),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.blueLight,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    'Otomatis Kumulatif',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primaryBlue,
                     ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${monthlyReports.length} Periode Bulan Tersedia',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textLight,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.blueLight,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Otomatis Kumulatif',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryBlue,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
 
-            // List of Month Cards
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: monthlyReports.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final report = monthlyReports[index];
-                return _buildMonthCard(report);
-              },
-            ),
-            const SizedBox(height: 24),
+          // List of Month Cards (tanpa nested shrinkWrap ListView)
+          for (int i = 0; i < monthlyReports.length; i++) ...[
+            if (i > 0) const SizedBox(height: 12),
+            _buildMonthCard(monthlyReports[i]),
           ],
-        ),
-      );
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
 
     if (widget.isEmbedded) {
       return mainBody;
@@ -941,13 +942,7 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
-            }
-          },
+          onPressed: () => goBackOrParent(context, '/laporan'),
         ),
         actions: headerActions,
       ),

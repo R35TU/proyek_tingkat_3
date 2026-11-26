@@ -246,7 +246,12 @@ class _SettingScreenState extends State<SettingScreen> {
               final userProf = context.read<UserProfileProvider>();
               await userProf.logout();
               if (!mounted) return;
-              context.go('/login');
+              final router = GoRouter.maybeOf(context);
+              if (router != null) {
+                Router.neglect(context, () => router.go('/login'));
+              } else {
+                Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+              }
             },
             child: const Text('Keluar'),
           ),
@@ -267,10 +272,15 @@ class _SettingScreenState extends State<SettingScreen> {
             icon: Icon(Icons.edit_outlined, color: isDesktop ? Colors.white : const Color(0xFF2563EB)),
             tooltip: 'Edit Profil',
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const EditProfilScreen()),
-              );
+              final router = GoRouter.maybeOf(context);
+              if (router != null) {
+                router.go('/akun/profil');
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EditProfilScreen()),
+                );
+              }
             },
           ),
           const SizedBox(width: 4),
@@ -460,10 +470,15 @@ class _SettingScreenState extends State<SettingScreen> {
                         userProf.tr('pengaturan'),
                         userProf.tr('pengaturan_sub'),
                         onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const PengaturanScreen()),
-                          );
+                          final router = GoRouter.maybeOf(context);
+                          if (router != null) {
+                            router.go('/akun/pengaturan');
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const PengaturanScreen()),
+                            );
+                          }
                         },
                       ),
                       Divider(height: 1, color: AppColors.getBorder(context)),
@@ -472,10 +487,15 @@ class _SettingScreenState extends State<SettingScreen> {
                         userProf.tr('keamanan'),
                         userProf.tr('keamanan_sub'),
                         onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const KeamananScreen()),
-                          );
+                          final router = GoRouter.maybeOf(context);
+                          if (router != null) {
+                            router.go('/akun/keamanan');
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const KeamananScreen()),
+                            );
+                          }
                         },
                       ),
                       Divider(height: 1, color: AppColors.getBorder(context)),
@@ -537,10 +557,15 @@ class _SettingScreenState extends State<SettingScreen> {
   Widget _buildContractCard(ContractModel c) {
     return InkWell(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => DetailKontrakScreen(contract: c)),
-        );
+        final router = GoRouter.maybeOf(context);
+        if (router != null) {
+          router.go('/kontrak/${c.id}?tab=0', extra: c);
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => DetailKontrakScreen(contract: c)),
+          );
+        }
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(

@@ -111,12 +111,17 @@ class _KontrakScreenState extends State<KontrakScreen> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const TambahKontrakScreen(),
-                      ),
-                    );
+                    final router = GoRouter.maybeOf(context);
+                    if (router != null) {
+                      router.go('/kontrak/tambah');
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TambahKontrakScreen(),
+                        ),
+                      );
+                    }
                   },
                   icon: const Icon(Icons.add),
                   label: const Text('Tambah Kontrak Baru'),
@@ -244,15 +249,23 @@ class _KontrakScreenState extends State<KontrakScreen> {
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => DetailKegiatanScreen(
-                      contract: parentContract,
-                      kegiatanIndex: kIndex,
+                final router = GoRouter.maybeOf(context);
+                if (router != null) {
+                  router.go(
+                    '/kegiatan/${parentContract.id}/$kIndex',
+                    extra: parentContract,
+                  );
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => DetailKegiatanScreen(
+                        contract: parentContract,
+                        kegiatanIndex: kIndex,
+                      ),
                     ),
-                  ),
-                );
+                  );
+                }
               },
               child: Padding(
                 padding: const EdgeInsets.all(18),
@@ -508,12 +521,17 @@ class _KontrakScreenState extends State<KontrakScreen> {
                 title: const Text('Edit Kontrak', style: TextStyle(fontWeight: FontWeight.w600)),
                 onTap: () {
                   Navigator.pop(ctx);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => TambahKontrakScreen(contractToEdit: contract),
-                    ),
-                  );
+                  final router = GoRouter.maybeOf(context);
+                  if (router != null) {
+                    router.go('/kontrak/${contract.id}/edit', extra: contract);
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TambahKontrakScreen(contractToEdit: contract),
+                      ),
+                    );
+                  }
                 },
               ),
               ListTile(

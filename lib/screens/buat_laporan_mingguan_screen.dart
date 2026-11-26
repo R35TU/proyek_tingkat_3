@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
@@ -915,7 +916,11 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
       ),
     );
 
-    Navigator.pop(context, true);
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context, true);
+    } else {
+      goBackOrParent(context, '/laporan');
+    }
   }
 
   @override
@@ -1083,13 +1088,7 @@ class _BuatLaporanMingguanScreenState extends State<BuatLaporanMingguanScreen> w
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF111827)),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
-            }
-          },
+          onPressed: () => goBackOrParent(context, '/laporan'),
         ),
         title: Text(
           pageTitle,

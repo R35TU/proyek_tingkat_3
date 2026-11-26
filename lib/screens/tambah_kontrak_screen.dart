@@ -4,6 +4,7 @@ import 'package:tata_saka_app/models/weekly_report_model.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/utils/execution_period_helper.dart';
@@ -1010,7 +1011,11 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
                     );
                   }
                   if (!context.mounted) return;
-                  Navigator.pop(context, true);
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context, true);
+                  } else {
+                    goBackOrParent(context, '/kontrak');
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryBlue,
@@ -1051,7 +1056,7 @@ class _TambahKontrakScreenState extends State<TambahKontrakScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => goBackOrParent(context, '/kontrak'),
         ),
         title: Text(
           pageTitle,

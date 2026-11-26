@@ -80,18 +80,16 @@ class _AdminPageState extends State<AdminPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (!widget.bypassAuthCheck && AuthService.currentUser == null) {
-        context.go('/login');
-        return;
-      }
-      // Hanya role Admin yang boleh mengelola akun — role lain ditolak.
+      if (!mounted || widget.bypassAuthCheck) return;
       try {
-        final role = Provider.of<UserProfileProvider>(context, listen: false)
-            .role
-            .toLowerCase();
-        if (role != 'admin') {
-          context.go('/dashboard');
+        final userProf = Provider.of<UserProfileProvider>(context, listen: false);
+        if (!userProf.isInitialized) return;
+        if (!userProf.isAuthenticated) {
+          Router.neglect(context, () => context.go('/login'));
+          return;
+        }
+        if (userProf.role.toLowerCase() != 'admin') {
+          Router.neglect(context, () => context.go('/dashboard'));
         }
       } catch (_) {}
     });
@@ -564,7 +562,7 @@ class _AdminPageState extends State<AdminPage> {
               // mengalihkan /login kembali ke /admin.
               await userProf.logout();
               if (!mounted) return;
-              context.go('/login');
+              Router.neglect(context, () => context.go('/login'));
             },
             child: const Text('Keluar'),
           ),
@@ -575,6 +573,20 @@ class _AdminPageState extends State<AdminPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.bypassAuthCheck) {
+      try {
+        final userProf = Provider.of<UserProfileProvider>(context);
+        if (!userProf.isInitialized ||
+            !userProf.isAuthenticated ||
+            userProf.role.toLowerCase() != 'admin') {
+          return const Scaffold(
+            backgroundColor: Colors.white,
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+      } catch (_) {}
+    }
+
     final isCompact = MediaQuery.sizeOf(context).width < 700;
 
     return PopScope(
@@ -633,11 +645,18 @@ class _AdminPageState extends State<AdminPage> {
             child: Tooltip(
               message: 'Panduan & FAQ Admin',
               child: IconButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const PanduanFaqScreen(role: 'admin'),
-                  ),
-                ),
+                onPressed: () {
+                  final router = GoRouter.maybeOf(context);
+                  if (router != null) {
+                    router.go('/admin/panduan');
+                  } else {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const PanduanFaqScreen(role: 'admin'),
+                      ),
+                    );
+                  }
+                },
                 icon: const Icon(Icons.help_outline_rounded, size: 24),
                 color: Colors.white,
               ),

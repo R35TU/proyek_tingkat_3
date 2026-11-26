@@ -161,15 +161,18 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
       return;
     }
     final targetRoute = WebDashboardLayout.routeForMenu(menuKey);
-    try {
-      final current = GoRouterState.of(context).uri.toString();
-      if (current != targetRoute) {
-        context.push(targetRoute);
+    final router = GoRouter.maybeOf(context);
+    if (router != null) {
+      try {
+        final current = GoRouterState.of(context).uri.toString();
+        if (current != targetRoute) {
+          router.go(targetRoute);
+        }
+      } catch (_) {
+        router.go(targetRoute);
       }
-    } catch (_) {
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
+    } else if (Navigator.canPop(context)) {
+      Navigator.pop(context);
     }
   }
 
@@ -453,15 +456,17 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                 onTap:
                     widget.onBack ??
                     () {
+                      final router = GoRouter.maybeOf(context);
+                      if (router != null) {
+                        if (router.canPop()) {
+                          router.pop();
+                        } else {
+                          router.go('/dashboard');
+                        }
+                        return;
+                      }
                       if (Navigator.canPop(context)) {
                         Navigator.pop(context);
-                      } else {
-                        try {
-                          Router.neglect(
-                            context,
-                            () => context.go('/dashboard'),
-                          );
-                        } catch (_) {}
                       }
                     },
                 child: Tooltip(
@@ -632,6 +637,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                         child: Image.asset(
                           'assets/images/logoRev.png',
                           fit: BoxFit.contain,
+                          cacheWidth: 144,
                           errorBuilder: (_, __, ___) => const Icon(
                             Icons.business,
                             color: Color(0xFF1E293B),
@@ -664,6 +670,7 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                           child: Image.asset(
                             'assets/images/logoRev.png',
                             fit: BoxFit.contain,
+                            cacheWidth: 144,
                             errorBuilder: (_, __, ___) => const Icon(
                               Icons.business,
                               color: Color(0xFF1E293B),
