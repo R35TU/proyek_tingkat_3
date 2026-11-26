@@ -72,10 +72,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _onWebMenuSelected(String menuKey) {
-    if (kIsWeb) {
-      replaceWebUrl('/#/$menuKey');
-    }
     if (_activeWebMenu == menuKey) return;
+    if (kIsWeb) {
+      pushWebUrl('/#/$menuKey');
+    }
     setState(() {
       _webMenuHistory.add(menuKey);
       _activeWebMenu = menuKey;
@@ -290,6 +290,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     WebDashboardLayout.activeWebMenu.addListener(_onWebDashboardMenuChanged);
+
+    // Listen browser Back/Forward button
+    listenPopState(_onBrowserPopState);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         try {
@@ -300,12 +304,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  /// Called when user presses browser Back/Forward button.
+  void _onBrowserPopState(String route) {
+    if (!mounted) return;
+    final menu = _normalizeMenuFromUrl(route) ?? 'dashboard';
+    if (_activeWebMenu != menu) {
+      setState(() {
+        _activeWebMenu = menu;
+        WebDashboardLayout.activeWebMenu.value = menu;
+        // Rebuild history to match.
+        if (!_webMenuHistory.contains(menu)) {
+          _webMenuHistory.add(menu);
+        }
+      });
+    }
+  }
+
   void _onWebDashboardMenuChanged() {
     final val = WebDashboardLayout.activeWebMenu.value;
-    if (kIsWeb) {
-      replaceWebUrl('/#/$val');
-    }
     if (mounted && _activeWebMenu != val) {
+      if (kIsWeb) {
+        pushWebUrl('/#/$val');
+      }
       setState(() {
         if (!_webMenuHistory.contains(val)) {
           _webMenuHistory.add(val);
@@ -366,6 +386,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void dispose() {
     WebDashboardLayout.activeWebMenu.removeListener(_onWebDashboardMenuChanged);
+    disposePopState();
     _timer?.cancel();
     _pageController.dispose();
     super.dispose();

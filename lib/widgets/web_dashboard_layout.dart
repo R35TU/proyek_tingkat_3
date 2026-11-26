@@ -80,7 +80,7 @@ class WebDashboardLayout extends StatefulWidget {
 class _WebDashboardLayoutState extends State<WebDashboardLayout> {
   void _handleMenuClick(String menuKey) {
     if (kIsWeb) {
-      replaceWebUrl('/#/$menuKey');
+      pushWebUrl('/#/$menuKey');
     }
     WebDashboardLayout.activeWebMenu.value = menuKey;
     if (widget.onMenuSelected != null) {

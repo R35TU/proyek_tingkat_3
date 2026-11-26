@@ -394,7 +394,7 @@ class _KontrakScreenState extends State<KontrakScreen> {
               borderRadius: BorderRadius.circular(16),
               onTap: () {
                 if (kIsWeb) {
-                  replaceWebUrl('/#/detail-kontrak?id=${contract.id}&tab=0');
+                  pushWebUrl('/#/detail-kontrak?id=${contract.id}&tab=0');
                 }
                 Navigator.push(
                   context,
