@@ -35,15 +35,30 @@ class LaporanMingguanScreen extends StatefulWidget {
   State<LaporanMingguanScreen> createState() => _LaporanMingguanScreenState();
 }
 
-class _LaporanMingguanScreenState extends State<LaporanMingguanScreen> {
+class _LaporanMingguanScreenState extends State<LaporanMingguanScreen>
+    with WidgetsBindingObserver {
   ContractModel? _selectedContract;
   int _selectedKegiatanIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _selectedContract = widget.initialContract;
     _selectedKegiatanIndex = widget.initialKegiatanIndex;
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      setState(() {});
+    }
   }
 
   void _showPilihKegiatanSheet(
@@ -339,7 +354,7 @@ class _LaporanMingguanScreenState extends State<LaporanMingguanScreen> {
       enableDrag: false,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        height: MediaQuery.of(context).size.height * 0.94,
+        height: MediaQuery.of(ctx).size.height * 0.94,
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -663,6 +678,10 @@ class _LaporanMingguanScreenState extends State<LaporanMingguanScreen> {
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+            onPressed: () => goBackOrParent(context, '/laporan'),
+          ),
           title: const Text('Laporan Mingguan'),
           backgroundColor: Colors.white,
           foregroundColor: AppColors.textDark,
@@ -701,6 +720,10 @@ class _LaporanMingguanScreenState extends State<LaporanMingguanScreen> {
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+            onPressed: () => goBackOrParent(context, '/laporan'),
+          ),
           title: const Text('Laporan Mingguan'),
           backgroundColor: Colors.white,
           foregroundColor: AppColors.textDark,

@@ -157,7 +157,7 @@ class ExecutionPeriodHelper {
     final s = raw?.toString().trim() ?? '';
     if (s.isEmpty) return null;
     final dt = DateTime.tryParse(s) ?? WeeklyReportModel.parseIndonesianDate(s);
-    return dt != null ? _dayOnly(dt) : null;
+    return dt != null ? _dayOnly(dt.toLocal()) : null;
   }
 
   static int? _extractDays(dynamic raw) {
@@ -348,7 +348,7 @@ class ExecutionPeriodHelper {
     DateTime? referenceDate,
   }) {
     final period = resolveExecutionPeriod(kegMap, contract: contract);
-    final now = referenceDate ?? DateTime.now();
+    final now = (referenceDate ?? DateTime.now()).toLocal();
     final today = _dayOnly(now);
 
     final kegNilai = kegMap['nilaiKontrak']?.toString().trim() ?? '';
@@ -445,16 +445,15 @@ class ExecutionPeriodHelper {
           statusDetail = 'Sedang berlangsung';
         }
       } else {
+        // Setelah tanggal akhir periode terlewati, status otomatis menjadi Completed.
+        status = WeeklyPeriodStatus.completed;
+        statusLabel = 'Completed';
         if (hasSaved) {
-          status = WeeklyPeriodStatus.completed;
-          statusLabel = 'Completed';
           statusDetail = 'Periode selesai & laporan mingguan tersimpan';
+        } else if (hasDailyInWeek) {
+          statusDetail = 'Periode berakhir • Terdapat realisasi harian';
         } else {
-          status = WeeklyPeriodStatus.onProgress;
-          statusLabel = 'On Progress';
-          statusDetail = hasDailyInWeek
-              ? 'Periode berakhir • Menunggu pelengkapan rencana/pengesahan'
-              : 'Periode berakhir • Belum dilengkapi';
+          statusDetail = 'Periode telah berakhir';
         }
       }
 

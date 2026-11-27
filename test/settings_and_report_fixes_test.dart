@@ -266,9 +266,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Data Laporan'), findsOneWidget);
-      expect(find.text('Harian'), findsOneWidget);
-      expect(find.text('Mingguan'), findsOneWidget);
+      expect(find.text('Laporan Harian'), findsOneWidget);
+      expect(find.text('Data Laporan'), findsNothing);
+      expect(find.text('Mingguan'), findsNothing);
 
       // Check for green dot indicators (Container with Color(0xFF10B981))
       final greenDots = find.byWidgetPredicate((widget) {

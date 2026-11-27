@@ -29,17 +29,97 @@ import 'package:tata_saka_app/screens/tambah_kontrak_screen.dart';
 import 'package:tata_saka_app/screens/timeline_screen.dart';
 import 'package:tata_saka_app/widgets/app_shell_layout.dart';
 
+final List<String> _shellRouteHistory = <String>[];
+
+bool _isShellHistoryRoute(String location) {
+  final path = Uri.tryParse(location)?.path ?? location;
+  return path == '/dashboard' ||
+      path == '/kontrak' ||
+      path == '/kegiatan' ||
+      path == '/laporan' ||
+      path == '/laporan/harian' ||
+      path == '/laporan/mingguan' ||
+      path == '/laporan/bulanan' ||
+      path == '/laporan/data' ||
+      path == '/timeline' ||
+      path == '/akun' ||
+      path == '/akun/profil' ||
+      path == '/akun/keamanan' ||
+      path == '/akun/pengaturan' ||
+      path == '/panduan';
+}
+
+/// Mencatat riwayat rute shell tingkat atas agar tombol Back mobile
+/// dapat menelusuri riwayat halaman sebelumnya secara berurutan.
+void recordShellRouteHistory(String location) {
+  final normalized = location.trim();
+  if (normalized.isEmpty || !_isShellHistoryRoute(normalized)) return;
+  if (_shellRouteHistory.isNotEmpty && _shellRouteHistory.last == normalized) {
+    return;
+  }
+  _shellRouteHistory.add(normalized);
+  if (_shellRouteHistory.length > 30) {
+    _shellRouteHistory.removeAt(0);
+  }
+}
+
+/// Menghapus riwayat rute shell (misalnya saat logout atau reset sesi).
+void resetShellRouteHistory() {
+  _shellRouteHistory.clear();
+}
+
+String _currentRouterLocation(GoRouter router) {
+  try {
+    return router.routerDelegate.currentConfiguration.uri.toString();
+  } catch (_) {
+    return '';
+  }
+}
+
 /// Navigasi antar-menu dengan menjaga URL dan riwayat browser tetap sinkron.
 void goTopLevelRoute(BuildContext context, String location) {
   final router = GoRouter.maybeOf(context);
   if (router == null) return;
-  try {
-    final current = GoRouterState.of(context).uri.toString();
-    if (current != location) {
-      router.go(location);
+  final current = _currentRouterLocation(router);
+  if (current != location) {
+    if (current.isNotEmpty) {
+      recordShellRouteHistory(current);
     }
-  } catch (_) {
+    recordShellRouteHistory(location);
     router.go(location);
+  }
+}
+
+/// Kembali ke halaman sebelumnya sesuai riwayat navigasi di dalam shell.
+void goBackWithShellHistory(
+  BuildContext context, {
+  String fallback = '/dashboard',
+}) {
+  final router = GoRouter.maybeOf(context);
+  if (router != null) {
+    if (router.canPop()) {
+      router.pop();
+      return;
+    }
+    final current = _currentRouterLocation(router);
+    while (_shellRouteHistory.isNotEmpty &&
+        _shellRouteHistory.last == current) {
+      _shellRouteHistory.removeLast();
+    }
+    if (_shellRouteHistory.isNotEmpty) {
+      final previous = _shellRouteHistory.last;
+      if (previous.isNotEmpty && previous != current) {
+        router.go(previous);
+        return;
+      }
+    }
+    if (current != fallback) {
+      router.go(fallback);
+    }
+    return;
+  }
+  if (Navigator.canPop(context)) {
+    Navigator.pop(context);
   }
 }
 
@@ -97,6 +177,7 @@ GoRouter createAppRouter(
       const publicPaths = {'/', '/landing', '/login', '/panduan-umum'};
 
       if (!isAuth) {
+        resetShellRouteHistory();
         if (publicPaths.contains(loc)) return null;
         return '/login';
       }
@@ -127,6 +208,9 @@ GoRouter createAppRouter(
       }
       if (loc == '/data_laporan' || loc == '/data-laporan') {
         return '/laporan/data';
+      }
+      if (loc == '/buat_laporan' || loc == '/buat-laporan') {
+        return '/laporan/harian';
       }
       if (loc == '/laporan_harian' || loc == '/laporan-harian') {
         return '/laporan/harian';
@@ -179,21 +263,26 @@ GoRouter createAppRouter(
       ),
       ShellRoute(
         navigatorKey: shellNavigatorKey,
-        builder: (context, state, child) => AppShellLayout(
-          routerState: state,
-          child: child,
-        ),
+        builder: (context, state, child) {
+          recordShellRouteHistory(state.uri.toString());
+          return AppShellLayout(
+            routerState: state,
+            child: child,
+          );
+        },
         routes: [
           GoRoute(
             path: '/dashboard',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: DashboardScreen(),
+            pageBuilder: (context, state) => NoTransitionPage(
+              key: state.pageKey,
+              child: const DashboardScreen(),
             ),
           ),
           GoRoute(
             path: '/kontrak',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: KontrakScreen(),
+            pageBuilder: (context, state) => NoTransitionPage(
+              key: state.pageKey,
+              child: const KontrakScreen(),
             ),
             routes: [
               GoRoute(
@@ -325,8 +414,9 @@ GoRouter createAppRouter(
           ),
           GoRoute(
             path: '/kegiatan',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: KontrakScreen(),
+            pageBuilder: (context, state) => NoTransitionPage(
+              key: state.pageKey,
+              child: const KontrakScreen(),
             ),
             routes: [
               GoRoute(
@@ -419,8 +509,9 @@ GoRouter createAppRouter(
           ),
           GoRoute(
             path: '/laporan',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: LaporanScreen(),
+            pageBuilder: (context, state) => NoTransitionPage(
+              key: state.pageKey,
+              child: const LaporanScreen(),
             ),
             routes: [
               GoRoute(
@@ -459,7 +550,22 @@ GoRouter createAppRouter(
               ),
               GoRoute(
                 path: 'mingguan',
-                builder: (context, state) => const LaporanMingguanScreen(),
+                builder: (context, state) {
+                  if (state.extra is ContractModel) {
+                    return LaporanMingguanScreen(
+                      initialContract: state.extra as ContractModel,
+                    );
+                  }
+                  if (state.extra is Map) {
+                    final extraMap = state.extra as Map;
+                    return LaporanMingguanScreen(
+                      initialContract: extraMap['contract'] as ContractModel?,
+                      initialKegiatanIndex:
+                          (extraMap['kegiatanIndex'] as int?) ?? 0,
+                    );
+                  }
+                  return const LaporanMingguanScreen();
+                },
               ),
               GoRoute(
                 path: 'bulanan',
@@ -469,14 +575,16 @@ GoRouter createAppRouter(
           ),
           GoRoute(
             path: '/timeline',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: TimelineScreen(),
+            pageBuilder: (context, state) => NoTransitionPage(
+              key: state.pageKey,
+              child: const TimelineScreen(),
             ),
           ),
           GoRoute(
             path: '/akun',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: SettingScreen(),
+            pageBuilder: (context, state) => NoTransitionPage(
+              key: state.pageKey,
+              child: const SettingScreen(),
             ),
             routes: [
               GoRoute(
@@ -496,6 +604,7 @@ GoRouter createAppRouter(
           GoRoute(
             path: '/panduan',
             pageBuilder: (context, state) => NoTransitionPage(
+              key: state.pageKey,
               child: PanduanFaqScreen(
                 role: userProf.isKontraktor
                     ? 'kontraktor'

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 
 /// Langkah panduan: langkah bernomor, sub-bullet, atau sub-heading (A./B./C.).
 class _GuideStep {
@@ -234,14 +235,14 @@ class PanduanFaqScreen extends StatelessWidget {
         'Klik Buka > pada periode bulan yang berstatus Selesai untuk melihat '
         'detail rekapitulasi bulanan.',
       ),
-      _GuideStep('D. Mengelola Data Laporan', isHeading: true),
+      _GuideStep('D. Mengelola Laporan Harian', isHeading: true),
       _GuideStep(
-        'Pilih menu Data Laporan, lalu klik tombol Laporan > pada kegiatan '
-        'yang ingin diperiksa.',
+        'Pilih menu Laporan Harian pada sidebar atau kartu Laporan Harian, '
+        'lalu klik tombol Laporan > pada kegiatan yang ingin diperiksa.',
       ),
       _GuideStep(
-        'Tab Harian: gunakan navigasi kalender mingguan untuk memilih '
-        'tanggal tertentu. Pada kartu laporan yang tersedia, Anda dapat:',
+        'Gunakan navigasi kalender mingguan untuk memilih '
+        'tanggal tertentu. Pada kartu laporan harian yang tersedia, Anda dapat:',
       ),
       _GuideStep(
         'Klik Buka & Lihat Dokumen Laporan untuk meninjau lembar Buku Harian '
@@ -341,8 +342,9 @@ class PanduanFaqScreen extends StatelessWidget {
         'Lihat Detail Kegiatan >.',
       ),
       _GuideStep(
-        'Menu Navigasi (Sidebar Kiri): Dashboard, Pelaporan (Data Laporan, '
-        'Laporan Harian), Histori (Timeline & Histori), Akun & Pengaturan '
+        'Menu Navigasi (Sidebar Kiri): Dashboard, Pelaporan (Laporan, '
+        'Buat Laporan, Laporan Harian, Laporan Mingguan, Laporan Bulanan), '
+        'Histori (Timeline & Histori), Akun & Pengaturan '
         '(Pengaturan Akun, Keamanan & Sandi, Edit Profil), dan Keluar / '
         'Logout.',
       ),
@@ -369,14 +371,14 @@ class PanduanFaqScreen extends StatelessWidget {
         isSub: true,
       ),
       _GuideStep(
-        'Memeriksa Data Laporan: klik menu Data Laporan pada sidebar kiri.',
+        'Memeriksa Laporan Harian: klik menu Laporan Harian pada sidebar kiri.',
       ),
       _GuideStep(
         'Gunakan kolom pencarian Cari Proyek atau Kegiatan.. bila diperlukan.',
       ),
       _GuideStep(
         'Klik tombol Laporan > di sisi kanan item kegiatan untuk membuka '
-        'arsip laporan harian maupun mingguan pada kegiatan tersebut.',
+        'arsip laporan harian pada kegiatan tersebut.',
       ),
     ]),
     _GuideSection('Membuat Laporan Harian (Buku Harian Standar)', [
@@ -583,7 +585,7 @@ class PanduanFaqScreen extends StatelessWidget {
       'Mengapa Realisasi Fisik dan Deviasi pada Laporan Mingguan tidak sesuai?',
       'Nilai Realisasi Fisik dan Deviasi (+/-) dihitung otomatis berdasarkan '
       'akumulasi volume laporan harian. Periksa kembali laporan harian pada '
-      'periode terkait melalui menu Data Laporan.',
+      'periode terkait melalui menu Laporan Harian.',
     ),
   ];
 
@@ -591,8 +593,8 @@ class PanduanFaqScreen extends StatelessWidget {
   static const List<_FaqItem> _faqKontraktor = [
     _FaqItem(
       'Apakah laporan yang sudah tersimpan masih bisa diedit?',
-      'Bisa. Buka menu Data Laporan > Laporan > pilih tab Harian atau '
-      'Mingguan, lalu gunakan ikon Pensil (edit cepat) atau tombol Buka & '
+      'Bisa. Buka menu Laporan Harian > Laporan > pilih tanggal terkait, '
+      'lalu gunakan ikon Pensil (edit cepat) atau tombol Buka & '
       'Lihat Dokumen > Edit. Laporan juga dapat diunduh dalam format PDF.',
     ),
   ];
@@ -724,7 +726,7 @@ class PanduanFaqScreen extends StatelessWidget {
               } else if (path.startsWith('/admin')) {
                 router.go('/admin');
               } else {
-                router.go('/dashboard');
+                goBackWithShellHistory(context, fallback: '/dashboard');
               }
             }
           }

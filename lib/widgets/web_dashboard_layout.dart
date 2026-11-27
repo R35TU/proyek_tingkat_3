@@ -6,6 +6,33 @@ import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 
+/// Deskripsi satu item menu navigasi yang digunakan bersama oleh Sidebar Web
+/// dan Drawer Mobile agar struktur, label, dan batasan role selalu sinkron.
+class SidebarMenuEntry {
+  final String key;
+  final String label;
+  final IconData webIcon;
+  final IconData mobileIcon;
+
+  const SidebarMenuEntry({
+    required this.key,
+    required this.label,
+    required this.webIcon,
+    required this.mobileIcon,
+  });
+}
+
+/// Kelompok kategori menu sidebar beserta daftar item di dalamnya.
+class SidebarMenuSection {
+  final String title;
+  final List<SidebarMenuEntry> items;
+
+  const SidebarMenuSection({
+    required this.title,
+    required this.items,
+  });
+}
+
 /// Penanda bahwa subtree sudah berada di dalam `ShellRoute` WebDashboardLayout,
 /// mencegah double sidebar jika child screen masih memanggil WebDashboardLayout.
 class WebShellScope extends InheritedWidget {
@@ -53,8 +80,8 @@ class WebDashboardLayout extends StatefulWidget {
     final clean = path.split('?').first;
     if (clean.startsWith('/kontrak')) return 'kontrak';
     if (clean.startsWith('/kegiatan')) return 'kegiatan';
-    if (clean.startsWith('/laporan/data')) return 'data_laporan';
-    if (clean.startsWith('/laporan/harian')) return 'laporan_harian';
+    if (clean.startsWith('/laporan/data')) return 'laporan_harian';
+    if (clean.startsWith('/laporan/harian')) return 'buat_laporan';
     if (clean.startsWith('/laporan/mingguan')) return 'laporan_mingguan';
     if (clean.startsWith('/laporan/bulanan')) return 'laporan_bulanan';
     if (clean.startsWith('/laporan')) return 'laporan';
@@ -75,10 +102,11 @@ class WebDashboardLayout extends StatefulWidget {
         return '/kegiatan';
       case 'laporan':
         return '/laporan';
-      case 'data_laporan':
-        return '/laporan/data';
-      case 'laporan_harian':
+      case 'buat_laporan':
         return '/laporan/harian';
+      case 'data_laporan':
+      case 'laporan_harian':
+        return '/laporan/data';
       case 'laporan_mingguan':
         return '/laporan/mingguan';
       case 'laporan_bulanan':
@@ -99,6 +127,142 @@ class WebDashboardLayout extends StatefulWidget {
     }
   }
 
+  /// Menentukan menu key aktif dari `GoRouterState` bila tersedia,
+  /// atau kembali ke [fallback] bila dirender tanpa GoRouter.
+  static String resolveActiveMenuKey(
+    BuildContext context, {
+    String fallback = 'dashboard',
+  }) {
+    try {
+      final uriStr = GoRouterState.of(context).uri.toString();
+      return menuKeyFromPath(uriStr);
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  /// Daftar kategori & submenu sidebar kanonik sesuai peran [userProf],
+  /// dijadikan sumber tunggal untuk Sidebar Web dan Drawer Mobile.
+  static List<SidebarMenuSection> sidebarSectionsFor(
+    UserProfileProvider userProf,
+  ) {
+    final bool isKontraktor = userProf.isKontraktor;
+    final bool isDinas = userProf.isDinas;
+
+    return [
+      SidebarMenuSection(
+        title: 'UTAMA',
+        items: [
+          SidebarMenuEntry(
+            key: 'dashboard',
+            label: userProf.tr('nav_dashboard'),
+            webIcon: Icons.dashboard,
+            mobileIcon: Icons.dashboard_rounded,
+          ),
+          if (!isKontraktor)
+            SidebarMenuEntry(
+              key: 'kontrak',
+              label: userProf.tr('nav_kontrak'),
+              webIcon: Icons.folder_outlined,
+              mobileIcon: Icons.folder_shared_rounded,
+            )
+          else
+            SidebarMenuEntry(
+              key: 'kegiatan',
+              label: userProf.tr('nav_kegiatan_saya'),
+              webIcon: Icons.assignment_outlined,
+              mobileIcon: Icons.assignment_rounded,
+            ),
+        ],
+      ),
+      if (!isKontraktor)
+        SidebarMenuSection(
+          title: 'PELAPORAN',
+          items: [
+            const SidebarMenuEntry(
+              key: 'laporan',
+              label: 'Laporan',
+              webIcon: Icons.description_outlined,
+              mobileIcon: Icons.folder_outlined,
+            ),
+            // Menu buat laporan & ringkasan periode disembunyikan untuk Dinas (view-only)
+            if (!isDinas)
+              const SidebarMenuEntry(
+                key: 'buat_laporan',
+                label: 'Buat Laporan',
+                webIcon: Icons.edit_note_outlined,
+                mobileIcon: Icons.edit_note_rounded,
+              ),
+            const SidebarMenuEntry(
+              key: 'laporan_harian',
+              label: 'Laporan Harian',
+              webIcon: Icons.today_outlined,
+              mobileIcon: Icons.today_rounded,
+            ),
+            if (!isDinas) ...const [
+              SidebarMenuEntry(
+                key: 'laporan_mingguan',
+                label: 'Laporan Mingguan',
+                webIcon: Icons.date_range_outlined,
+                mobileIcon: Icons.date_range_rounded,
+              ),
+              SidebarMenuEntry(
+                key: 'laporan_bulanan',
+                label: 'Laporan Bulanan',
+                webIcon: Icons.calendar_month_outlined,
+                mobileIcon: Icons.calendar_month_rounded,
+              ),
+            ],
+          ],
+        ),
+      const SidebarMenuSection(
+        title: 'DOKUMEN & HISTORI',
+        items: [
+          SidebarMenuEntry(
+            key: 'timeline',
+            label: 'Timeline & Histori',
+            webIcon: Icons.timeline,
+            mobileIcon: Icons.timeline_rounded,
+          ),
+        ],
+      ),
+      const SidebarMenuSection(
+        title: 'AKUN & PENGATURAN',
+        items: [
+          SidebarMenuEntry(
+            key: 'pengaturan',
+            label: 'Pengaturan Akun',
+            webIcon: Icons.settings_outlined,
+            mobileIcon: Icons.settings_rounded,
+          ),
+          SidebarMenuEntry(
+            key: 'keamanan',
+            label: 'Keamanan & Sandi',
+            webIcon: Icons.security_outlined,
+            mobileIcon: Icons.security_rounded,
+          ),
+          SidebarMenuEntry(
+            key: 'edit_profil',
+            label: 'Edit Profil',
+            webIcon: Icons.person_outline_rounded,
+            mobileIcon: Icons.person_outline_rounded,
+          ),
+        ],
+      ),
+      const SidebarMenuSection(
+        title: 'BANTUAN',
+        items: [
+          SidebarMenuEntry(
+            key: 'panduan_faq',
+            label: 'Panduan & FAQ',
+            webIcon: Icons.help_outline,
+            mobileIcon: Icons.help_outline_rounded,
+          ),
+        ],
+      ),
+    ];
+  }
+
   /// Daftar konstanta ikon eksplisit agar Flutter font tree-shaker tidak pernah
   /// membuang glyph Material Icons yang digunakan di Web Dashboard saat release build.
   static const List<Icon> retainedWebIcons = [
@@ -109,6 +273,8 @@ class WebDashboardLayout extends StatefulWidget {
     Icon(Icons.folder_outlined),
     Icon(Icons.assignment_outlined),
     Icon(Icons.description_outlined),
+    Icon(Icons.edit_note_outlined),
+    Icon(Icons.edit_note_rounded),
     Icon(Icons.folder_open),
     Icon(Icons.today_outlined),
     Icon(Icons.date_range_outlined),
@@ -146,14 +312,11 @@ class WebDashboardLayout extends StatefulWidget {
 }
 
 class _WebDashboardLayoutState extends State<WebDashboardLayout> {
-  String _resolveActiveMenu(BuildContext context) {
-    try {
-      final uriStr = GoRouterState.of(context).uri.toString();
-      return WebDashboardLayout.menuKeyFromPath(uriStr);
-    } catch (_) {
-      return widget.activeMenu;
-    }
-  }
+  String _resolveActiveMenu(BuildContext context) =>
+      WebDashboardLayout.resolveActiveMenuKey(
+        context,
+        fallback: widget.activeMenu,
+      );
 
   void _handleMenuClick(String menuKey) {
     if (widget.onMenuSelected != null) {
@@ -717,239 +880,33 @@ class _WebDashboardLayoutState extends State<WebDashboardLayout> {
                   vertical: 10,
                 ),
                 children: [
-                  // 1. KATEGORI UTAMA
-                  _buildSidebarCategory('UTAMA', isCollapsed, isDrawer),
-                  _SidebarItemWidget(
-                    key: ValueKey(
-                      'sidebar_${isDrawer ? "drawer_" : ""}dashboard',
+                  for (final section in WebDashboardLayout.sidebarSectionsFor(
+                    userProf,
+                  )) ...[
+                    _buildSidebarCategory(
+                      section.title,
+                      isCollapsed,
+                      isDrawer,
                     ),
-                    isDrawer: isDrawer,
-                    menuKey: 'dashboard',
-                    label: userProf.tr('nav_dashboard'),
-                    icon: Icons.dashboard,
-                    isActive: activeMenuKey == 'dashboard',
-                    isCollapsed: isCollapsed,
-                    onTap: () {
-                      if (isDrawer) Navigator.pop(context);
-                      _handleMenuClick('dashboard');
-                    },
-                  ),
-                  if (!userProf.isKontraktor)
-                    _SidebarItemWidget(
-                      key: ValueKey(
-                        'sidebar_${isDrawer ? "drawer_" : ""}kontrak',
-                      ),
-                      isDrawer: isDrawer,
-                      menuKey: 'kontrak',
-                      label: userProf.tr('nav_kontrak'),
-                      icon: Icons.folder_outlined,
-                      isActive: activeMenuKey == 'kontrak',
-                      isCollapsed: isCollapsed,
-                      onTap: () {
-                        if (isDrawer) Navigator.pop(context);
-                        _handleMenuClick('kontrak');
-                      },
-                    )
-                  else
-                    _SidebarItemWidget(
-                      key: ValueKey(
-                        'sidebar_${isDrawer ? "drawer_" : ""}kegiatan',
-                      ),
-                      isDrawer: isDrawer,
-                      menuKey: 'kegiatan',
-                      label: userProf.tr('nav_kegiatan_saya'),
-                      icon: Icons.assignment_outlined,
-                      isActive: activeMenuKey == 'kegiatan',
-                      isCollapsed: isCollapsed,
-                      onTap: () {
-                        if (isDrawer) Navigator.pop(context);
-                        _handleMenuClick('kegiatan');
-                      },
-                    ),
-
-                  const SizedBox(height: 12),
-
-                  // 2. KATEGORI PELAPORAN (Hanya Konsultan & Dinas)
-                  if (!userProf.isKontraktor) ...[
-                    _buildSidebarCategory('PELAPORAN', isCollapsed, isDrawer),
-                    _SidebarItemWidget(
-                      key: ValueKey(
-                        'sidebar_${isDrawer ? "drawer_" : ""}laporan',
-                      ),
-                      isDrawer: isDrawer,
-                      menuKey: 'laporan',
-                      label: 'Laporan',
-                      icon: Icons.description_outlined,
-                      isActive: activeMenuKey == 'laporan',
-                      isCollapsed: isCollapsed,
-                      onTap: () {
-                        if (isDrawer) Navigator.pop(context);
-                        _handleMenuClick('laporan');
-                      },
-                    ),
-                    _SidebarItemWidget(
-                      key: ValueKey(
-                        'sidebar_${isDrawer ? "drawer_" : ""}data_laporan',
-                      ),
-                      isDrawer: isDrawer,
-                      menuKey: 'data_laporan',
-                      label: 'Data Laporan',
-                      icon: Icons.folder_open,
-                      isActive: activeMenuKey == 'data_laporan',
-                      isCollapsed: isCollapsed,
-                      onTap: () {
-                        if (isDrawer) Navigator.pop(context);
-                        _handleMenuClick('data_laporan');
-                      },
-                    ),
-                    // Menu pintas buat laporan disembunyikan untuk Dinas (view-only)
-                    if (!userProf.isDinas) ...[
+                    for (final item in section.items)
                       _SidebarItemWidget(
                         key: ValueKey(
-                          'sidebar_${isDrawer ? "drawer_" : ""}laporan_harian',
+                          'sidebar_${isDrawer ? "drawer_" : ""}${item.key}',
                         ),
                         isDrawer: isDrawer,
-                        menuKey: 'laporan_harian',
-                        label: 'Laporan Harian',
-                        icon: Icons.today_outlined,
-                        isActive: activeMenuKey == 'laporan_harian',
+                        menuKey: item.key,
+                        label: item.label,
+                        icon: item.webIcon,
+                        isActive: activeMenuKey == item.key,
                         isCollapsed: isCollapsed,
                         onTap: () {
                           if (isDrawer) Navigator.pop(context);
-                          _handleMenuClick('laporan_harian');
+                          _handleMenuClick(item.key);
                         },
                       ),
-                      _SidebarItemWidget(
-                        key: ValueKey(
-                          'sidebar_${isDrawer ? "drawer_" : ""}laporan_mingguan',
-                        ),
-                        isDrawer: isDrawer,
-                        menuKey: 'laporan_mingguan',
-                        label: 'Laporan Mingguan',
-                        icon: Icons.date_range_outlined,
-                        isActive: activeMenuKey == 'laporan_mingguan',
-                        isCollapsed: isCollapsed,
-                        onTap: () {
-                          if (isDrawer) Navigator.pop(context);
-                          _handleMenuClick('laporan_mingguan');
-                        },
-                      ),
-                      _SidebarItemWidget(
-                        key: ValueKey(
-                          'sidebar_${isDrawer ? "drawer_" : ""}laporan_bulanan',
-                        ),
-                        isDrawer: isDrawer,
-                        menuKey: 'laporan_bulanan',
-                        label: 'Laporan Bulanan',
-                        icon: Icons.calendar_month_outlined,
-                        isActive: activeMenuKey == 'laporan_bulanan',
-                        isCollapsed: isCollapsed,
-                        onTap: () {
-                          if (isDrawer) Navigator.pop(context);
-                          _handleMenuClick('laporan_bulanan');
-                        },
-                      ),
-                    ],
                     const SizedBox(height: 12),
                   ],
-
-                  // 3. KATEGORI DOKUMEN & HISTORI
-                  _buildSidebarCategory(
-                    'DOKUMEN & HISTORI',
-                    isCollapsed,
-                    isDrawer,
-                  ),
-                  _SidebarItemWidget(
-                    key: ValueKey(
-                      'sidebar_${isDrawer ? "drawer_" : ""}timeline',
-                    ),
-                    isDrawer: isDrawer,
-                    menuKey: 'timeline',
-                    label: 'Timeline & Histori',
-                    icon: Icons.timeline,
-                    isActive: activeMenuKey == 'timeline',
-                    isCollapsed: isCollapsed,
-                    onTap: () {
-                      if (isDrawer) Navigator.pop(context);
-                      _handleMenuClick('timeline');
-                    },
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // 4. KATEGORI AKUN & PENGATURAN
-                  _buildSidebarCategory(
-                    'AKUN & PENGATURAN',
-                    isCollapsed,
-                    isDrawer,
-                  ),
-                  _SidebarItemWidget(
-                    key: ValueKey(
-                      'sidebar_${isDrawer ? "drawer_" : ""}pengaturan',
-                    ),
-                    isDrawer: isDrawer,
-                    menuKey: 'pengaturan',
-                    label: 'Pengaturan Akun',
-                    icon: Icons.settings_outlined,
-                    isActive: activeMenuKey == 'pengaturan',
-                    isCollapsed: isCollapsed,
-                    onTap: () {
-                      if (isDrawer) Navigator.pop(context);
-                      _handleMenuClick('pengaturan');
-                    },
-                  ),
-                  _SidebarItemWidget(
-                    key: ValueKey(
-                      'sidebar_${isDrawer ? "drawer_" : ""}keamanan',
-                    ),
-                    isDrawer: isDrawer,
-                    menuKey: 'keamanan',
-                    label: 'Keamanan & Sandi',
-                    icon: Icons.security_outlined,
-                    isActive: activeMenuKey == 'keamanan',
-                    isCollapsed: isCollapsed,
-                    onTap: () {
-                      if (isDrawer) Navigator.pop(context);
-                      _handleMenuClick('keamanan');
-                    },
-                  ),
-                  _SidebarItemWidget(
-                    key: ValueKey(
-                      'sidebar_${isDrawer ? "drawer_" : ""}edit_profil',
-                    ),
-                    isDrawer: isDrawer,
-                    menuKey: 'edit_profil',
-                    label: 'Edit Profil',
-                    icon: Icons.person_outline_rounded,
-                    isActive: activeMenuKey == 'edit_profil',
-                    isCollapsed: isCollapsed,
-                    onTap: () {
-                      if (isDrawer) Navigator.pop(context);
-                      _handleMenuClick('edit_profil');
-                    },
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // 5. KATEGORI BANTUAN
-                  _buildSidebarCategory('BANTUAN', isCollapsed, isDrawer),
-                  _SidebarItemWidget(
-                    key: ValueKey(
-                      'sidebar_${isDrawer ? "drawer_" : ""}panduan_faq',
-                    ),
-                    isDrawer: isDrawer,
-                    menuKey: 'panduan_faq',
-                    label: 'Panduan & FAQ',
-                    icon: Icons.help_outline,
-                    isActive: activeMenuKey == 'panduan_faq',
-                    isCollapsed: isCollapsed,
-                    onTap: () {
-                      if (isDrawer) Navigator.pop(context);
-                      _handleMenuClick('panduan_faq');
-                    },
-                  ),
-
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 8),
                 ],
               ),
             ),
@@ -1165,6 +1122,8 @@ class _SidebarItemWidgetState extends State<_SidebarItemWidget> {
         return Icon(Icons.assignment_outlined, size: size, color: color);
       case 'laporan':
         return Icon(Icons.description_outlined, size: size, color: color);
+      case 'buat_laporan':
+        return Icon(Icons.edit_note_outlined, size: size, color: color);
       case 'data_laporan':
         return Icon(Icons.folder_open, size: size, color: color);
       case 'laporan_harian':

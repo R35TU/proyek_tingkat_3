@@ -386,8 +386,8 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
 
     if (isDesktop) {
       return WebDashboardLayout(
-        title: 'Data Laporan',
-        activeMenu: 'data_laporan',
+        title: 'Laporan Harian',
+        activeMenu: 'laporan_harian',
         showBackButton: true,
         child: mainBody,
       );
@@ -403,7 +403,7 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
           onPressed: () => goBackOrParent(context, '/laporan'),
         ),
         title: const Text(
-          'Data Laporan',
+          'Laporan Harian',
           style: TextStyle(
             color: AppColors.textDark,
             fontSize: 18,

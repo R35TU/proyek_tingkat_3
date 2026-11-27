@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/kegiatan_model.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
+import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/screens/buat_laporan_screen.dart';
 import 'package:tata_saka_app/screens/detail_data_laporan_screen.dart';
 import 'package:tata_saka_app/screens/detail_kegiatan_screen.dart';
 import 'package:tata_saka_app/screens/kelola_rkk_screen.dart';
+import 'package:tata_saka_app/screens/laporan_mingguan_screen.dart';
 import 'package:tata_saka_app/widgets/lembar_boq_mingguan_widget.dart';
 
 void main() {
@@ -177,7 +180,7 @@ void main() {
       expect(find.text('Pilih dari RKK Kontrak *'), findsOneWidget);
     });
 
-    testWidgets('DetailDataLaporanScreen renders LembarBoqMingguanWidget below weekly report', (WidgetTester tester) async {
+    testWidgets('LaporanMingguanScreen renders LembarBoqMingguanWidget in weekly report modal', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(900, 1400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -193,11 +196,11 @@ void main() {
         instansiDinas: ['Dinas PU'],
         nilaiKontrak: 'Rp 1.000.000.000,00',
         hariKalender: 90,
-        tglMulaiSpk: '01 Juli 2026',
+        tglMulaiSpk: '19 April 2026',
         nomorSpk: 'SPK-01',
         nomorSpmk: 'SPMK-01',
-        tglMulaiSpmk: '05 Juli 2026',
-        tglSelesaiSpmk: '03 Oktober 2026',
+        tglMulaiSpmk: '19 April 2026',
+        tglSelesaiSpmk: '17 Juli 2026',
         sumberDana: 'APBD',
         deskripsi: 'Deskripsi',
         kegiatans: [
@@ -212,25 +215,41 @@ void main() {
         ],
       );
 
+      SharedPreferences.setMockInitialValues({});
+      final contractProv = ContractProvider();
+      await contractProv.addContract(contract);
+
       await tester.pumpWidget(
         MultiProvider(
-          providers: [ChangeNotifierProvider(create: (_) => ContractProvider())],
+          providers: [
+            ChangeNotifierProvider.value(value: contractProv),
+            ChangeNotifierProvider(create: (_) => UserProfileProvider()),
+          ],
           child: MaterialApp(
-            home: DetailDataLaporanScreen(contract: contract, initialTab: 1),
+            home: LaporanMingguanScreen(initialContract: contract),
           ),
         ),
       );
 
       await tester.pumpAndSettle();
 
-      // Tap on 'Buka Dokumen' for weekly report
-      final openDocButton = find.text('Buka Dokumen');
-      expect(openDocButton, findsOneWidget);
-      await tester.tap(openDocButton);
+      await tester.dragUntilVisible(
+        find.text('Buka'),
+        find.byType(CustomScrollView),
+        const Offset(0, -300),
+      );
+      await tester.ensureVisible(find.text('Buka').first);
       await tester.pumpAndSettle();
 
-      // Verify BOTH sheets are rendered: Sheet 1 (Ringkasan) & Sheet 2 (BoQ)
+      await tester.tap(find.text('Buka').first);
+      await tester.pumpAndSettle();
+
+      // Sheet 1: Ringkasan Mingguan
       expect(find.text('RINGKASAN KEGIATAN MINGGUAN'), findsOneWidget);
+
+      // Pindah ke tab 2: Progress BoQ (14 Kolom)
+      await tester.tap(find.text('2. Progress BoQ (14 Kolom)'));
+      await tester.pumpAndSettle();
       expect(find.byType(LembarBoqMingguanWidget), findsOneWidget);
       expect(find.text('LAPORAN MINGGUAN'), findsOneWidget);
     });

@@ -11,6 +11,7 @@ import 'package:tata_saka_app/screens/data_laporan_screen.dart';
 import 'package:tata_saka_app/screens/detail_data_laporan_screen.dart';
 import 'package:tata_saka_app/screens/detail_kegiatan_screen.dart';
 import 'package:tata_saka_app/screens/detail_kontrak_screen.dart';
+import 'package:tata_saka_app/screens/laporan_mingguan_screen.dart';
 import 'package:tata_saka_app/utils/progress_calculator.dart';
 
 void main() {
@@ -247,7 +248,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('42.95%'), findsOneWidget);
 
-        // C. DetailDataLaporanScreen Tab Mingguan: menghitung ulang snapshot 12.34% -> 42,95 %
+        // C. DetailDataLaporanScreen kini khusus Laporan Harian (tanpa tab Mingguan),
+        // sedangkan ringkasan mingguan live berada di LaporanMingguanScreen.
         await tester.pumpWidget(
           wrap(
             DetailDataLaporanScreen(
@@ -258,10 +260,26 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.text('Progres: 42.95%'), findsOneWidget);
+        expect(find.text('Mingguan'), findsNothing);
+
+        await tester.pumpWidget(
+          wrap(
+            LaporanMingguanScreen(
+              initialContract: contract,
+              initialKegiatanIndex: 0,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('42.95%'), findsWidgets);
+        await tester.ensureVisible(find.text('Buka').first);
+        await tester.tap(find.text('Buka').first);
+        await tester.pumpAndSettle();
         expect(find.text('10,00 %'), findsOneWidget);
         expect(find.text('42,95 %'), findsOneWidget);
         expect(find.text('12,34 %'), findsNothing);
+        await tester.tap(find.byIcon(Icons.close).first);
+        await tester.pumpAndSettle();
 
         // D. DetailKegiatanScreen: menampilkan 42.95% dan ikut live-update ke 75.00% saat mutasi in-place
         await tester.pumpWidget(
@@ -295,18 +313,20 @@ void main() {
 
         expect(find.text('75.00%'), findsOneWidget);
 
-        // Verifikasi DetailDataLaporanScreen juga menunjukkan 75.00% & 75,00 %
+        // Verifikasi LaporanMingguanScreen juga menunjukkan 75.00% & 75,00 %
         await tester.pumpWidget(
           wrap(
-            DetailDataLaporanScreen(
-              contract: contract,
-              kegiatanIndex: 0,
-              initialTab: 1,
+            LaporanMingguanScreen(
+              initialContract: contract,
+              initialKegiatanIndex: 0,
             ),
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.text('Progres: 75.00%'), findsOneWidget);
+        expect(find.text('75.00%'), findsWidgets);
+        await tester.ensureVisible(find.text('Buka').first);
+        await tester.tap(find.text('Buka').first);
+        await tester.pumpAndSettle();
         expect(find.text('75,00 %'), findsOneWidget);
       },
     );

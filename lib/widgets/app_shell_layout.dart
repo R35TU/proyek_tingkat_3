@@ -77,8 +77,8 @@ class AppShellLayout extends StatelessWidget {
     if (clean == '/kegiatan') return userProf.tr('nav_kegiatan_saya');
     if (clean.startsWith('/kegiatan/')) return 'Detail Kegiatan';
     if (clean == '/laporan') return 'Laporan Proyek';
-    if (clean == '/laporan/data') return 'Data Laporan';
-    if (clean.startsWith('/laporan/data/')) return 'Detail Data Laporan';
+    if (clean == '/laporan/data') return 'Laporan Harian';
+    if (clean.startsWith('/laporan/data/')) return 'Detail Laporan Harian';
     if (clean == '/laporan/harian') return 'Buat Laporan Harian';
     if (clean == '/laporan/mingguan') return 'Laporan Mingguan';
     if (clean == '/laporan/bulanan') return 'Laporan Bulanan';
@@ -113,7 +113,7 @@ class AppShellLayout extends StatelessWidget {
       return;
     }
     if (path != '/dashboard') {
-      goTopLevelRoute(context, '/dashboard');
+      goBackWithShellHistory(context, fallback: '/dashboard');
       return;
     }
     if (kIsWeb) {
@@ -192,11 +192,9 @@ class AppShellLayout extends StatelessWidget {
       );
     }
 
-    // Mobile layout (< 900px): tampilkan BottomNavigationBar hanya pada top-level tabs
+    // Mobile layout (< 900px): jaga parent Scaffold + Stack tetap stabil agar
+    // Navigator ShellRoute tidak pernah di-reparent saat transisi ke sub-rute.
     final isTopLevelTab = _topLevelMobilePaths.contains(currentPath);
-    if (!isTopLevelTab) {
-      return child;
-    }
 
     final isKontraktor = userProf.isKontraktor;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -257,44 +255,59 @@ class AppShellLayout extends StatelessWidget {
             ),
           ];
 
+    if (isTopLevelTab) {
+      recordShellRouteHistory(currentPath);
+    }
     final currentIdx = _mobileTabIndex(currentPath, isKontraktor);
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
-        await _handleMobileBack(context, currentPath);
-      },
-      child: Scaffold(
-        body: child,
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            color: navBg,
-            border: Border(top: BorderSide(color: navBorder, width: 0.8)),
-          ),
-          child: BottomNavigationBar(
-            elevation: 0,
-            currentIndex: currentIdx,
-            onTap: (index) {
-              if (index < 0 || index >= tabPaths.length) return;
-              goTopLevelRoute(context, tabPaths[index]);
-            },
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: navBg,
-            selectedItemColor: selectedColor,
-            unselectedItemColor: unselectedColor,
-            selectedLabelStyle: const TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
+    return Scaffold(
+      body: Stack(
+        children: [
+          child,
+          if (isTopLevelTab)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: PopScope(
+                  canPop: false,
+                  onPopInvokedWithResult: (didPop, _) async {
+                    if (didPop) return;
+                    await _handleMobileBack(context, currentPath);
+                  },
+                  child: const SizedBox.shrink(),
+                ),
+              ),
             ),
-            unselectedLabelStyle: const TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 12,
-            ),
-            items: navItems,
-          ),
-        ),
+        ],
       ),
+      bottomNavigationBar: isTopLevelTab
+          ? Container(
+              decoration: BoxDecoration(
+                color: navBg,
+                border: Border(top: BorderSide(color: navBorder, width: 0.8)),
+              ),
+              child: BottomNavigationBar(
+                elevation: 0,
+                currentIndex: currentIdx,
+                onTap: (index) {
+                  if (index < 0 || index >= tabPaths.length) return;
+                  goTopLevelRoute(context, tabPaths[index]);
+                },
+                type: BottomNavigationBarType.fixed,
+                backgroundColor: navBg,
+                selectedItemColor: selectedColor,
+                unselectedItemColor: unselectedColor,
+                selectedLabelStyle: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 12,
+                ),
+                items: navItems,
+              ),
+            )
+          : null,
     );
   }
 }

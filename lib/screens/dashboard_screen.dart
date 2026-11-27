@@ -63,6 +63,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'kontrak',
       'kegiatan',
       'laporan',
+      'buat_laporan',
+      'buat-laporan',
       'data_laporan',
       'data-laporan',
       'laporan_harian',
@@ -80,39 +82,90 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'panduan-faq',
     };
     if (validMenus.contains(path)) {
-      return path.replaceAll('-', '_');
+      final norm = path.replaceAll('-', '_');
+      return norm == 'data_laporan' ? 'laporan_harian' : norm;
     }
     final qMenu = uri.queryParameters['menu'];
     if (qMenu != null && validMenus.contains(qMenu)) {
-      return qMenu.replaceAll('-', '_');
+      final norm = qMenu.replaceAll('-', '_');
+      return norm == 'data_laporan' ? 'laporan_harian' : norm;
     }
     return null;
   }
 
   void _onWebMenuSelected(String menuKey) {
-    if (_activeWebMenu == menuKey) return;
     if (GoRouter.maybeOf(context) != null) {
       goTopLevelRoute(context, WebDashboardLayout.routeForMenu(menuKey));
       return;
     }
+    if (_activeWebMenu == menuKey) return;
     setState(() {
+      if (_webMenuHistory.isEmpty || _webMenuHistory.last != menuKey) {
+        _webMenuHistory.add(menuKey);
+      }
       _activeWebMenu = menuKey;
     });
   }
 
   void _onWebBack() {
     if (GoRouter.maybeOf(context) != null) {
-      goTopLevelRoute(context, '/dashboard');
+      goBackWithShellHistory(context, fallback: '/dashboard');
       return;
     }
     setState(() {
-      _activeWebMenu = 'dashboard';
+      if (_webMenuHistory.length > 1) {
+        _webMenuHistory.removeLast();
+        _activeWebMenu = _webMenuHistory.last;
+      } else {
+        _activeWebMenu = 'dashboard';
+        _webMenuHistory
+          ..clear()
+          ..add('dashboard');
+      }
     });
+  }
+
+  Widget? _destinationForMenu(String menuKey, UserProfileProvider userProf) {
+    switch (menuKey) {
+      case 'kontrak':
+      case 'kegiatan':
+        return const KontrakScreen();
+      case 'laporan':
+        return const LaporanScreen();
+      case 'buat_laporan':
+        return const BuatLaporanScreen();
+      case 'data_laporan':
+      case 'laporan_harian':
+        return const DataLaporanScreen();
+      case 'laporan_mingguan':
+        return const LaporanMingguanScreen();
+      case 'laporan_bulanan':
+        return const LaporanBulananScreen();
+      case 'timeline':
+        return const TimelineScreen();
+      case 'pengaturan':
+        return const PengaturanScreen();
+      case 'keamanan':
+        return const KeamananScreen();
+      case 'edit_profil':
+        return const EditProfilScreen();
+      case 'panduan_faq':
+        // Panduan hanya sesuai peran login; Dinas belum punya
+        // guidebook → null → tampilan 3 tab default (tetap).
+        return PanduanFaqScreen(
+          role: userProf.isKontraktor
+              ? 'kontraktor'
+              : (userProf.isKonsultan ? 'konsultan' : null),
+        );
+      case 'dashboard':
+      default:
+        return null;
+    }
   }
 
   void _navigateFromSidebar(
     String menuKey,
-    Widget destination, {
+    Widget? destination, {
     bool isDrawer = false,
   }) {
     if (isDrawer) Navigator.pop(context);
@@ -120,11 +173,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       goTopLevelRoute(context, WebDashboardLayout.routeForMenu(menuKey));
       return;
     }
-    if (ResponsiveBreakpoints.isDesktop(context)) {
+    if (menuKey == 'dashboard' || ResponsiveBreakpoints.isDesktop(context)) {
       setState(() {
+        if (_webMenuHistory.isEmpty || _webMenuHistory.last != menuKey) {
+          _webMenuHistory.add(menuKey);
+        }
         _activeWebMenu = menuKey;
       });
-    } else {
+    } else if (destination != null) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => destination),
@@ -146,10 +202,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return 'Addendum CCO & Tambah Kurang';
       case 'laporan':
         return 'Laporan Proyek';
+      case 'buat_laporan':
+        return 'Buat Laporan Harian';
       case 'data_laporan':
-        return 'Data & Arsip Laporan';
       case 'laporan_harian':
-        return 'Laporan Harian (Buku Harian Standar)';
+        return 'Laporan Harian';
       case 'laporan_mingguan':
         return 'Laporan Mingguan Proyek';
       case 'laporan_bulanan':
@@ -203,10 +260,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return const KontrakScreen(isEmbedded: true);
       case 'laporan':
         return const LaporanScreen(isEmbedded: true);
-      case 'data_laporan':
-        return const DataLaporanScreen(isEmbedded: true);
-      case 'laporan_harian':
+      case 'buat_laporan':
         return const BuatLaporanScreen(isEmbedded: true);
+      case 'data_laporan':
+      case 'laporan_harian':
+        return const DataLaporanScreen(isEmbedded: true);
       case 'laporan_mingguan':
         return const LaporanMingguanScreen(isEmbedded: true);
       case 'laporan_bulanan':
@@ -285,9 +343,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _startTimer();
+    final hasRouter = GoRouter.maybeOf(context) != null;
     final startMenu =
         widget.initialMenu ??
-        (kIsWeb ? _normalizeMenuFromUrl(getInitialWebRoute()) : null) ??
+        (kIsWeb && hasRouter ? _normalizeMenuFromUrl(getInitialWebRoute()) : null) ??
         'dashboard';
     _activeWebMenu = startMenu;
     _webMenuHistory.clear();
@@ -597,6 +656,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
 
     if (isWeb) {
+      if (WebShellScope.isInside(context)) {
+        return mainBody;
+      }
       return PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, result) {
@@ -606,11 +668,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             return;
           }
           if (_activeWebMenu != 'dashboard') {
-            if (GoRouter.maybeOf(context) != null) {
-              goTopLevelRoute(context, '/dashboard');
-            } else {
-              setState(() => _activeWebMenu = 'dashboard');
-            }
+            _onWebBack();
           }
         },
         child: WebDashboardLayout(
@@ -1487,14 +1545,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Kegiatan Pelaksanaan Saya',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: AppColors.textDark,
+              const Expanded(
+                child: Text(
+                  'Kegiatan Pelaksanaan Saya',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: AppColors.textDark,
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
               Text(
                 '${myKegiatans.length} Kegiatan',
                 style: const TextStyle(
@@ -1723,19 +1785,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
 
     if (isWeb) {
-      return WebDashboardLayout(
-        title: _activeWebMenu != 'dashboard'
-            ? _getHeaderTitle(userProf)
-            : 'Dashboard Kontraktor',
-        activeMenu: _activeWebMenu,
-        showBackButton: _activeWebMenu != 'dashboard',
-        onBack: _onWebBack,
-        onMenuSelected: _onWebMenuSelected,
-        child: _buildActiveWebContent(
-          context,
-          userProf,
-          contracts,
-          contractorBody,
+      if (WebShellScope.isInside(context)) {
+        return contractorBody;
+      }
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+            return;
+          }
+          if (_activeWebMenu != 'dashboard') {
+            _onWebBack();
+          }
+        },
+        child: WebDashboardLayout(
+          title: _activeWebMenu != 'dashboard'
+              ? _getHeaderTitle(userProf)
+              : 'Dashboard Kontraktor',
+          activeMenu: _activeWebMenu,
+          showBackButton: _activeWebMenu != 'dashboard',
+          onBack: _onWebBack,
+          onMenuSelected: _onWebMenuSelected,
+          child: _buildActiveWebContent(
+            context,
+            userProf,
+            contracts,
+            contractorBody,
+          ),
         ),
       );
     }
@@ -1806,8 +1884,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final mutedIconColor = isDrawer
         ? const Color(0xFF94A3B8)
         : AppColors.slateLight;
+    final activeMenuKey = WebDashboardLayout.resolveActiveMenuKey(
+      context,
+      fallback: _activeWebMenu,
+    );
+    final sidebarSections = WebDashboardLayout.sidebarSectionsFor(userProf);
 
     return Container(
+      key: isDrawer ? const ValueKey('mobile_dark_drawer') : null,
       width: sidebarWidth,
       height: double.infinity,
       color: sidebarBackground,
@@ -2055,217 +2139,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   vertical: 8,
                 ),
                 children: [
-                  // 1. KATEGORI UTAMA
-                  _buildSidebarCategory('UTAMA', isCollapsed, isDrawer),
-                  _buildSidebarItem(
-                    isDrawer: isDrawer,
-                    key: 'dashboard',
-                    label: userProf.tr('nav_dashboard'),
-                    icon: Icons.dashboard_rounded,
-                    isActive: _activeWebMenu == 'dashboard',
-                    isCollapsed: isCollapsed,
-                    onTap: () {
-                      if (isDrawer) Navigator.pop(context);
-                      setState(() => _activeWebMenu = 'dashboard');
-                    },
-                  ),
-                  if (!userProf.isKontraktor)
-                    _buildSidebarItem(
-                      isDrawer: isDrawer,
-                      key: 'kontrak',
-                      label: userProf.tr('nav_kontrak'),
-                      icon: Icons.folder_shared_rounded,
-                      isActive: _activeWebMenu == 'kontrak',
-                      isCollapsed: isCollapsed,
-                      onTap: () => _navigateFromSidebar(
-                        'kontrak',
-                        const KontrakScreen(),
-                        isDrawer: isDrawer,
-                      ),
-                    )
-                  else
-                    _buildSidebarItem(
-                      isDrawer: isDrawer,
-                      key: 'kegiatan',
-                      label: userProf.tr('nav_kegiatan_saya'),
-                      icon: Icons.assignment_rounded,
-                      isActive: _activeWebMenu == 'kegiatan',
-                      isCollapsed: isCollapsed,
-                      onTap: () => _navigateFromSidebar(
-                        'kegiatan',
-                        const KontrakScreen(),
-                        isDrawer: isDrawer,
-                      ),
+                  for (final section in sidebarSections) ...[
+                    _buildSidebarCategory(
+                      section.title,
+                      isCollapsed,
+                      isDrawer,
                     ),
-
-                  const SizedBox(height: 14),
-
-                  // 2. KATEGORI PELAPORAN (Hanya Konsultan & Dinas)
-                  if (!userProf.isKontraktor) ...[
-                    _buildSidebarCategory('PELAPORAN', isCollapsed, isDrawer),
-                    _buildSidebarItem(
-                      isDrawer: isDrawer,
-                      key: 'laporan',
-                      label: 'Laporan',
-                      icon: Icons.folder_outlined,
-                      isActive: _activeWebMenu == 'laporan',
-                      isCollapsed: isCollapsed,
-                      onTap: () => _navigateFromSidebar(
-                        'laporan',
-                        const LaporanScreen(),
-                        isDrawer: isDrawer,
-                      ),
-                    ),
-                    _buildSidebarItem(
-                      isDrawer: isDrawer,
-                      key: 'data_laporan',
-                      label: 'Data Laporan',
-                      icon: Icons.folder_special_rounded,
-                      isActive: _activeWebMenu == 'data_laporan',
-                      isCollapsed: isCollapsed,
-                      onTap: () => _navigateFromSidebar(
-                        'data_laporan',
-                        const DataLaporanScreen(),
-                        isDrawer: isDrawer,
-                      ),
-                    ),
-                    if (!userProf.isDinas) ...[
+                    for (final item in section.items)
                       _buildSidebarItem(
                         isDrawer: isDrawer,
-                        key: 'laporan_harian',
-                        label: 'Laporan Harian',
-                        icon: Icons.today_rounded,
-                        isActive: _activeWebMenu == 'laporan_harian',
+                        key: item.key,
+                        label: item.label,
+                        icon: item.mobileIcon,
+                        isActive: activeMenuKey == item.key,
                         isCollapsed: isCollapsed,
                         onTap: () => _navigateFromSidebar(
-                          'laporan_harian',
-                          const BuatLaporanScreen(),
+                          item.key,
+                          _destinationForMenu(item.key, userProf),
                           isDrawer: isDrawer,
                         ),
                       ),
-                      _buildSidebarItem(
-                        isDrawer: isDrawer,
-                        key: 'laporan_mingguan',
-                        label: 'Laporan Mingguan',
-                        icon: Icons.date_range_rounded,
-                        isActive: _activeWebMenu == 'laporan_mingguan',
-                        isCollapsed: isCollapsed,
-                        onTap: () => _navigateFromSidebar(
-                          'laporan_mingguan',
-                          const LaporanMingguanScreen(),
-                          isDrawer: isDrawer,
-                        ),
-                      ),
-                      _buildSidebarItem(
-                        isDrawer: isDrawer,
-                        key: 'laporan_bulanan',
-                        label: 'Laporan Bulanan',
-                        icon: Icons.calendar_month_rounded,
-                        isActive: _activeWebMenu == 'laporan_bulanan',
-                        isCollapsed: isCollapsed,
-                        onTap: () => _navigateFromSidebar(
-                          'laporan_bulanan',
-                          const LaporanBulananScreen(),
-                          isDrawer: isDrawer,
-                        ),
-                      ),
-                    ],
                     const SizedBox(height: 14),
                   ],
-
-                  // 3. KATEGORI DOKUMEN & HISTORI
-                  _buildSidebarCategory(
-                    'DOKUMEN & HISTORI',
-                    isCollapsed,
-                    isDrawer,
-                  ),
-                  _buildSidebarItem(
-                    isDrawer: isDrawer,
-                    key: 'timeline',
-                    label: 'Timeline & Histori',
-                    icon: Icons.timeline_rounded,
-                    isActive: _activeWebMenu == 'timeline',
-                    isCollapsed: isCollapsed,
-                    onTap: () => _navigateFromSidebar(
-                      'timeline',
-                      const TimelineScreen(),
-                      isDrawer: isDrawer,
-                    ),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  // 4. KATEGORI AKUN & PENGATURAN
-                  _buildSidebarCategory(
-                    'AKUN & PENGATURAN',
-                    isCollapsed,
-                    isDrawer,
-                  ),
-                  _buildSidebarItem(
-                    isDrawer: isDrawer,
-                    key: 'pengaturan',
-                    label: 'Pengaturan Akun',
-                    icon: Icons.settings_rounded,
-                    isActive: _activeWebMenu == 'pengaturan',
-                    isCollapsed: isCollapsed,
-                    onTap: () => _navigateFromSidebar(
-                      'pengaturan',
-                      const PengaturanScreen(),
-                      isDrawer: isDrawer,
-                    ),
-                  ),
-                  _buildSidebarItem(
-                    isDrawer: isDrawer,
-                    key: 'keamanan',
-                    label: 'Keamanan & Sandi',
-                    icon: Icons.security_rounded,
-                    isActive: _activeWebMenu == 'keamanan',
-                    isCollapsed: isCollapsed,
-                    onTap: () => _navigateFromSidebar(
-                      'keamanan',
-                      const KeamananScreen(),
-                      isDrawer: isDrawer,
-                    ),
-                  ),
-                  _buildSidebarItem(
-                    isDrawer: isDrawer,
-                    key: 'edit_profil',
-                    label: 'Edit Profil',
-                    icon: Icons.person_outline_rounded,
-                    isActive: _activeWebMenu == 'edit_profil',
-                    isCollapsed: isCollapsed,
-                    onTap: () => _navigateFromSidebar(
-                      'edit_profil',
-                      const EditProfilScreen(),
-                      isDrawer: isDrawer,
-                    ),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  // 5. KATEGORI BANTUAN
-                  _buildSidebarCategory('BANTUAN', isCollapsed, isDrawer),
-                  _buildSidebarItem(
-                    isDrawer: isDrawer,
-                    key: 'panduan_faq',
-                    label: 'Panduan & FAQ',
-                    icon: Icons.help_outline_rounded,
-                    isActive: _activeWebMenu == 'panduan_faq',
-                    isCollapsed: isCollapsed,
-                    onTap: () => _navigateFromSidebar(
-                      'panduan_faq',
-                      // Panduan hanya sesuai peran login; Dinas belum punya
-                      // guidebook → null → tampilan 3 tab default (tetap).
-                      PanduanFaqScreen(
-                        role: userProf.isKontraktor
-                            ? 'kontraktor'
-                            : (userProf.isKonsultan ? 'konsultan' : null),
-                      ),
-                      isDrawer: isDrawer,
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 10),
                 ],
               ),
             ),

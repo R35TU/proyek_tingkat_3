@@ -26,10 +26,34 @@ class LaporanScreen extends StatelessWidget {
       padding: const EdgeInsets.all(20.0),
       child: Column(
         children: [
+          if (!isDinas) ...[
+            _buildMenuCard(
+              title: 'Buat Laporan Harian',
+              description:
+                  'Buku Harian Standar (pekerjaan, material, alat,\npersonil, cuaca & kejadian)',
+              icon: Icons.edit_note,
+              iconBgColor: const Color(0xFFE6F4EA),
+              iconColor: AppColors.successGreen,
+              onTap: () {
+                final router = GoRouter.maybeOf(context);
+                if (router != null) {
+                  router.go('/laporan/harian');
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const BuatLaporanScreen(),
+                    ),
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
           _buildMenuCard(
-            title: 'Data Laporan',
+            title: 'Laporan Harian',
             description:
-                'Lihat daftar proyek dan semua data\nlaporan harian & mingguan',
+                'Lihat daftar proyek dan seluruh data\nlaporan harian yang tersimpan',
             icon: Icons.folder_outlined,
             iconBgColor: AppColors.blueLight,
             iconColor: AppColors.primaryBlue,
@@ -48,72 +72,50 @@ class LaporanScreen extends StatelessWidget {
             },
           ),
           if (!isDinas) ...[
-          const SizedBox(height: 16),
-          _buildMenuCard(
-            title: 'Buat Laporan Harian',
-            description:
-                'Buku Harian Standar (pekerjaan, material, alat,\npersonil, cuaca & kejadian)',
-            icon: Icons.edit_note,
-            iconBgColor: const Color(0xFFE6F4EA),
-            iconColor: AppColors.successGreen,
-            onTap: () {
-              final router = GoRouter.maybeOf(context);
-              if (router != null) {
-                router.go('/laporan/harian');
-              } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const BuatLaporanScreen(),
-                  ),
-                );
-              }
-            },
-          ),
-          const SizedBox(height: 16),
-          _buildMenuCard(
-            title: 'Laporan Mingguan',
-            description:
-                'Daftar Periode Mingguan (status berjalan, realisasi\nharian otomatis, bobot BoQ 14 kolom & tanda tangan)',
-            icon: Icons.analytics_outlined,
-            iconBgColor: const Color(0xFFFEF3C7),
-            iconColor: const Color(0xFFD97706),
-            onTap: () {
-              final router = GoRouter.maybeOf(context);
-              if (router != null) {
-                router.go('/laporan/mingguan');
-              } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const LaporanMingguanScreen(),
-                  ),
-                );
-              }
-            },
-          ),
-          const SizedBox(height: 16),
-          _buildMenuCard(
-            title: 'Laporan Bulanan',
-            description:
-                'Rekapitulasi Fisik Bulanan (Otomatis per 4 minggu,\nkemajuan fisik CCO, bulan lalu, bulan ini & sisa)',
-            icon: Icons.calendar_month_outlined,
-            iconBgColor: const Color(0xFFEDE9FE),
-            iconColor: const Color(0xFF7C3AED),
-            onTap: () {
-              final router = GoRouter.maybeOf(context);
-              if (router != null) {
-                router.go('/laporan/bulanan');
-              } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const LaporanBulananScreen(),
-                  ),
-                );
-              }
-            },
-          ),
+            const SizedBox(height: 16),
+            _buildMenuCard(
+              title: 'Laporan Mingguan',
+              description:
+                  'Daftar Periode Mingguan (status berjalan, realisasi\nharian otomatis, bobot BoQ 14 kolom & tanda tangan)',
+              icon: Icons.analytics_outlined,
+              iconBgColor: const Color(0xFFFEF3C7),
+              iconColor: const Color(0xFFD97706),
+              onTap: () {
+                final router = GoRouter.maybeOf(context);
+                if (router != null) {
+                  router.go('/laporan/mingguan');
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LaporanMingguanScreen(),
+                    ),
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            _buildMenuCard(
+              title: 'Laporan Bulanan',
+              description:
+                  'Rekapitulasi Fisik Bulanan (Otomatis per 4 minggu,\nkemajuan fisik CCO, bulan lalu, bulan ini & sisa)',
+              icon: Icons.calendar_month_outlined,
+              iconBgColor: const Color(0xFFEDE9FE),
+              iconColor: const Color(0xFF7C3AED),
+              onTap: () {
+                final router = GoRouter.maybeOf(context);
+                if (router != null) {
+                  router.go('/laporan/bulanan');
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LaporanBulananScreen(),
+                    ),
+                  );
+                }
+              },
+            ),
           ] else ...[
             const SizedBox(height: 16),
             _buildInfoCardDinas(),
@@ -142,7 +144,7 @@ class LaporanScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () => goBackOrParent(context, '/dashboard'),
+          onPressed: () => goBackWithShellHistory(context),
         ),
         title: const Text(
           'Laporan Proyek',
@@ -248,7 +250,7 @@ class LaporanScreen extends StatelessWidget {
           const Expanded(
             child: Text(
               'Role Dinas bersifat pemantau: Anda dapat melihat semua laporan '
-              '(harian, mingguan, bulanan) melalui menu Data Laporan.',
+              '(harian, mingguan, bulanan) melalui menu Laporan Harian.',
               style: TextStyle(fontSize: 12.5, color: AppColors.textLight),
             ),
           ),

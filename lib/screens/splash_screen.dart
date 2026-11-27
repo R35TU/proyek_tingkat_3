@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/widgets/responsive_layout.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -161,22 +163,23 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           ),
 
-          // Bottom Footer Shape
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: IgnorePointer(
-              child: Image.asset(
-                'assets/images/landingpage.png',
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  height: 150,
-                  color: AppColors.primaryBlue,
+          // Bottom Footer Shape (khusus tampilan mobile agar tidak menimpa logo pada Web desktop/layar awal)
+          if (!kIsWeb && !ResponsiveBreakpoints.isDesktop(context))
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: Image.asset(
+                  'assets/images/landingpage.png',
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 150,
+                    color: AppColors.primaryBlue,
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

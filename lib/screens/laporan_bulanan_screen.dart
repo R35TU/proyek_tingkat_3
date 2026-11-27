@@ -359,9 +359,22 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
         ? (existingData['ttdList'] as List)
         : (report.ttdList ?? []);
 
+    bool hasEntryContent(Map it) {
+      final peran = (it['peran'] ?? it['jabatan'] ?? '').toString().trim();
+      final instansi = (it['instansi'] ?? '').toString().trim();
+      final nama = (it['nama'] ?? '').toString().trim();
+      final tanggal = (it['tanggal'] ?? '').toString().trim();
+      final sig = (it['signature'] ?? '').toString().trim();
+      return peran.isNotEmpty ||
+          instansi.isNotEmpty ||
+          nama.isNotEmpty ||
+          tanggal.isNotEmpty ||
+          sig.isNotEmpty;
+    }
+
     if (rawList.isNotEmpty) {
       for (final it in rawList) {
-        if (it is Map) {
+        if (it is Map && hasEntryContent(it)) {
           items.add(
             _TtdBulananDraftItem(
               peran: it['peran']?.toString() ?? it['jabatan']?.toString() ?? '',
@@ -376,35 +389,51 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
     }
 
     if (items.isEmpty) {
-      final dateStr = report.periodeFormatted.split('-').last.trim();
+      final legacyEntries = [
+        {
+          'peran': report.ttdKontraktorJabatan?.trim() ?? '',
+          'instansi': '',
+          'nama': report.ttdKontraktorNama?.trim() ?? '',
+          'tanggal': report.ttdKontraktorTanggal?.trim() ?? '',
+          'signature': report.ttdKontraktorSignature,
+        },
+        {
+          'peran': report.ttdKonsultanJabatan?.trim() ?? '',
+          'instansi': '',
+          'nama': report.ttdKonsultanNama?.trim() ?? '',
+          'tanggal': report.ttdKonsultanTanggal?.trim() ?? '',
+          'signature': report.ttdKonsultanSignature,
+        },
+        {
+          'peran': report.ttdPpkJabatan?.trim() ?? '',
+          'instansi': '',
+          'nama': report.ttdPpkNama?.trim() ?? '',
+          'tanggal': report.ttdPpkTanggal?.trim() ?? '',
+          'signature': report.ttdPpkSignature,
+        },
+      ];
+      for (final legacy in legacyEntries) {
+        if (hasEntryContent(legacy)) {
+          items.add(
+            _TtdBulananDraftItem(
+              peran: legacy['peran']?.toString() ?? '',
+              instansi: legacy['instansi']?.toString() ?? '',
+              nama: legacy['nama']?.toString() ?? '',
+              tanggal: legacy['tanggal']?.toString() ?? '',
+              signatureBase64: legacy['signature']?.toString(),
+            ),
+          );
+        }
+      }
+    }
+
+    if (items.isEmpty) {
       items.add(
         _TtdBulananDraftItem(
-          peran: 'Kontraktor Pelaksana',
-          instansi: report.pelaksanaKontraktor,
-          nama: report.ttdKontraktorNama ?? '',
-          tanggal: report.ttdKontraktorTanggal ?? dateStr,
-          signatureBase64: report.ttdKontraktorSignature,
-        ),
-      );
-      items.add(
-        _TtdBulananDraftItem(
-          peran: 'Konsultan Supervisi',
-          instansi: report.konsultanPengawas,
-          nama: report.ttdKonsultanNama ?? '',
-          tanggal: report.ttdKonsultanTanggal ?? dateStr,
-          signatureBase64: report.ttdKonsultanSignature,
-        ),
-      );
-      final dinasDefault = _selectedContract!.instansiDinas.isNotEmpty
-          ? _selectedContract!.instansiDinas.first
-          : '';
-      items.add(
-        _TtdBulananDraftItem(
-          peran: 'Pejabat Pembuat Komitmen (PPK)',
-          instansi: dinasDefault,
-          nama: report.ttdPpkNama ?? '',
-          tanggal: report.ttdPpkTanggal ?? dateStr,
-          signatureBase64: report.ttdPpkSignature,
+          peran: '',
+          instansi: '',
+          nama: '',
+          tanggal: '',
         ),
       );
     }
@@ -423,10 +452,10 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
               setModalState(() {
                 items.add(
                   _TtdBulananDraftItem(
-                    peran: 'Pengawas Lapangan',
+                    peran: '',
                     instansi: '',
                     nama: '',
-                    tanggal: report.periodeFormatted.split('-').last.trim(),
+                    tanggal: '',
                   ),
                 );
               });
@@ -634,29 +663,42 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            final cleanList = items.map((e) => e.toMap()).toList();
+                            final cleanList = items
+                                .map((e) => e.toMap())
+                                .where((m) =>
+                                    (m['peran']?.toString().trim().isNotEmpty ?? false) ||
+                                    (m['instansi']?.toString().trim().isNotEmpty ?? false) ||
+                                    (m['nama']?.toString().trim().isNotEmpty ?? false) ||
+                                    (m['tanggal']?.toString().trim().isNotEmpty ?? false) ||
+                                    (m['signature']?.toString().trim().isNotEmpty ?? false))
+                                .toList();
                             final Map<String, dynamic> dataToSave = Map<String, dynamic>.from(existingData ?? {});
                             dataToSave['bulanKe'] = report.bulanKe;
                             dataToSave['ttdList'] = cleanList;
 
-                            final ttdK = items.isNotEmpty ? items[0] : null;
-                            final ttdS = items.length > 1 ? items[1] : null;
-                            final ttdP = items.length > 2 ? items[2] : null;
+                            String? nonEmptyOrNull(String? val) {
+                              final trimmed = val?.trim() ?? '';
+                              return trimmed.isEmpty ? null : trimmed;
+                            }
 
-                            dataToSave['ttdKontraktorNama'] = ttdK?.namaController.text.trim();
-                            dataToSave['ttdKontraktorJabatan'] = ttdK?.peranController.text.trim();
-                            dataToSave['ttdKontraktorSignature'] = ttdK?.signatureBase64;
-                            dataToSave['ttdKontraktorTanggal'] = ttdK?.tanggalController.text.trim();
+                            final ttdK = cleanList.isNotEmpty ? cleanList[0] : null;
+                            final ttdS = cleanList.length > 1 ? cleanList[1] : null;
+                            final ttdP = cleanList.length > 2 ? cleanList[2] : null;
 
-                            dataToSave['ttdKonsultanNama'] = ttdS?.namaController.text.trim();
-                            dataToSave['ttdKonsultanJabatan'] = ttdS?.peranController.text.trim();
-                            dataToSave['ttdKonsultanSignature'] = ttdS?.signatureBase64;
-                            dataToSave['ttdKonsultanTanggal'] = ttdS?.tanggalController.text.trim();
+                            dataToSave['ttdKontraktorNama'] = nonEmptyOrNull(ttdK?['nama']?.toString());
+                            dataToSave['ttdKontraktorJabatan'] = nonEmptyOrNull(ttdK?['peran']?.toString());
+                            dataToSave['ttdKontraktorSignature'] = nonEmptyOrNull(ttdK?['signature']?.toString());
+                            dataToSave['ttdKontraktorTanggal'] = nonEmptyOrNull(ttdK?['tanggal']?.toString());
 
-                            dataToSave['ttdPpkNama'] = ttdP?.namaController.text.trim();
-                            dataToSave['ttdPpkJabatan'] = ttdP?.peranController.text.trim();
-                            dataToSave['ttdPpkSignature'] = ttdP?.signatureBase64;
-                            dataToSave['ttdPpkTanggal'] = ttdP?.tanggalController.text.trim();
+                            dataToSave['ttdKonsultanNama'] = nonEmptyOrNull(ttdS?['nama']?.toString());
+                            dataToSave['ttdKonsultanJabatan'] = nonEmptyOrNull(ttdS?['peran']?.toString());
+                            dataToSave['ttdKonsultanSignature'] = nonEmptyOrNull(ttdS?['signature']?.toString());
+                            dataToSave['ttdKonsultanTanggal'] = nonEmptyOrNull(ttdS?['tanggal']?.toString());
+
+                            dataToSave['ttdPpkNama'] = nonEmptyOrNull(ttdP?['nama']?.toString());
+                            dataToSave['ttdPpkJabatan'] = nonEmptyOrNull(ttdP?['peran']?.toString());
+                            dataToSave['ttdPpkSignature'] = nonEmptyOrNull(ttdP?['signature']?.toString());
+                            dataToSave['ttdPpkTanggal'] = nonEmptyOrNull(ttdP?['tanggal']?.toString());
 
                             kegMap[existingKey] = dataToSave;
 
@@ -745,6 +787,10 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+            onPressed: () => goBackOrParent(context, '/laporan'),
+          ),
           title: const Text('Laporan Bulanan'),
           backgroundColor: Colors.white,
           foregroundColor: AppColors.textDark,
@@ -813,6 +859,10 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+            onPressed: () => goBackOrParent(context, '/laporan'),
+          ),
           title: const Text('Laporan Bulanan'),
           backgroundColor: Colors.white,
           foregroundColor: AppColors.textDark,
@@ -1128,63 +1178,60 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Top Row: Roman Badge & Title + Status Chip
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: hasData ? AppColors.blueLight : const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Center(
-                              child: Text(
-                                report.bulanRomawi,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: hasData ? AppColors.primaryBlue : const Color(0xFF475569),
-                                ),
+                LayoutBuilder(
+                  builder: (context, headerConstraints) {
+                    final titleSection = Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: hasData ? AppColors.blueLight : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Text(
+                              report.bulanRomawi,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: hasData ? AppColors.primaryBlue : const Color(0xFF475569),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'BULAN ${report.bulanRomawi}',
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF0F172A),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'BULAN ${report.bulanRomawi}',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
                                 ),
-                                Text(
-                                  report.namaBulan,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF475569),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                report.namaBulan,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF475569),
                                 ),
-                              ],
-                            ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
+                        ),
+                      ],
+                    );
+
+                    final statusChip = Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: statusBgColor,
@@ -1196,18 +1243,42 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
                         children: [
                           Icon(statusIcon, size: 13, color: statusTextColor),
                           const SizedBox(width: 4),
-                          Text(
-                            report.status,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: statusTextColor,
+                          Flexible(
+                            child: Text(
+                              report.status,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: statusTextColor,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                    );
+
+                    if (headerConstraints.maxWidth < 280) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          titleSection,
+                          const SizedBox(height: 8),
+                          statusChip,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(child: titleSection),
+                        const SizedBox(width: 8),
+                        Flexible(child: statusChip),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
 
@@ -1234,51 +1305,41 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
 
                 // Metrics (Rencana, Realisasi, Deviasi)
                 if (hasData) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildMetricItem(
-                          'Rencana',
-                          '${report.rencanaFisikPersen.toStringAsFixed(2)}%',
-                          const Color(0xFF334155),
-                        ),
-                      ),
-                      Expanded(
-                        child: _buildMetricItem(
-                          'Realisasi',
-                          '${report.realisasiKumulatifPersen.toStringAsFixed(2)}%',
-                          AppColors.primaryBlue,
-                          bold: true,
-                        ),
-                      ),
-                      Expanded(
-                        child: _buildMetricItem(
-                          'Deviasi',
-                          '${report.deviasiPersen >= 0 ? '+' : ''}${report.deviasiPersen.toStringAsFixed(2)}%',
-                          report.deviasiPersen >= 0
-                              ? const Color(0xFF137333)
-                              : const Color(0xFFC5221F),
-                          bold: true,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Role Dinas: tidak dapat menandatangani laporan.
-                      if (_tryReadUserProfile(context)?.isDinas ?? false)
-                        const SizedBox.shrink()
-                      else
-                        OutlinedButton.icon(
-                        onPressed: () => _openTandaTanganBulananModal(context, report),
-                        icon: const Icon(Icons.draw_outlined, size: 13, color: AppColors.primaryBlue),
-                        label: const Text('Tanda Tangan', style: TextStyle(fontSize: 11, color: AppColors.primaryBlue)),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppColors.primaryBlue),
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Row(
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isCompact = constraints.maxWidth < 520;
+                      final canSign =
+                          !(_tryReadUserProfile(context)?.isDinas ?? false);
+                      final signButton = canSign
+                          ? OutlinedButton.icon(
+                              onPressed: () =>
+                                  _openTandaTanganBulananModal(context, report),
+                              icon: const Icon(
+                                Icons.draw_outlined,
+                                size: 13,
+                                color: AppColors.primaryBlue,
+                              ),
+                              label: const Text(
+                                'Tanda Tangan',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.primaryBlue,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(
+                                  color: AppColors.primaryBlue,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            )
+                          : const SizedBox.shrink();
+                      final openHint = Row(
                         mainAxisSize: MainAxisSize.min,
                         children: const [
                           Text(
@@ -1295,8 +1356,74 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
                             color: AppColors.primaryBlue,
                           ),
                         ],
-                      ),
-                    ],
+                      );
+                      final metricsRow = Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _buildMetricItem(
+                              'Rencana',
+                              '${report.rencanaFisikPersen.toStringAsFixed(2)}%',
+                              const Color(0xFF334155),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildMetricItem(
+                              'Realisasi',
+                              '${report.realisasiKumulatifPersen.toStringAsFixed(2)}%',
+                              AppColors.primaryBlue,
+                              bold: true,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildMetricItem(
+                              'Deviasi',
+                              '${report.deviasiPersen >= 0 ? '+' : ''}${report.deviasiPersen.toStringAsFixed(2)}%',
+                              report.deviasiPersen >= 0
+                                  ? const Color(0xFF137333)
+                                  : const Color(0xFFC5221F),
+                              bold: true,
+                            ),
+                          ),
+                        ],
+                      );
+
+                      if (isCompact) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            metricsRow,
+                            const SizedBox(height: 12),
+                            Wrap(
+                              alignment: canSign
+                                  ? WrapAlignment.spaceBetween
+                                  : WrapAlignment.end,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                if (canSign) signButton,
+                                openHint,
+                              ],
+                            ),
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          Expanded(child: metricsRow),
+                          const SizedBox(width: 12),
+                          if (canSign) ...[
+                            signButton,
+                            const SizedBox(width: 8),
+                          ],
+                          openHint,
+                        ],
+                      );
+                    },
                   ),
                 ] else ...[
                   Row(
@@ -1341,15 +1468,22 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
       children: [
         Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 11, color: AppColors.textLight),
         ),
         const SizedBox(height: 2),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: bold ? FontWeight.bold : FontWeight.w600,
-            color: color,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            maxLines: 1,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: bold ? FontWeight.bold : FontWeight.w600,
+              color: color,
+            ),
           ),
         ),
       ],

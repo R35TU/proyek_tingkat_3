@@ -405,15 +405,32 @@ void main() {
       expect(weeksDuringW2[2].status, WeeklyPeriodStatus.upcoming);
       expect(weeksDuringW2[2].statusLabel, 'Upcoming');
 
-      // 3) Jika referenceDate = 10 Desember 2026 & Minggu 2 sudah berakhir TETAPI belum ada laporan mingguan:
-      // Tidak boleh Completed karena laporan belum diselesaikan -> tetap On Progress!
+      // 3) Jika referenceDate = 10 Desember 2026 & Minggu 2 sudah berakhir:
+      // Walaupun belum ada laporan mingguan tersimpan, periode tetap otomatis Completed.
       final weeksLater = ExecutionPeriodHelper.generateWeeklyPeriods(
         contract: synced,
         kegMap: synced.kegiatans.first,
         referenceDate: DateTime(2026, 12, 10),
       );
-      expect(weeksLater[1].status, WeeklyPeriodStatus.onProgress);
-      expect(weeksLater[1].statusLabel, 'On Progress');
+      expect(weeksLater[1].status, WeeklyPeriodStatus.completed);
+      expect(weeksLater[1].statusLabel, 'Completed');
+
+      // 4) Verifikasi tepat di batas transisi minggu:
+      // Minggu 1 (20 Nov - 26 Nov 2026), Minggu 2 (27 Nov - 3 Des 2026) pada tanggal 27 Nov 2026
+      // tanpa ada laporan mingguan tersimpan sama sekali -> Minggu 1 Completed, Minggu 2 On Progress.
+      final noSavedKeg = Map<String, dynamic>.from(synced.kegiatans.first);
+      noSavedKeg['laporanMingguan'] = [];
+      final weeksBoundary = ExecutionPeriodHelper.generateWeeklyPeriods(
+        contract: synced,
+        kegMap: noSavedKeg,
+        referenceDate: DateTime(2026, 11, 27),
+      );
+      expect(weeksBoundary[0].status, WeeklyPeriodStatus.completed);
+      expect(weeksBoundary[0].statusLabel, 'Completed');
+      expect(weeksBoundary[1].status, WeeklyPeriodStatus.onProgress);
+      expect(weeksBoundary[1].statusLabel, 'On Progress');
+      expect(weeksBoundary[2].status, WeeklyPeriodStatus.upcoming);
+      expect(weeksBoundary[2].statusLabel, 'Upcoming');
     });
   });
 
