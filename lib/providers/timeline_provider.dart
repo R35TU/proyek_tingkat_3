@@ -436,6 +436,10 @@ class TimelineProvider with ChangeNotifier {
     // dipakai untuk membersihkan event basi/duplikat/terhapus.
     final expectedReportEventIds = <String>{};
 
+    // Event sintetis "Penetapan Kegiatan" yang sudah diwakili event asli
+    // (hasil logEvent saat kegiatan ditambahkan) dan harus dibuang.
+    final staleKegEventIds = <String>{};
+
     for (final c in contracts) {
       final cId = c.id;
       final cName = c.namaKontrak;
@@ -507,9 +511,23 @@ class TimelineProvider with ChangeNotifier {
         final kegId = 'keg_${cId}_$kIdx';
 
         // 3a. Event Pembuatan Kegiatan
+        // Event "Penetapan Kegiatan" sudah dicatat saat pengguna menambahkan
+        // kegiatan (DetailKontrakScreen._addKegiatan). Bila event asli itu
+        // ada, event sintetis tidak dibuat dan sisa event sintetis lama
+        // (yang dulu bertanggal tetap 18 April 2026) dibersihkan agar
+        // timeline tidak menampilkan dua penetapan untuk kegiatan yang sama.
         final kegEventId = 'timeline_keg_create_${cId}_$kIdx';
-        if (!existingIds.contains(kegEventId)) {
-          final kegTime = DateTime(2026, 4, 18, 10, 0);
+        final hasLoggedKegEvent = _events.any((e) =>
+            e.id != kegEventId &&
+            e.contractId == cId &&
+            (e.kegiatanName ?? '').trim() == kName.trim() &&
+            e.title.startsWith('Penetapan Kegiatan:'));
+        if (hasLoggedKegEvent) {
+          if (existingIds.contains(kegEventId)) {
+            staleKegEventIds.add(kegEventId);
+          }
+        } else if (!existingIds.contains(kegEventId)) {
+          final kegTime = _kegiatanCreatedAt(keg, c) ?? DateTime.now();
           _events.add(TimelineEventModel(
             id: kegEventId,
             timestamp: kegTime,
@@ -732,6 +750,28 @@ class TimelineProvider with ChangeNotifier {
       }
     }
 
+    // Hapus event sintetis penetapan kegiatan yang kini sudah diwakili oleh
+    // event asli, supaya tidak muncul sebagai riwayat ganda.
+    if (staleKegEventIds.isNotEmpty) {
+      _events.removeWhere((e) => staleKegEventIds.contains(e.id));
+      existingIds.removeAll(staleKegEventIds);
+      await _saveEvents();
+      final db = _db;
+      if (db != null) {
+        try {
+          final batch = db.batch();
+          for (final id in staleKegEventIds) {
+            batch.delete(db.collection(_cloudCollection).doc(id));
+          }
+          await batch.commit();
+        } catch (e) {
+          debugPrint(
+              '[TimelineProvider] Gagal hapus event penetapan sintetis: $e');
+        }
+      }
+      notifyListeners();
+    }
+
     if (hasNewEvents) {
       _sortEvents();
       await _saveEvents();
@@ -852,6 +892,29 @@ class TimelineProvider with ChangeNotifier {
 
       return true;
     }).toList();
+  }
+
+  /// Waktu pembuatan kegiatan bila tercatat pada datanya; cadangan tanggal
+  /// mulai kontrak, dan tidak pernah melewati waktu sekarang.
+  DateTime? _kegiatanCreatedAt(
+    Map<String, dynamic> keg,
+    ContractModel contract,
+  ) {
+    DateTime? time;
+    for (final key in const [
+      'createdAt',
+      'docCreateTime',
+      'tanggalDibuat',
+      'timestamp',
+    ]) {
+      time = DateTime.tryParse(keg[key]?.toString() ?? '')?.toLocal();
+      if (time != null) break;
+    }
+    time ??= DateTime.tryParse(contract.tglMulaiSpk);
+    time ??= DateTime.tryParse(contract.tglMulaiSpmk);
+    final now = DateTime.now();
+    if (time == null) return now;
+    return time.isAfter(now) ? now : time;
   }
 
   /// Kontrak sumber event, bila masih termuat di memori.
