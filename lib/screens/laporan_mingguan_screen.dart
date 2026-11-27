@@ -219,6 +219,15 @@ class _LaporanMingguanScreenState extends State<LaporanMingguanScreen>
     );
   }
 
+  /// Role Dinas bersifat pemantau (tanpa hak isi/edit laporan).
+  bool _isDinasViewer() {
+    try {
+      return Provider.of<UserProfileProvider>(context, listen: false).isDinas;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Menyusun objek WeeklyReportModel sinkron untuk kebutuhan pratinjau / PDF
   /// dari data periode mingguan terpilih.
   WeeklyReportModel _buildEffectiveReport(
@@ -1118,7 +1127,9 @@ class _LaporanMingguanScreenState extends State<LaporanMingguanScreen>
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
-            if (item.hasSavedReport) {
+            // Dinas hanya boleh melihat: selalu buka pratinjau, bukan form
+            // pengisian laporan mingguan.
+            if (item.hasSavedReport || _isDinasViewer()) {
               _openDetailModal(item, contract, kegMap, allWeeks);
             } else {
               _openFormForWeek(item, contract, kegMap, allWeeks);
