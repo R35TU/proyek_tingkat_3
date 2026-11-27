@@ -8,6 +8,7 @@ import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/screens/detail_data_laporan_screen.dart';
+import 'package:tata_saka_app/utils/contract_access.dart';
 import 'package:tata_saka_app/utils/progress_calculator.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
@@ -35,28 +36,13 @@ class _DataLaporanScreenState extends State<DataLaporanScreen> {
     UserProfileProvider userProf,
   ) {
     final currentUserUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    final kKontraktorUid = (k['kontraktorUid'] ?? '').toString();
-
-    // FIRST: match by kontraktorUid
-    if (currentUserUid.isNotEmpty && kKontraktorUid.isNotEmpty && kKontraktorUid == currentUserUid) {
-      return true;
-    }
-
-    final contractorName = userProf.namaLengkap.toLowerCase();
-    final kKontraktor = (k['kontraktor'] ?? '').toString().toLowerCase();
-    if (kKontraktor.isEmpty) return false;
-    if (kKontraktor.contains(contractorName) ||
-        contractorName.contains(kKontraktor)) {
-      return true;
-    }
-    if (contractorName.contains('divan') && kKontraktor.contains('divan')) {
-      return true;
-    }
-    if (contractorName.contains('langgeng') &&
-        kKontraktor.contains('langgeng')) {
-      return true;
-    }
-    return false;
+    return ContractAccess.kegiatanOwnedByKontraktor(
+      k,
+      contractorUid: currentUserUid,
+      fullName: userProf.namaLengkap,
+      companyOrAgency: userProf.companyOrAgency,
+      username: userProf.username,
+    );
   }
 
   void _showPilihKegiatanSheet(

@@ -71,6 +71,14 @@ class ContractProvider with ChangeNotifier {
     }
   }
 
+  /// Kunci mirror lokal khusus akun ini. Tidak memakai kunci global `contracts`
+  /// agar data satu akun tidak terbaca akun lain di perangkat/browser yang sama
+  /// (di web, SharedPreferences = localStorage yang tidak terpisah per akun).
+  String get _localContractsKey {
+    final uid = _currentUid;
+    return uid.isEmpty ? '' : 'contracts_$uid';
+  }
+
   ContractProvider({FirebaseFirestore? db}) : _injectedDb = db {
     _loadFromLocalFallback().then((_) {
       _loadFuture = _loadContracts();
@@ -84,8 +92,14 @@ class ContractProvider with ChangeNotifier {
           if (_loadInFlight && _loadFuture != null) await _loadFuture;
           _loadFuture = _loadContracts();
         } else {
-          // Logout → sesi berikutnya boleh memuat ulang datanya sendiri.
+          // Logout → jangan tinggalkan data akun sebelumnya di memori/layar.
           _loadedUid = null;
+          _contracts = [];
+          for (final sub in _dokumenSubs.values) {
+            sub.cancel();
+          }
+          _dokumenSubs.clear();
+          if (!_disposed) notifyListeners();
         }
       });
     } catch (_) {
@@ -292,8 +306,14 @@ class ContractProvider with ChangeNotifier {
   /// Fallback offline: baca mirror JSON di SharedPreferences.
   Future<void> _loadFromLocalFallback() async {
     try {
+      final key = _localContractsKey;
+      if (key.isEmpty) {
+        // Sesi belum diketahui → jangan tampilkan mirror milik akun lain.
+        _contracts = [];
+        return;
+      }
       final prefs = await SharedPreferences.getInstance();
-      final String? contractsJson = prefs.getString('contracts');
+      final String? contractsJson = prefs.getString(key);
       if (contractsJson != null) {
         final List<dynamic> decoded = jsonDecode(contractsJson);
         _contracts = decoded
@@ -310,9 +330,11 @@ class ContractProvider with ChangeNotifier {
   /// Mirror cadangan ke SharedPreferences (dipakai saat offline).
   Future<void> _saveLocalBackup() async {
     try {
+      final key = _localContractsKey;
+      if (key.isEmpty) return;
       final prefs = await SharedPreferences.getInstance();
       final encoded = jsonEncode(_contracts.map((c) => c.toJson()).toList());
-      await prefs.setString('contracts', encoded);
+      await prefs.setString(key, encoded);
     } catch (_) {}
   }
 

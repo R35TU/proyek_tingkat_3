@@ -12,6 +12,7 @@ import 'package:tata_saka_app/screens/edit_profil_screen.dart';
 import 'package:tata_saka_app/screens/keamanan_screen.dart';
 import 'package:tata_saka_app/screens/pengaturan_screen.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/utils/contract_access.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 
@@ -423,8 +424,19 @@ class _SettingScreenState extends State<SettingScreen> {
                 const SizedBox(height: 12),
                 Consumer<ContractProvider>(
                   builder: (context, provider, child) {
-                    final contracts = provider.contracts;
+                    // Hanya proyek yang benar-benar terkait akun ini:
+                    // kontraktor → kegiatan yang ditugaskan kepadanya,
+                    // dinas → kontrak dengan dinasUid/nama instansinya.
+                    final contracts = ContractAccess.visibleContracts(
+                      provider.contracts,
+                      userProf,
+                    );
                     if (contracts.isEmpty) {
+                      final emptyMessage = userProf.isKontraktor
+                          ? 'Belum ada kegiatan yang ditugaskan kepada akun Anda.'
+                          : (userProf.isDinas
+                              ? 'Belum ada proyek yang terkait dengan instansi Anda.'
+                              : 'Belum ada proyek atau kontrak aktif.');
                       return Container(
                         padding: const EdgeInsets.all(20),
                         width: double.infinity,
@@ -435,7 +447,8 @@ class _SettingScreenState extends State<SettingScreen> {
                         ),
                         child: Center(
                           child: Text(
-                            'Belum ada proyek atau kontrak aktif.',
+                            emptyMessage,
+                            textAlign: TextAlign.center,
                             style: TextStyle(color: AppColors.getTextLight(context), fontSize: 13),
                           ),
                         ),
