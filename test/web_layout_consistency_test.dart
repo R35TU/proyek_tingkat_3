@@ -68,7 +68,7 @@ void main() {
         // 1. Initial State: On Dashboard
         expect(find.byType(VerticalDivider), findsOneWidget);
         expect(find.text('CV. TATA SAKA CONSULTANT'), findsOneWidget);
-        expect(find.text('Engineering Consultant'), findsOneWidget);
+        expect(find.text('KONSULTAN TEKNIS'), findsOneWidget);
         expect(find.text('Dashboard'), findsWidgets);
 
         // 2. Click 'Kontrak' on the Sidebar
@@ -80,7 +80,7 @@ void main() {
         // 3. Verify Sidebar is STILL visible
         expect(find.byType(VerticalDivider), findsOneWidget);
         expect(find.text('CV. TATA SAKA CONSULTANT'), findsOneWidget);
-        expect(find.text('Engineering Consultant'), findsOneWidget);
+        expect(find.text('KONSULTAN TEKNIS'), findsOneWidget);
 
         // 4. Verify Heading is STILL visible and updated to Kontrak
         expect(find.text('Kontrak'), findsWidgets);

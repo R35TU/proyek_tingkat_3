@@ -345,7 +345,7 @@ class PanduanFaqScreen extends StatelessWidget {
         'Menu Navigasi (Sidebar Kiri): Dashboard, Pelaporan (Laporan, '
         'Buat Laporan, Laporan Harian, Laporan Mingguan, Laporan Bulanan), '
         'Histori (Timeline & Histori), Akun & Pengaturan '
-        '(Pengaturan Akun, Keamanan & Sandi, Edit Profil), dan Keluar / '
+        '(Akun, Pengaturan Akun, Keamanan & Sandi, Edit Profil), dan Keluar / '
         'Logout.',
       ),
     ]),

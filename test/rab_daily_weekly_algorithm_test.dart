@@ -81,7 +81,7 @@ void main() {
       });
 
       final contractProvider = ContractProvider();
-      contractProvider.addContract(testContract);
+      await contractProvider.addContract(testContract);
 
       await tester.pumpWidget(
         MultiProvider(
@@ -90,6 +90,7 @@ void main() {
             home: BuatLaporanScreen(
               initialContract: testContract,
               initialKegiatanIndex: 0,
+              initialDate: DateTime(2026, 4, 22),
             ),
           ),
         ),
@@ -135,7 +136,7 @@ void main() {
       });
 
       final contractProvider = ContractProvider();
-      contractProvider.addContract(testContract);
+      await contractProvider.addContract(testContract);
 
       await tester.pumpWidget(
         MultiProvider(
@@ -144,6 +145,7 @@ void main() {
             home: BuatLaporanScreen(
               initialContract: testContract,
               initialKegiatanIndex: 0,
+              initialDate: DateTime(2026, 4, 22),
             ),
           ),
         ),
@@ -181,7 +183,7 @@ void main() {
       });
 
       final contractProvider = ContractProvider();
-      contractProvider.addContract(testContract);
+      await contractProvider.addContract(testContract);
 
       await tester.pumpWidget(
         MultiProvider(
@@ -190,6 +192,7 @@ void main() {
             home: BuatLaporanScreen(
               initialContract: testContract,
               initialKegiatanIndex: 0,
+              initialDate: DateTime(2026, 4, 22),
             ),
           ),
         ),

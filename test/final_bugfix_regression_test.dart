@@ -18,11 +18,14 @@ import 'package:tata_saka_app/screens/dashboard_screen.dart';
 import 'package:tata_saka_app/screens/data_laporan_screen.dart';
 import 'package:tata_saka_app/screens/detail_data_laporan_screen.dart';
 import 'package:tata_saka_app/screens/detail_kegiatan_screen.dart';
+import 'package:tata_saka_app/screens/edit_profil_screen.dart';
+import 'package:tata_saka_app/screens/keamanan_screen.dart';
 import 'package:tata_saka_app/screens/kontrak_screen.dart';
 import 'package:tata_saka_app/screens/laporan_bulanan_screen.dart';
 import 'package:tata_saka_app/screens/laporan_mingguan_screen.dart';
 import 'package:tata_saka_app/screens/laporan_screen.dart';
 import 'package:tata_saka_app/screens/panduan_faq_screen.dart';
+import 'package:tata_saka_app/screens/pengaturan_screen.dart';
 import 'package:tata_saka_app/screens/setting_screen.dart';
 import 'package:tata_saka_app/screens/splash_screen.dart';
 import 'package:tata_saka_app/screens/timeline_screen.dart';
@@ -1273,6 +1276,230 @@ void main() {
           );
           expect(find.byType(expectedScreen), findsOneWidget);
         }
+      },
+    );
+
+    testWidgets(
+      '15. Web Sidebar & Mobile Dark Drawer AKUN & PENGATURAN has exact 4 ordered menus [Akun, Pengaturan Akun, Keamanan & Sandi, Edit Profil], accurate active states, and Back history',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        resetShellRouteHistory();
+
+        bool isWebSidebarKeyActive(String key) {
+          final itemFinder = find.byKey(ValueKey('sidebar_$key'));
+          final activeContainer = find.descendant(
+            of: itemFinder,
+            matching: find.byWidgetPredicate(
+              (w) =>
+                  w is AnimatedContainer &&
+                  w.decoration is BoxDecoration &&
+                  (w.decoration as BoxDecoration).color ==
+                      const Color(0xFF1E293B),
+            ),
+          );
+          return activeContainer.evaluate().isNotEmpty;
+        }
+
+        final userProf = UserProfileProvider()
+          ..loginAs(const RegisteredUser(
+            username: 'konsultan_akun_15',
+            password: 'password123',
+            role: 'Konsultan',
+            namaLengkap: 'Konsultan Akun Uji',
+            companyOrAgency: 'CV. Tata Saka Consultant',
+          ));
+        final contractProv = ContractProvider();
+        final router = createAppRouter(
+          userProf,
+          initialLocation: '/dashboard',
+        );
+        addTearDown(router.dispose);
+
+        // 1. Desktop Web (>= 900px)
+        tester.view.physicalSize = const Size(1280, 960);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          buildRoutedApp(
+            userProf: userProf,
+            router: router,
+            contractProv: contractProv,
+          ),
+        );
+        await tester.pumpAndSettle();
+        // Tambahkan kontrak setelah _loadContracts() awal selesai agar fallback
+        // lokal saat belum login Firebase tidak mengosongkan state uji.
+        await contractProv.addContract(makeUnsavedContract());
+        await tester.pumpAndSettle();
+
+        final akunFinder = find.byKey(const ValueKey('sidebar_akun'));
+        final pengFinder = find.byKey(const ValueKey('sidebar_pengaturan'));
+        final keamFinder = find.byKey(const ValueKey('sidebar_keamanan'));
+        final editFinder = find.byKey(const ValueKey('sidebar_edit_profil'));
+
+        for (final f in [akunFinder, pengFinder, keamFinder, editFinder]) {
+          await tester.ensureVisible(f);
+        }
+        await tester.pumpAndSettle();
+
+        expect(
+          tester.getTopLeft(akunFinder).dy,
+          lessThan(tester.getTopLeft(pengFinder).dy),
+        );
+        expect(
+          tester.getTopLeft(pengFinder).dy,
+          lessThan(tester.getTopLeft(keamFinder).dy),
+        );
+        expect(
+          tester.getTopLeft(keamFinder).dy,
+          lessThan(tester.getTopLeft(editFinder).dy),
+        );
+
+        // Klik Akun -> /akun (SettingScreen, BUKAN PengaturanScreen) & active indicator 'akun'
+        await tester.tap(akunFinder);
+        await tester.pumpAndSettle();
+        expect(router.routeInformationProvider.value.uri.path, '/akun');
+        expect(find.byType(SettingScreen), findsOneWidget);
+        expect(find.byType(PengaturanScreen), findsNothing);
+        expect(find.text('Konsultan Akun Uji'), findsWidgets);
+        expect(find.text('konsultan_akun_15'), findsWidgets);
+        expect(find.text('Paket Peningkatan Jalan Ruas Test'), findsOneWidget);
+        expect(isWebSidebarKeyActive('akun'), isTrue);
+        expect(isWebSidebarKeyActive('pengaturan'), isFalse);
+
+        // Klik Pengaturan Akun -> /akun/pengaturan (PengaturanScreen) & active indicator 'pengaturan'
+        await tester.ensureVisible(pengFinder);
+        await tester.tap(pengFinder);
+        await tester.pumpAndSettle();
+        expect(
+          router.routeInformationProvider.value.uri.path,
+          '/akun/pengaturan',
+        );
+        expect(find.byType(PengaturanScreen), findsOneWidget);
+        expect(isWebSidebarKeyActive('pengaturan'), isTrue);
+        expect(isWebSidebarKeyActive('akun'), isFalse);
+
+        // Klik Keamanan & Sandi -> /akun/keamanan (KeamananScreen) & active indicator 'keamanan'
+        await tester.ensureVisible(keamFinder);
+        await tester.tap(keamFinder);
+        await tester.pumpAndSettle();
+        expect(
+          router.routeInformationProvider.value.uri.path,
+          '/akun/keamanan',
+        );
+        expect(find.byType(KeamananScreen), findsOneWidget);
+        expect(isWebSidebarKeyActive('keamanan'), isTrue);
+        expect(isWebSidebarKeyActive('akun'), isFalse);
+
+        // Klik Edit Profil -> /akun/profil (EditProfilScreen) & active indicator 'edit_profil'
+        await tester.ensureVisible(editFinder);
+        await tester.tap(editFinder);
+        await tester.pumpAndSettle();
+        expect(router.routeInformationProvider.value.uri.path, '/akun/profil');
+        expect(find.byType(EditProfilScreen), findsOneWidget);
+        expect(isWebSidebarKeyActive('edit_profil'), isTrue);
+        expect(isWebSidebarKeyActive('akun'), isFalse);
+
+        // Kembali ke Dashboard -> konten lama Akun tidak membekas
+        final dashFinder = find.byKey(const ValueKey('sidebar_dashboard'));
+        await tester.scrollUntilVisible(
+          dashFinder,
+          -120,
+          scrollable: find
+              .ancestor(
+                of: editFinder,
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(dashFinder);
+        await tester.tap(dashFinder);
+        await tester.pumpAndSettle();
+        expect(router.routeInformationProvider.value.uri.path, '/dashboard');
+        expect(find.byType(SettingScreen), findsNothing);
+        expect(find.byType(EditProfilScreen), findsNothing);
+
+        // 2. Mobile Dark Drawer (< 900px)
+        tester.view.physicalSize = const Size(540, 960);
+        tester.view.devicePixelRatio = 1.0;
+
+        resetShellRouteHistory();
+        final mobileRouter = createAppRouter(
+          userProf,
+          initialLocation: '/dashboard',
+        );
+        addTearDown(mobileRouter.dispose);
+
+        await tester.pumpWidget(
+          buildRoutedApp(
+            userProf: userProf,
+            router: mobileRouter,
+            contractProv: contractProv,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.menu));
+        await tester.pumpAndSettle();
+
+        final drawerFinder = find.byKey(const ValueKey('mobile_dark_drawer'));
+        expect(drawerFinder, findsOneWidget);
+        expect(
+          tester.widget<Container>(drawerFinder).color,
+          const Color(0xFF0F172A),
+        );
+
+        final drawerScroll = find.descendant(
+          of: drawerFinder,
+          matching: find.byType(Scrollable),
+        );
+
+        final mobileLabels = [
+          'Akun',
+          'Pengaturan Akun',
+          'Keamanan & Sandi',
+          'Edit Profil',
+        ];
+        double prevDy = -1.0;
+        for (final label in mobileLabels) {
+          final itemFinder = find.descendant(
+            of: drawerFinder,
+            matching: find.text(label),
+          );
+          await tester.scrollUntilVisible(
+            itemFinder,
+            120,
+            scrollable: drawerScroll,
+          );
+          final dy = tester.getTopLeft(itemFinder).dy;
+          expect(dy, greaterThan(prevDy));
+          prevDy = dy;
+        }
+
+        // Tap Akun di Drawer Mobile -> membuka /akun (SettingScreen), bukan PengaturanScreen
+        final drawerAkun = find.descendant(
+          of: drawerFinder,
+          matching: find.text('Akun'),
+        );
+        await tester.ensureVisible(drawerAkun);
+        await tester.pumpAndSettle();
+        await tester.tap(drawerAkun);
+        await tester.pumpAndSettle();
+        expect(mobileRouter.routeInformationProvider.value.uri.path, '/akun');
+        expect(find.byType(SettingScreen), findsOneWidget);
+        expect(find.byType(PengaturanScreen), findsNothing);
+
+        // Tombol Back dari /akun kembali sesuai riwayat ke /dashboard
+        await tester.tap(find.byIcon(Icons.arrow_back));
+        await tester.pumpAndSettle();
+        expect(
+          mobileRouter.routeInformationProvider.value.uri.path,
+          '/dashboard',
+        );
+        expect(find.byType(DashboardScreen), findsOneWidget);
       },
     );
   });

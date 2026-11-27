@@ -448,8 +448,8 @@ void main() {
       // Memastikan indikator Kuning muncul: "Belum Sesuai" dan "Kekurangan: Rp 600.000"
       expect(find.text('Belum Sesuai'), findsOneWidget);
       expect(find.textContaining('Total RAB belum mencapai nilai kontrak kegiatan'), findsOneWidget);
-      expect(find.text('Rp 600.000'), findsOneWidget);
-      expect(find.text('40.000%'), findsWidgets);
+      expect(find.textContaining('Kekurangan: Rp 600.000'), findsOneWidget);
+      expect(find.textContaining('40.000%'), findsWidgets);
     });
 
     testWidgets('DetailKegiatanScreen menampilkan status Merah (Melebihi) saat Total RAB > Nilai Kontrak', (tester) async {
@@ -521,8 +521,8 @@ void main() {
       // Memastikan indikator Merah muncul: "Melebihi" dan "Kelebihan: Rp 200.000"
       expect(find.text('Melebihi'), findsOneWidget);
       expect(find.textContaining('Peringatan: Total RAB melebihi nilai kontrak kegiatan'), findsOneWidget);
-      expect(find.text('Rp 200.000'), findsOneWidget);
-      expect(find.text('120.000%'), findsWidgets);
+      expect(find.textContaining('Kelebihan: Rp 200.000'), findsOneWidget);
+      expect(find.textContaining('120.000%'), findsWidgets);
     });
 
     testWidgets('KelolaRkkScreen menampilkan status Belum Sesuai dan Kekurangan saat Total RAB < Nilai Kontrak', (tester) async {

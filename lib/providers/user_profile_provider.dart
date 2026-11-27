@@ -61,6 +61,9 @@ class LoginActivityItem {
   );
 }
 
+typedef AuthSessionResolver = Future<({bool enforceAuth, String? uid})>
+    Function();
+
 class UserProfileProvider with ChangeNotifier {
   static const String _prefProfileKey = 'user_profile_data';
   static const String _prefSettingsKey = 'app_settings_data';
@@ -77,6 +80,8 @@ class UserProfileProvider with ChangeNotifier {
 
   // ─── 1. ACTIVE USER PROFILE & ROLE ───
   bool _isInitialized = false;
+  bool _hasExplicitAuthMutation = false;
+  final AuthSessionResolver _authSessionResolver;
   String _uid = '';
   String _namaLengkap = '';
   String _username = '';
@@ -152,7 +157,19 @@ class UserProfileProvider with ChangeNotifier {
     return ThemeMode.light;
   }
 
-  UserProfileProvider() {
+  static Future<({bool enforceAuth, String? uid})>
+      _defaultAuthSessionResolver() async {
+    if (!AuthService.isFirebaseInitialized) {
+      return (enforceAuth: false, uid: null);
+    }
+    final user = await AuthService.resolveCurrentUser();
+    return (enforceAuth: true, uid: user?.uid);
+  }
+
+  UserProfileProvider({
+    @visibleForTesting AuthSessionResolver? authSessionResolver,
+  }) : _authSessionResolver =
+            authSessionResolver ?? _defaultAuthSessionResolver {
     _loadFromPreferences();
   }
 
@@ -161,19 +178,33 @@ class UserProfileProvider with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
 
       final profileJson = prefs.getString(_prefProfileKey);
-      if (profileJson != null) {
-        final Map<String, dynamic> p = jsonDecode(profileJson);
-        _uid = p['uid'] ?? AuthService.currentUser?.uid ?? _uid;
-        _namaLengkap = p['namaLengkap'] ?? _namaLengkap;
-        _username = p['username'] ?? _username;
-        _role = p['role'] ?? _role;
-        if (_role.toLowerCase() == 'konsultan') {
-          _companyOrAgency = 'CV. Tata Saka Consultant';
-        } else {
-          _companyOrAgency = p['companyOrAgency'] ?? _companyOrAgency;
+      if (profileJson != null && !_hasExplicitAuthMutation) {
+        final Map<String, dynamic> p =
+            Map<String, dynamic>.from(jsonDecode(profileJson) as Map);
+        final cachedUid = p['uid']?.toString().trim() ?? '';
+        final session = await _authSessionResolver();
+        final validSession = !session.enforceAuth ||
+            (session.uid != null &&
+                session.uid!.isNotEmpty &&
+                (cachedUid.isEmpty || cachedUid == session.uid));
+
+        if (validSession && !_hasExplicitAuthMutation) {
+          _uid = cachedUid.isNotEmpty
+              ? cachedUid
+              : (session.uid ?? AuthService.currentUser?.uid ?? _uid);
+          _namaLengkap = p['namaLengkap'] ?? _namaLengkap;
+          _username = p['username'] ?? _username;
+          _role = p['role'] ?? _role;
+          if (_role.toLowerCase() == 'konsultan') {
+            _companyOrAgency = 'CV. Tata Saka Consultant';
+          } else {
+            _companyOrAgency = p['companyOrAgency'] ?? _companyOrAgency;
+          }
+          _profileImagePath = p['profileImagePath'];
+          _currentPassword = p['currentPassword'] ?? _currentPassword;
+        } else if (!_hasExplicitAuthMutation) {
+          await prefs.remove(_prefProfileKey);
         }
-        _profileImagePath = p['profileImagePath'];
-        _currentPassword = p['currentPassword'] ?? _currentPassword;
       }
 
       final settingsJson = prefs.getString(_prefSettingsKey);
@@ -250,6 +281,7 @@ class UserProfileProvider with ChangeNotifier {
         await AuthService.signOut();
         return false;
       }
+      _hasExplicitAuthMutation = true;
       _uid = uid;
       final fallbackUsername = cleanInput.contains('@') ? cleanInput.split('@').first : cleanInput;
       _username = (doc['username'] ?? fallbackUsername).toString();
@@ -280,6 +312,7 @@ class UserProfileProvider with ChangeNotifier {
   }
 
   void loginAs(RegisteredUser user) {
+    _hasExplicitAuthMutation = true;
     _username = user.username;
     _role = user.role;
     _namaLengkap = user.namaLengkap;
@@ -391,6 +424,7 @@ class UserProfileProvider with ChangeNotifier {
 
   /// Logout: keluar dari Firebase Auth + bersihkan profil lokal.
   Future<void> logout() async {
+    _hasExplicitAuthMutation = true;
     try {
       await AuthService.signOut();
     } catch (_) {}
