@@ -1186,7 +1186,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ? timelineProv.getFilteredEvents(userProfile: userProf)
         : <TimelineEventModel>[];
 
-    final hasTimelineEvents = timelineEvents.isNotEmpty;
+    // Samakan urutan dengan Timeline & Histori: event yang tanggalnya masih
+    // di depan (mis. laporan bertanggal besok) tidak boleh menimpa aktivitas
+    // hari ini di posisi teratas. Di timeline event tersebut jatuh ke grup
+    // bulannya, di bawah "HARI INI".
+    final now = DateTime.now();
+    final endOfToday = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+    final recentEvents = List<TimelineEventModel>.from(timelineEvents)
+      ..sort((a, b) {
+        final aFuture = a.timestamp.isAfter(endOfToday);
+        final bFuture = b.timestamp.isAfter(endOfToday);
+        if (aFuture != bFuture) return aFuture ? 1 : -1;
+        return b.timestamp.compareTo(a.timestamp);
+      });
+
+    final hasTimelineEvents = recentEvents.isNotEmpty;
     final fallbackActivities = !hasTimelineEvents
         ? _extractRecentActivities(contracts, userProfile: userProf)
         : <Map<String, String>>[];
@@ -1237,7 +1251,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 16),
         if (hasTimelineEvents)
           Column(
-            children: timelineEvents
+            children: recentEvents
                 .take(5)
                 .map(
                   (ev) => Padding(
