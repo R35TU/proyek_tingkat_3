@@ -114,7 +114,7 @@ void main() {
 
       expect(find.byType(WebDashboardLayout), findsOneWidget);
       expect(find.text('CV. TATA SAKA CONSULTANT'), findsWidgets);
-      expect(find.text('Engineering Consultant'), findsOneWidget);
+      expect(find.text('KONSULTAN TEKNIS'), findsOneWidget);
       expect(find.byTooltip('Kembali'), findsOneWidget);
     });
 

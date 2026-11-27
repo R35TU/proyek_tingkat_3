@@ -229,9 +229,7 @@ void main() {
           ],
         );
 
-        SharedPreferences.setMockInitialValues({
-          'contracts': jsonEncode([contract.toJson()]),
-        });
+        SharedPreferences.setMockInitialValues({});
 
         final konsultanProfile = UserProfileProvider();
         konsultanProfile.loginAs(const RegisteredUser(
@@ -243,8 +241,7 @@ void main() {
         ));
 
         final contractProvider = ContractProvider();
-        contractProvider.contracts.clear();
-        contractProvider.contracts.add(contract);
+        await contractProvider.addContract(contract);
 
         tester.view.physicalSize = const Size(1280, 900);
         tester.view.devicePixelRatio = 1.0;
@@ -330,9 +327,7 @@ void main() {
           kegiatans: [keg],
         );
 
-        SharedPreferences.setMockInitialValues({
-          'contracts': jsonEncode([contract.toJson()]),
-        });
+        SharedPreferences.setMockInitialValues({});
 
         final konsultanProfile = UserProfileProvider();
         konsultanProfile.loginAs(const RegisteredUser(
@@ -344,8 +339,7 @@ void main() {
         ));
 
         final contractProvider = ContractProvider();
-        contractProvider.contracts.clear();
-        contractProvider.contracts.add(contract);
+        await contractProvider.addContract(contract);
 
         // 1. Periksa kalkulasi di DetailKegiatanScreen
         tester.view.physicalSize = const Size(1280, 1600);

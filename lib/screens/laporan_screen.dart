@@ -54,7 +54,7 @@ class LaporanScreen extends StatelessWidget {
             title: 'Laporan Harian',
             description:
                 'Lihat daftar proyek dan seluruh data\nlaporan harian yang tersimpan',
-            icon: Icons.folder_outlined,
+            icon: Icons.fact_check_outlined,
             iconBgColor: AppColors.blueLight,
             iconColor: AppColors.primaryBlue,
             onTap: () {

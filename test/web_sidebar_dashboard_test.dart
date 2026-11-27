@@ -70,7 +70,7 @@ void main() {
 
         // Drawer is opened, showing Corporate Slate Sidebar
         expect(find.text('CV. TATA SAKA CONSULTANT'), findsOneWidget);
-        expect(find.text('Engineering Consultant'), findsOneWidget);
+        expect(find.text('KONSULTAN TEKNIS'), findsOneWidget);
         for (final category in [
           'UTAMA',
           'PELAPORAN',
@@ -129,7 +129,7 @@ void main() {
         // Sidebar is visible in main body
         expect(find.byType(VerticalDivider), findsOneWidget);
         expect(find.text('CV. TATA SAKA CONSULTANT'), findsOneWidget);
-        expect(find.text('Engineering Consultant'), findsOneWidget);
+        expect(find.text('KONSULTAN TEKNIS'), findsOneWidget);
         expect(find.text('UTAMA'), findsOneWidget);
         expect(find.text('PELAPORAN'), findsOneWidget);
         // Menu yang dihapus TIDAK ada di Web sidebar

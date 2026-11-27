@@ -30,6 +30,14 @@ class AuthService {
   static FirebaseAuth get auth => FirebaseAuth.instance;
   static FirebaseFirestore get _db => FirebaseFirestore.instance;
 
+  static bool get isFirebaseInitialized {
+    try {
+      return Firebase.apps.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static User? get currentUser {
     try {
       return FirebaseAuth.instance.currentUser;
@@ -37,6 +45,23 @@ class AuthService {
       // Firebase belum diinisialisasi (lingkungan test / gagal init) →
       // perlakukan sebagai tidak ada sesi.
       return null;
+    }
+  }
+
+  /// Mengembalikan user Firebase Auth aktif saat inisialisasi aplikasi,
+  /// menunggu hidrasi persistensi auth bila Firebase sudah aktif tetapi
+  /// `currentUser` belum langsung terisi (mis. Web IndexedDB).
+  static Future<User?> resolveCurrentUser() async {
+    if (!isFirebaseInitialized) return null;
+    final direct = currentUser;
+    if (direct != null) return direct;
+    try {
+      return await auth
+          .authStateChanges()
+          .first
+          .timeout(const Duration(seconds: 2), onTimeout: () => currentUser);
+    } catch (_) {
+      return currentUser;
     }
   }
 

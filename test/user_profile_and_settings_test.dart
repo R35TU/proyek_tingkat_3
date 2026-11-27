@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/screens/edit_profil_screen.dart';
@@ -14,9 +16,27 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
+  const konsultanUser = RegisteredUser(
+    username: 'konsultan',
+    password: 'password123',
+    role: 'Konsultan',
+    namaLengkap: 'CV. Tata Saka Consultant',
+    companyOrAgency: 'CV. Tata Saka Consultant',
+  );
+
   group('UserProfileProvider Unit Tests', () {
-    test('Initial profile and default credentials are correct', () async {
+    test('Initial profile starts unauthenticated & empty, and loginAs populates authenticated Konsultan credentials', () async {
       final provider = UserProfileProvider();
+      expect(provider.isAuthenticated, isFalse);
+      expect(provider.namaLengkap, isEmpty);
+      expect(provider.username, isEmpty);
+      expect(provider.role, isEmpty);
+      expect(provider.profileImagePath, isNull);
+      expect(provider.cacheSize, '0 KB');
+      expect(provider.loginActivities, isEmpty);
+
+      provider.loginAs(konsultanUser);
+      expect(provider.isAuthenticated, isTrue);
       expect(provider.namaLengkap, 'CV. Tata Saka Consultant');
       expect(provider.username, 'konsultan');
       expect(provider.role, 'Konsultan');
@@ -25,7 +45,7 @@ void main() {
     });
 
     test('Updating namaLengkap works and preserves username & role', () async {
-      final provider = UserProfileProvider();
+      final provider = UserProfileProvider()..loginAs(konsultanUser);
       provider.updateNamaLengkap('CV. Tata Saka Konsultan Utama');
       expect(provider.namaLengkap, 'CV. Tata Saka Konsultan Utama');
       expect(provider.username, 'konsultan');
@@ -59,7 +79,7 @@ void main() {
     });
 
     test('Changing password validates old password and stores new password', () async {
-      final provider = UserProfileProvider();
+      final provider = UserProfileProvider()..loginAs(konsultanUser);
       final failed = await provider.changePassword('wrongpass', 'NewPass123!');
       expect(failed, isFalse);
       expect(provider.verifyCurrentPassword('password123'), isTrue);
@@ -71,17 +91,88 @@ void main() {
 
     test('Clearing cache resets cache size to 0 KB', () async {
       final provider = UserProfileProvider();
-      expect(provider.cacheSize, '12.4 MB');
+      expect(provider.cacheSize, '0 KB');
       provider.clearCache();
       expect(provider.cacheSize, '0 KB');
     });
 
-    test('Logout from all other devices removes non-current sessions', () async {
+    test('Logout from all other devices handles empty sessions safely without dummy data', () async {
       final provider = UserProfileProvider();
-      expect(provider.loginActivities.length, greaterThan(1));
+      expect(provider.loginActivities, isEmpty);
       provider.logoutFromAllOtherDevices();
-      expect(provider.loginActivities.length, 1);
-      expect(provider.loginActivities.first.isCurrent, isTrue);
+      expect(provider.loginActivities, isEmpty);
+    });
+
+    test('Enforced auth drops cached user_profile_data when Firebase Auth user is null', () async {
+      SharedPreferences.setMockInitialValues({
+        'user_profile_data': jsonEncode({
+          'uid': 'uid-dinas-old',
+          'username': 'dinas_pupr',
+          'role': 'Dinas',
+          'namaLengkap': 'Dinas PUPR',
+          'companyOrAgency': 'Dinas PUPR Kab. Purbalingga',
+        }),
+      });
+
+      final provider = UserProfileProvider(
+        authSessionResolver: () async => (enforceAuth: true, uid: null),
+      );
+      while (!provider.isInitialized) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+
+      expect(provider.isAuthenticated, isFalse);
+      expect(provider.username, isEmpty);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('user_profile_data'), isNull);
+    });
+
+    test('Enforced auth drops cached user_profile_data when UID mismatches active Firebase Auth session', () async {
+      SharedPreferences.setMockInitialValues({
+        'user_profile_data': jsonEncode({
+          'uid': 'uid-dinas-old',
+          'username': 'dinas_pupr',
+          'role': 'Dinas',
+          'namaLengkap': 'Dinas PUPR',
+          'companyOrAgency': 'Dinas PUPR Kab. Purbalingga',
+        }),
+      });
+
+      final provider = UserProfileProvider(
+        authSessionResolver: () async => (enforceAuth: true, uid: 'uid-konsultan-new'),
+      );
+      while (!provider.isInitialized) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+
+      expect(provider.isAuthenticated, isFalse);
+      expect(provider.username, isEmpty);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('user_profile_data'), isNull);
+    });
+
+    test('Enforced auth restores cached profile when UID matches active Firebase Auth session', () async {
+      SharedPreferences.setMockInitialValues({
+        'user_profile_data': jsonEncode({
+          'uid': 'uid-konsultan-1',
+          'username': 'konsultan1',
+          'role': 'Konsultan',
+          'namaLengkap': 'Konsultan Uji',
+          'companyOrAgency': 'CV. Tata Saka Consultant',
+        }),
+      });
+
+      final provider = UserProfileProvider(
+        authSessionResolver: () async => (enforceAuth: true, uid: 'uid-konsultan-1'),
+      );
+      while (!provider.isInitialized) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+
+      expect(provider.isAuthenticated, isTrue);
+      expect(provider.uid, 'uid-konsultan-1');
+      expect(provider.username, 'konsultan1');
+      expect(provider.role, 'Konsultan');
     });
   });
 
@@ -103,17 +194,49 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
 
-      await tester.pumpWidget(buildTestApp(const SettingScreen()));
+      final userProf = UserProfileProvider()..loginAs(konsultanUser);
+      final contractProv = ContractProvider();
+      await contractProv.addContract(
+        ContractModel(
+          id: 'ktr-akun-test-1',
+          namaKontrak: 'PAKET PENGAWASAN RUAS UJI',
+          jenisKegiatan: 'Pengawasan Teknis',
+          nomorSpk: 'SPK-01',
+          tglMulaiSpk: '20 April 2026',
+          nomorSpmk: 'SPMK-01',
+          tglMulaiSpmk: '20 April 2026',
+          tglSelesaiSpmk: '18 Juli 2026',
+          hariKalender: 90,
+          nilaiKontrak: 'Rp 250.000.000,00',
+          instansiDinas: ['DPU-PR'],
+          sumberDana: 'APBD',
+          deskripsi: 'Kontrak terkait uji tampilan Akun',
+          kegiatans: [],
+        ),
+      );
+
+      await tester.pumpWidget(
+        buildTestApp(
+          const SettingScreen(),
+          userProf: userProf,
+          contractProv: contractProv,
+        ),
+      );
       await tester.pumpAndSettle();
 
-      expect(find.text('Akun'), findsOneWidget);
+      // Pada layout Web Desktop (>= 900px), terdapat menu sidebar 'Akun' & judul header 'Akun'
+      final sidebarAkun = find.byKey(const ValueKey('sidebar_akun'));
+      expect(sidebarAkun, findsOneWidget);
+      expect(find.descendant(of: sidebarAkun, matching: find.text('Akun')), findsOneWidget);
+      expect(find.text('Akun'), findsNWidgets(2));
+
       expect(find.text('CV. Tata Saka Consultant'), findsWidgets);
       expect(find.text('konsultan'), findsOneWidget);
       expect(find.text('Konsultan'), findsWidgets);
 
       // Proyek Terkait
       expect(find.text('Proyek Terkait'), findsOneWidget);
-      expect(find.textContaining('PEMELIHARAAN BERKALA'), findsOneWidget);
+      expect(find.textContaining('PAKET PENGAWASAN RUAS UJI'), findsOneWidget);
 
       // Menu Lainnya
       expect(find.text('Pengaturan'), findsOneWidget);
@@ -123,7 +246,7 @@ void main() {
     });
 
     testWidgets('EditProfilScreen renders editable Nama Lengkap and disabled Username & Role', (tester) async {
-      final userProf = UserProfileProvider();
+      final userProf = UserProfileProvider()..loginAs(konsultanUser);
       await tester.pumpWidget(buildTestApp(const EditProfilScreen(), userProf: userProf));
       await tester.pumpAndSettle();
 
@@ -193,7 +316,7 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
 
-      final userProf = UserProfileProvider();
+      final userProf = UserProfileProvider()..loginAs(konsultanUser);
       await tester.pumpWidget(buildTestApp(const KeamananScreen(), userProf: userProf));
       await tester.pumpAndSettle();
 
@@ -205,9 +328,10 @@ void main() {
       expect(find.text('Mengandung angka'), findsOneWidget);
       expect(find.text('Mengandung simbol'), findsOneWidget);
 
-      // Aktivitas Login Terakhir
+      // Aktivitas Login Terakhir tanpa data dummy palsu
       expect(find.text('Aktivitas Login Terakhir'), findsOneWidget);
-      expect(find.text('iPhone 11'), findsOneWidget);
+      expect(find.text('iPhone 11'), findsNothing);
+      expect(find.text('Lihat Semua Aktivitas'), findsOneWidget);
       expect(find.text('Keluar Dari Semua Perangkat'), findsOneWidget);
 
       // Input password

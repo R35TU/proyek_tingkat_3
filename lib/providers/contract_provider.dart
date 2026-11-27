@@ -29,6 +29,7 @@ class ContractProvider with ChangeNotifier {
   /// Firestore diakses lazy: hanya saat operasi nyata berjalan (di dalam try),
   /// sehingga konstruktor tetap aman di lingkungan test / belum init Firebase.
   final FirebaseFirestore? _injectedDb;
+  final String Function() _uidProvider;
   List<ContractModel> _contracts = [];
   bool _isLoading = false;
 
@@ -49,23 +50,38 @@ class ContractProvider with ChangeNotifier {
   final Map<String, StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>
       _dokumenSubs = {};
   bool _snapshotRebuilding = false;
+  bool _retryingPending = false;
 
   /// UID yang datanya sudah dimuat penuh pada sesi ini — mencegah pembacaan
   /// ulang seluruh koleksi (kontrak + laporan + dokumen) di sesi yang sama.
   String? _loadedUid;
+  String? _activeSessionUid;
   bool _loadInFlight = false;
   Future<void>? _loadFuture;
   bool _disposed = false;
-  StreamSubscription<User?>? _authSub;
+  bool _wasSignedIn = false;
+  int _authEpoch = 0;
+  int _mutationSeq = 0;
+  final List<int> _inFlightLoadStartSeqs = [];
+  final Map<String, _LocalMutationRecord> _sessionMutations = {};
+  StreamSubscription<String?>? _authSub;
 
   bool get isLoading => _isLoading;
 
   FirebaseFirestore get _db => _injectedDb ?? FirebaseFirestore.instance;
 
+  static String _defaultFirebaseUid() {
+    try {
+      return FirebaseAuth.instance.currentUser?.uid ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   /// UID sesi Firebase Auth saat ini ('' bila belum login / belum init).
   String get _currentUid {
     try {
-      return FirebaseAuth.instance.currentUser?.uid ?? '';
+      return _uidProvider();
     } catch (_) {
       return '';
     }
@@ -79,28 +95,23 @@ class ContractProvider with ChangeNotifier {
     return uid.isEmpty ? '' : 'contracts_$uid';
   }
 
-  ContractProvider({FirebaseFirestore? db}) : _injectedDb = db {
-    _loadFromLocalFallback().then((_) {
-      _loadFuture = _loadContracts();
-    });
+  ContractProvider({
+    FirebaseFirestore? db,
+    @visibleForTesting String Function()? uidProvider,
+    @visibleForTesting Stream<String?>? authUidStream,
+  })  : _injectedDb = db,
+        _uidProvider = uidProvider ?? _defaultFirebaseUid {
+    final initialUid = _currentUid;
+    _wasSignedIn = initialUid.isNotEmpty;
+    _activeSessionUid = initialUid.isNotEmpty ? initialUid : null;
+    _loadFuture = _initLoad();
     // Muat ulang dari Firestore begitu sesi login Firebase Auth tersedia
     // (sebelum login, rules menolak baca → fallback lokal dipakai sementara).
     try {
-      _authSub = FirebaseAuth.instance.authStateChanges().listen((user) async {
-        if (user != null) {
-          // Tunggu pembacaan awal selesai agar tidak berjalan bersamaan.
-          if (_loadInFlight && _loadFuture != null) await _loadFuture;
-          _loadFuture = _loadContracts();
-        } else {
-          // Logout → jangan tinggalkan data akun sebelumnya di memori/layar.
-          _loadedUid = null;
-          _contracts = [];
-          for (final sub in _dokumenSubs.values) {
-            sub.cancel();
-          }
-          _dokumenSubs.clear();
-          if (!_disposed) notifyListeners();
-        }
+      final stream = authUidStream ??
+          FirebaseAuth.instance.authStateChanges().map((u) => u?.uid);
+      _authSub = stream.listen((rawUid) {
+        _handleAuthUidChanged(rawUid);
       });
     } catch (_) {
       // Firebase belum init (test) → abaikan.
@@ -117,6 +128,79 @@ class ContractProvider with ChangeNotifier {
     }
   }
 
+  void _clearWriteCaches() {
+    _reportDocCache.clear();
+    _weeklyDocCache.clear();
+    _dokumenDocCache.clear();
+    _deletedDocIds.clear();
+    _lastWrittenJson.clear();
+  }
+
+  void _cancelDokumenSubs() {
+    for (final sub in _dokumenSubs.values) {
+      sub.cancel();
+    }
+    _dokumenSubs.clear();
+  }
+
+  void _resetSessionState({bool clearSessionUid = true}) {
+    _loadedUid = null;
+    if (clearSessionUid) {
+      _wasSignedIn = false;
+      _activeSessionUid = null;
+    }
+    _contracts = [];
+    _sessionMutations.clear();
+    _clearWriteCaches();
+    _cancelDokumenSubs();
+  }
+
+  Future<void> _handleAuthUidChanged(String? rawUid) async {
+    final uid = (rawUid ?? '').trim();
+    final int epoch = ++_authEpoch;
+    if (uid.isNotEmpty) {
+      final bool switchDetected =
+          _activeSessionUid != null && _activeSessionUid != uid;
+      if (switchDetected) {
+        // Bersihkan segera seluruh data & cache sesi lama agar tidak pernah
+        // terbawa ke sesi akun baru, termasuk bila akun sebelumnya masih offline.
+        _resetSessionState(clearSessionUid: false);
+        _activeSessionUid = uid;
+        _wasSignedIn = true;
+        if (!_disposed) notifyListeners();
+      } else {
+        _activeSessionUid ??= uid;
+        _wasSignedIn = true;
+      }
+
+      // Tunggu inisialisasi/pembacaan awal selesai agar tidak saling menimpa.
+      if (_loadFuture != null) await _loadFuture;
+      if (_disposed || epoch != _authEpoch) return;
+
+      if (_loadedUid != null && _loadedUid != uid) {
+        _resetSessionState(clearSessionUid: false);
+      }
+      _activeSessionUid = uid;
+      _wasSignedIn = true;
+
+      final f = _loadContracts(expectedAuthEpoch: epoch);
+      _loadFuture = f;
+      await f;
+    } else {
+      // Logout → bersihkan kontrak, mutasi lokal, & cache milik akun sebelumnya.
+      if (_wasSignedIn || _loadedUid != null || _activeSessionUid != null) {
+        _resetSessionState(clearSessionUid: true);
+        if (!_disposed) notifyListeners();
+      }
+    }
+  }
+
+  bool _isLocallyProtected(String id, int againstSeq) {
+    final rec = _sessionMutations[id];
+    if (rec == null) return false;
+    return !rec.syncedToCloud || rec.seq > againstSeq;
+  }
+
   /// Rebuild cerdas saat ada perubahan dari perangkat lain: tampil seketika,
   /// tapi no-op bila perubahan hanyalah pantulan tulisan perangkat ini sendiri
   /// (mencegah loop & menjaga referensi objek yang sedang dipegang layar).
@@ -125,6 +209,8 @@ class ContractProvider with ChangeNotifier {
   Future<void> _onContractsSnapshot(
       QuerySnapshot<Map<String, dynamic>> snap) async {
     if (_isLoading || _snapshotRebuilding) return;
+    final int authEpoch = _authEpoch;
+    final int snapStartSeq = _mutationSeq;
     try {
       // Kumpulkan kontrak yang benar-benar berubah isinya.
       final changed = <String, Map<String, dynamic>>{};
@@ -135,9 +221,20 @@ class ContractProvider with ChangeNotifier {
       for (final ch in snap.docChanges) {
         final id = ch.doc.id;
         if (ch.type == DocumentChangeType.removed) {
+          final rec = _sessionMutations[id];
+          if (rec != null &&
+              (!rec.syncedToCloud || rec.seq > snapStartSeq) &&
+              !rec.isDeleted) {
+            continue;
+          }
           removedIds.add(id);
           anyRealChange = anyRealChange ||
               _contracts.any((x) => x.id == id);
+          continue;
+        }
+        // Lindungi mutasi lokal yang belum tersinkron (mis. saat offline) atau
+        // lebih baru agar tidak tertimpa data server ketika koneksi pulih.
+        if (_isLocallyProtected(id, snapStartSeq)) {
           continue;
         }
         final raw = ch.doc.data();
@@ -158,8 +255,10 @@ class ContractProvider with ChangeNotifier {
         // Identik = pantulan ack tulisan sendiri → diabaikan.
       }
       // Kontrak yang hilang dari snapshot (dihapus perangkat lain).
+      // Jangan hapus kontrak lokal yang belum tersinkron ke Firestore.
       for (final x in _contracts) {
-        if (!snap.docs.any((d) => d.id == x.id)) {
+        if (!snap.docs.any((d) => d.id == x.id) &&
+            !_isLocallyProtected(x.id, snapStartSeq)) {
           removedIds.add(x.id);
           anyRealChange = true;
         }
@@ -169,6 +268,7 @@ class ContractProvider with ChangeNotifier {
       _snapshotRebuilding = true;
       // Terapkan: hydrate HANYA kontrak yang berubah.
       for (final id in changed.keys) {
+        if (_disposed || authEpoch != _authEpoch) return;
         final data = changed[id]!;
         // Pantulan tulisan perangkat ini sendiri → memori sudah paling baru,
         // jadi tidak perlu membaca ulang laporan & dokumen kontrak tersebut.
@@ -180,6 +280,10 @@ class ContractProvider with ChangeNotifier {
         _ensureKegiatanIds(c);
         await _hydrateReports(c);
         await _hydrateDokumen(c);
+        if (_disposed || authEpoch != _authEpoch) return;
+        // Re-cek setelah await agar mutasi lokal selama hidrasi tidak tertimpa.
+        if (_isLocallyProtected(id, snapStartSeq)) continue;
+
         final idx = _contracts.indexWhere((x) => x.id == id);
         if (idx >= 0) {
           // Lindungi laporan di memori jika hydrated snapshot sementara kosong
@@ -206,24 +310,120 @@ class ContractProvider with ChangeNotifier {
         }
       }
       for (final id in removedIds) {
+        if (_isLocallyProtected(id, snapStartSeq) &&
+            !(_sessionMutations[id]?.isDeleted ?? false)) {
+          continue;
+        }
         _contracts.removeWhere((x) => x.id == id);
         _dokumenSubs.remove(id)?.cancel();
         _dokumenDocCache.remove(id);
         _deletedDocIds.remove(id);
       }
-      notifyListeners();
+      if (!_disposed && authEpoch == _authEpoch) notifyListeners();
     } catch (e) {
       debugPrint('[ContractProvider] Snapshot rebuild gagal: $e');
     } finally {
       _snapshotRebuilding = false;
+      if (!_disposed &&
+          authEpoch == _authEpoch &&
+          _currentUid.isNotEmpty &&
+          _sessionMutations.values.any((r) => !r.syncedToCloud)) {
+        unawaited(_retryPendingMutations(expectedAuthEpoch: authEpoch));
+      }
     }
   }
 
   // ═════════════════════════════════════════════════════════════════════
-  // LOAD
+  // LOAD & SINKRONISASI MUTASI LOKAL
   // ═════════════════════════════════════════════════════════════════════
 
-  Future<void> _loadContracts() async {
+  int _recordMutation(
+    String id, {
+    ContractModel? contract,
+    bool isDeleted = false,
+  }) {
+    final seq = ++_mutationSeq;
+    _sessionMutations[id] = _LocalMutationRecord(
+      seq: seq,
+      contract: contract,
+      isDeleted: isDeleted,
+      syncedToCloud: false,
+    );
+    return seq;
+  }
+
+  void _markMutationSynced(String id, int seq) {
+    final rec = _sessionMutations[id];
+    if (rec != null && rec.seq == seq) {
+      rec.syncedToCloud = true;
+      _pruneSyncedMutations();
+    }
+  }
+
+  /// Hapus catatan mutasi yang sudah tersinkron setelah seluruh proses load
+  /// yang dimulai sebelum mutasi tersebut selesai — mencegah penerapan ulang.
+  void _pruneSyncedMutations() {
+    _sessionMutations.removeWhere((_, rec) {
+      if (!rec.syncedToCloud) return false;
+      return _inFlightLoadStartSeqs.every((startSeq) => startSeq >= rec.seq);
+    });
+  }
+
+  List<ContractModel> _mergeSessionMutations(
+    List<ContractModel> loaded, {
+    required int startedAtSeq,
+  }) {
+    final merged = List<ContractModel>.from(loaded);
+    final pending = _sessionMutations.entries
+        .where((e) => e.value.seq > startedAtSeq || !e.value.syncedToCloud)
+        .toList()
+      ..sort((a, b) => a.value.seq.compareTo(b.value.seq));
+
+    for (final entry in pending) {
+      final id = entry.key;
+      final rec = entry.value;
+      final existingIdx = merged.indexWhere((c) => c.id == id);
+      if (rec.isDeleted) {
+        if (existingIdx >= 0) merged.removeAt(existingIdx);
+      } else if (rec.contract != null) {
+        if (existingIdx >= 0) {
+          merged[existingIdx] = rec.contract!;
+        } else {
+          merged.add(rec.contract!);
+        }
+      }
+    }
+    return merged;
+  }
+
+  Future<void> _initLoad() async {
+    final startedAtSeq = _mutationSeq;
+    final authEpoch = _authEpoch;
+    _inFlightLoadStartSeqs.add(startedAtSeq);
+    try {
+      await _loadFromLocalFallback(
+        startedAtSeq: startedAtSeq,
+        expectedAuthEpoch: authEpoch,
+      );
+      if (_disposed || authEpoch != _authEpoch) return;
+      if (_contracts.isNotEmpty) {
+        notifyListeners();
+      }
+      await _loadContracts(
+        startedAtSeq: startedAtSeq,
+        expectedAuthEpoch: authEpoch,
+      );
+    } finally {
+      _inFlightLoadStartSeqs.remove(startedAtSeq);
+      _pruneSyncedMutations();
+    }
+  }
+
+  Future<void> _loadContracts({
+    int? startedAtSeq,
+    int? expectedAuthEpoch,
+  }) async {
+    final int authEpoch = expectedAuthEpoch ?? _authEpoch;
     final uid = _currentUid;
     if (_loadInFlight) return;
     // Sesi ini sudah dimuat penuh → jangan baca ulang seluruh data.
@@ -231,16 +431,21 @@ class ContractProvider with ChangeNotifier {
       _attachDokumenListeners();
       return;
     }
+    final int loadSeq = startedAtSeq ?? _mutationSeq;
     _loadInFlight = true;
     _isLoading = true;
-    notifyListeners();
+    _inFlightLoadStartSeqs.add(loadSeq);
+    if (!_disposed) notifyListeners();
 
     bool loaded = false;
     try {
       final snap = await _db.collection('contracts').get();
+      if (_disposed || authEpoch != _authEpoch) return;
+
       if (snap.docs.isEmpty) {
-        // Jangan auto-seed: biarkan database bersih tanpa injeksi data dummy otomatis.
-        _contracts = [];
+        // Jangan auto-seed: biarkan database bersih tanpa injeksi data dummy otomatis,
+        // sambil mempertahankan mutasi in-memory yang terjadi saat load berjalan.
+        _contracts = _mergeSessionMutations([], startedAtSeq: loadSeq);
       } else {
         final list = <ContractModel>[];
         for (final doc in snap.docs) {
@@ -250,26 +455,42 @@ class ContractProvider with ChangeNotifier {
           _ensureKegiatanIds(contract);
           await _hydrateReports(contract);
           await _hydrateDokumen(contract);
+          if (_disposed || authEpoch != _authEpoch) return;
           list.add(contract);
         }
-        _contracts = list;
+        _contracts = _mergeSessionMutations(list, startedAtSeq: loadSeq);
       }
       loaded = true;
     } catch (e) {
       debugPrint('[ContractProvider] Firestore gagal, pakai data lokal: $e');
-      await _loadFromLocalFallback();
+      if (!_disposed && authEpoch == _authEpoch) {
+        await _loadFromLocalFallback(
+          startedAtSeq: loadSeq,
+          expectedAuthEpoch: authEpoch,
+        );
+      }
+    } finally {
+      _isLoading = false;
+      _loadInFlight = false;
+      _inFlightLoadStartSeqs.remove(loadSeq);
+      _pruneSyncedMutations();
     }
 
+    if (_disposed || authEpoch != _authEpoch) return;
     if (loaded && uid.isNotEmpty) _loadedUid = uid;
-    _isLoading = false;
-    _loadInFlight = false;
-    if (!_disposed) notifyListeners();
+    notifyListeners();
     _attachDokumenListeners();
+    if (loaded &&
+        uid.isNotEmpty &&
+        _sessionMutations.values.any((r) => !r.syncedToCloud)) {
+      unawaited(_retryPendingMutations(expectedAuthEpoch: authEpoch));
+    }
   }
 
   /// Listener realtime per-subcollection `dokumen` — perubahan dokumen dari
   /// perangkat lain tampil seketika tanpa restart.
   void _attachDokumenListeners() {
+    if (_disposed) return;
     try {
       final ids = _contracts.map((c) => c.id).toSet();
       for (final c in _contracts) {
@@ -304,26 +525,37 @@ class ContractProvider with ChangeNotifier {
   }
 
   /// Fallback offline: baca mirror JSON di SharedPreferences.
-  Future<void> _loadFromLocalFallback() async {
+  Future<void> _loadFromLocalFallback({
+    int? startedAtSeq,
+    int? expectedAuthEpoch,
+  }) async {
+    final int authEpoch = expectedAuthEpoch ?? _authEpoch;
+    final int loadSeq = startedAtSeq ?? _mutationSeq;
     try {
       final key = _localContractsKey;
       if (key.isEmpty) {
-        // Sesi belum diketahui → jangan tampilkan mirror milik akun lain.
-        _contracts = [];
+        if (_disposed || authEpoch != _authEpoch) return;
+        // Sesi belum diketahui → jangan tampilkan mirror milik akun lain,
+        // namun pertahankan mutasi lokal in-memory yang dibuat pada instance ini.
+        _contracts = _mergeSessionMutations([], startedAtSeq: loadSeq);
         return;
       }
       final prefs = await SharedPreferences.getInstance();
+      if (_disposed || authEpoch != _authEpoch) return;
       final String? contractsJson = prefs.getString(key);
       if (contractsJson != null) {
         final List<dynamic> decoded = jsonDecode(contractsJson);
-        _contracts = decoded
+        final list = decoded
             .map((item) => ContractModel.fromJson(Map<String, dynamic>.from(item)))
             .toList();
+        _contracts = _mergeSessionMutations(list, startedAtSeq: loadSeq);
       } else {
-        _contracts = [];
+        _contracts = _mergeSessionMutations([], startedAtSeq: loadSeq);
       }
     } catch (_) {
-      _contracts = [];
+      if (!_disposed && authEpoch == _authEpoch) {
+        _contracts = _mergeSessionMutations([], startedAtSeq: loadSeq);
+      }
     }
   }
 
@@ -665,16 +897,20 @@ class ContractProvider with ChangeNotifier {
 
       // Soft-delete: dokumen yang dikenal cache tapi hilang dari memori
       // = dihapus user di perangkat ini (bukan overwrite perangkat lain).
+      final pendingTombs = <String>[];
       for (final id in List<String>.from(cache.keys)) {
         final masihAda = docs.any((d) => d['id'].toString() == id);
         if (!masihAda && !tomb.contains(id)) {
           batch.set(cRef.collection('dokumen').doc(id),
               {'deleted': true}, SetOptions(merge: true));
-          tomb.add(id);
+          pendingTombs.add(id);
           ops++;
         }
       }
 
+      if (ops > 0) await batch.commit();
+
+      tomb.addAll(pendingTombs);
       final newCache = <String, String>{};
       for (final d in docs) {
         newCache[d['id'].toString()] = jsonEncode(d);
@@ -682,10 +918,9 @@ class ContractProvider with ChangeNotifier {
       cache
         ..clear()
         ..addAll(newCache);
-
-      if (ops > 0) await batch.commit();
     } catch (e) {
       debugPrint('[ContractProvider] Sync dokumen gagal: $e');
+      rethrow;
     }
   }
 
@@ -852,26 +1087,136 @@ class ContractProvider with ChangeNotifier {
   int get activeContracts => _contracts.where((c) => c.status == 'Aktif').length;
   int get completedContracts => _contracts.where((c) => c.status == 'Selesai').length;
 
+  Future<void> _syncContractToCloud(
+    ContractModel contract, {
+    required bool writeParentFirst,
+    required int opAuthEpoch,
+  }) async {
+    if (_disposed || opAuthEpoch != _authEpoch) return;
+    _ensureKegiatanIds(contract);
+    final daily = _extractReports(contract, 'laporans');
+    final weekly = _extractReports(contract, 'laporanMingguan');
+    final prevWritten = _lastWrittenJson[contract.id];
+    final writeJson = _comparisonJson(contract);
+
+    Future<void> writeParentDoc({required bool onlyIfChanged}) async {
+      if (_disposed || opAuthEpoch != _authEpoch) return;
+      if (onlyIfChanged && prevWritten == writeJson) return;
+      _lastWrittenJson[contract.id] = writeJson;
+      try {
+        await _db
+            .collection('contracts')
+            .doc(contract.id)
+            .set(_sanitizeForWrite(contract));
+      } catch (_) {
+        if (prevWritten == null) {
+          _lastWrittenJson.remove(contract.id);
+        } else {
+          _lastWrittenJson[contract.id] = prevWritten;
+        }
+        rethrow;
+      }
+    }
+
+    if (writeParentFirst) {
+      await writeParentDoc(onlyIfChanged: false);
+      await _syncReports(contract.id, daily, _reportDocCache, 'laporans');
+      await _syncReports(contract.id, weekly, _weeklyDocCache, 'laporanMingguan');
+      await _syncDokumen(contract);
+    } else {
+      // Sinkronkan subcollection terlebih dahulu sebelum menulis parent document
+      // agar snapshot listener tidak membaca subcollection yang belum diperbarui.
+      await _syncReports(contract.id, daily, _reportDocCache, 'laporans');
+      await _syncReports(contract.id, weekly, _weeklyDocCache, 'laporanMingguan');
+      await _syncDokumen(contract);
+      await writeParentDoc(onlyIfChanged: true);
+    }
+  }
+
+  Future<void> _deleteContractFromCloud(String id) async {
+    final cRef = _db.collection('contracts').doc(id);
+    for (final sub in const ['laporans', 'laporanMingguan', 'dokumen']) {
+      final snap = await cRef.collection(sub).get();
+      final batch = _db.batch();
+      for (final d in snap.docs) {
+        batch.delete(d.reference);
+      }
+      if (snap.docs.isNotEmpty) await batch.commit();
+    }
+    await cRef.delete();
+  }
+
+  Future<void> _retryPendingMutations({required int expectedAuthEpoch}) async {
+    if (_retryingPending || _disposed || expectedAuthEpoch != _authEpoch) {
+      return;
+    }
+    _retryingPending = true;
+    bool anySynced = false;
+    try {
+      final pending = _sessionMutations.entries
+          .where((e) => !e.value.syncedToCloud)
+          .toList()
+        ..sort((a, b) => a.value.seq.compareTo(b.value.seq));
+
+      for (final entry in pending) {
+        if (_disposed || expectedAuthEpoch != _authEpoch) break;
+        final id = entry.key;
+        final rec = entry.value;
+        final seq = rec.seq;
+        try {
+          if (rec.isDeleted) {
+            await _deleteContractFromCloud(id);
+          } else if (rec.contract != null) {
+            await _syncContractToCloud(
+              rec.contract!,
+              writeParentFirst: _lastWrittenJson[id] == null,
+              opAuthEpoch: expectedAuthEpoch,
+            );
+          }
+          if (!_disposed && expectedAuthEpoch == _authEpoch) {
+            _markMutationSynced(id, seq);
+            anySynced = true;
+          }
+        } catch (e) {
+          debugPrint('[ContractProvider] Retry sync $id gagal: $e');
+        }
+      }
+      if (anySynced && !_disposed && expectedAuthEpoch == _authEpoch) {
+        await _saveLocalBackup();
+      }
+    } finally {
+      _retryingPending = false;
+    }
+  }
+
   Future<void> addContract(ContractModel newContract) async {
+    final opAuthEpoch = _authEpoch;
     if (newContract.id.isEmpty) newContract.id = generateId();
     _ensureKegiatanIds(newContract);
-    _contracts.add(newContract);
+    final mutSeq = _recordMutation(newContract.id, contract: newContract);
+    final existingIdx = _contracts.indexWhere((c) => c.id == newContract.id);
+    if (existingIdx >= 0) {
+      _contracts[existingIdx] = newContract;
+    } else {
+      _contracts.add(newContract);
+    }
     notifyListeners(); // UI langsung tampil
 
-    final daily = _extractReports(newContract, 'laporans');
-    final weekly = _extractReports(newContract, 'laporanMingguan');
-
     try {
-      final cRef = _db.collection('contracts').doc(newContract.id);
-      _lastWrittenJson[newContract.id] = _comparisonJson(newContract);
-      await cRef.set(_sanitizeForWrite(newContract));
-      await _syncReports(newContract.id, daily, _reportDocCache, 'laporans');
-      await _syncReports(newContract.id, weekly, _weeklyDocCache, 'laporanMingguan');
-      await _syncDokumen(newContract);
+      await _syncContractToCloud(
+        newContract,
+        writeParentFirst: true,
+        opAuthEpoch: opAuthEpoch,
+      );
+      if (!_disposed && opAuthEpoch == _authEpoch) {
+        _markMutationSynced(newContract.id, mutSeq);
+      }
     } catch (e) {
       debugPrint('[ContractProvider] addContract gagal: $e');
     }
-    await _saveLocalBackup();
+    if (!_disposed && opAuthEpoch == _authEpoch) {
+      await _saveLocalBackup();
+    }
   }
 
   /// Simpan perubahan kontrak. Laporan harian/mingguan otomatis disinkronkan
@@ -884,37 +1229,36 @@ class ContractProvider with ChangeNotifier {
       await addContract(updatedContract);
       return;
     }
+    final opAuthEpoch = _authEpoch;
     // Lindungi dokumen yang diunggah perangkat lain dari objek layar yang basi.
     _mergePreserveDokumen(_contracts[index], updatedContract);
+    final mutSeq = _recordMutation(
+      updatedContract.id,
+      contract: updatedContract,
+    );
     _contracts[index] = updatedContract;
     notifyListeners(); // UI responsif tanpa menunggu jaringan
 
-    _ensureKegiatanIds(updatedContract);
-    final daily = _extractReports(updatedContract, 'laporans');
-    final weekly = _extractReports(updatedContract, 'laporanMingguan');
-
     try {
-      // Sinkronkan subcollection terlebih dahulu sebelum menulis parent document
-      // agar snapshot listener tidak membaca subcollection yang belum diperbarui.
-      await _syncReports(updatedContract.id, daily, _reportDocCache, 'laporans');
-      await _syncReports(updatedContract.id, weekly, _weeklyDocCache, 'laporanMingguan');
-      await _syncDokumen(updatedContract);
-      // Tulis dokumen induk hanya bila isinya benar-benar berubah.
-      final writeJson = _comparisonJson(updatedContract);
-      if (_lastWrittenJson[updatedContract.id] != writeJson) {
-        _lastWrittenJson[updatedContract.id] = writeJson;
-        await _db
-            .collection('contracts')
-            .doc(updatedContract.id)
-            .set(_sanitizeForWrite(updatedContract));
+      await _syncContractToCloud(
+        updatedContract,
+        writeParentFirst: false,
+        opAuthEpoch: opAuthEpoch,
+      );
+      if (!_disposed && opAuthEpoch == _authEpoch) {
+        _markMutationSynced(updatedContract.id, mutSeq);
       }
     } catch (e) {
       debugPrint('[ContractProvider] updateContract gagal: $e');
     }
-    await _saveLocalBackup();
+    if (!_disposed && opAuthEpoch == _authEpoch) {
+      await _saveLocalBackup();
+    }
   }
 
   Future<void> deleteContract(String id) async {
+    final opAuthEpoch = _authEpoch;
+    final mutSeq = _recordMutation(id, isDeleted: true);
     _contracts.removeWhere((c) => c.id == id);
     _reportDocCache.remove(id);
     _weeklyDocCache.remove(id);
@@ -924,20 +1268,16 @@ class ContractProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final cRef = _db.collection('contracts').doc(id);
-      for (final sub in const ['laporans', 'laporanMingguan', 'dokumen']) {
-        final snap = await cRef.collection(sub).get();
-        final batch = _db.batch();
-        for (final d in snap.docs) {
-          batch.delete(d.reference);
-        }
-        if (snap.docs.isNotEmpty) await batch.commit();
+      await _deleteContractFromCloud(id);
+      if (!_disposed && opAuthEpoch == _authEpoch) {
+        _markMutationSynced(id, mutSeq);
       }
-      await cRef.delete();
     } catch (e) {
       debugPrint('[ContractProvider] deleteContract gagal: $e');
     }
-    await _saveLocalBackup();
+    if (!_disposed && opAuthEpoch == _authEpoch) {
+      await _saveLocalBackup();
+    }
   }
 
   Future<void> clearAllContracts() async {
@@ -950,6 +1290,7 @@ class ContractProvider with ChangeNotifier {
   Future<void> resetToDemoContract() async {
     await clearAllContracts();
     await _seedDemoData();
+    if (_loadFuture != null) await _loadFuture;
     await _loadContracts();
   }
 
@@ -974,4 +1315,18 @@ class ContractProvider with ChangeNotifier {
     }
     super.dispose();
   }
+}
+
+class _LocalMutationRecord {
+  final int seq;
+  final ContractModel? contract;
+  final bool isDeleted;
+  bool syncedToCloud;
+
+  _LocalMutationRecord({
+    required this.seq,
+    required this.contract,
+    required this.isDeleted,
+    this.syncedToCloud = false,
+  });
 }

@@ -85,7 +85,7 @@ void main() {
         namaKontrak: 'PEMELIHARAAN JALAN MT HARYONO',
         jenisKegiatan: 'Pengawasan',
         instansiDinas: ['Dinas PU'],
-        nilaiKontrak: 'Rp 1.000.000.000,00',
+        nilaiKontrak: 'Rp 288.350.703,03',
         hariKalender: 90,
         tglMulaiSpk: '01 Juli 2026',
         nomorSpk: 'SPK-01',

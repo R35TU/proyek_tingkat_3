@@ -8,6 +8,118 @@ import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/screens/timeline_screen.dart';
 
+Future<void> _seedProjectAuditEvents(TimelineProvider prov) async {
+  const cId = 'kontrak-ruas-uji-01';
+  const cName = 'PENGAWASAN JALAN PAKET UJI';
+  const dinas = 'DPU-PR Kab. Purbalingga';
+
+  await prov.logEvent(
+    actorName: 'PPK DPU-PR',
+    actorRole: 'Dinas',
+    actionType: 'CREATE',
+    entityType: 'KONTRAK',
+    contractId: cId,
+    contractName: cName,
+    dinasName: dinas,
+    title: 'Penerbitan SPK Kontrak Pengawasan',
+    description: 'Kontrak pengawasan teknis diterbitkan.',
+    customTimestamp: DateTime(2026, 4, 20, 8, 30),
+  );
+
+  await prov.logEvent(
+    actorName: 'Site Engineer',
+    actorRole: 'Konsultan',
+    actionType: 'CREATE',
+    entityType: 'RKK',
+    contractId: cId,
+    contractName: cName,
+    kegiatanId: 'keg_ruas_a',
+    kegiatanName: 'Ruas Jalan A',
+    kontraktorName: 'CV. Divan Insan Cemerlang',
+    dinasName: dinas,
+    title: 'Pengisian Master RAB / BoQ Ruas Jalan A',
+    description: 'Input rincian BoQ kontrak awal.',
+    customTimestamp: DateTime(2026, 4, 22, 10, 00),
+  );
+
+  await prov.logEvent(
+    actorName: 'Inspektor Lapangan',
+    actorRole: 'Konsultan',
+    actionType: 'CREATE',
+    entityType: 'LAPORAN_HARIAN',
+    contractId: cId,
+    contractName: cName,
+    kegiatanId: 'keg_ruas_b',
+    kegiatanName: 'Ruas Jalan B',
+    kontraktorName: 'CV. Langgeng',
+    dinasName: dinas,
+    title: 'Buku Harian Standar #03: Ruas Jalan B',
+    description: 'Pekerjaan lapis pondasi agregat.',
+    customTimestamp: DateTime(2026, 5, 10, 16, 00),
+  );
+
+  await prov.logEvent(
+    actorName: 'Inspektor Lapangan',
+    actorRole: 'Konsultan',
+    actionType: 'CREATE',
+    entityType: 'LAPORAN_HARIAN',
+    contractId: cId,
+    contractName: cName,
+    kegiatanId: 'keg_ruas_a',
+    kegiatanName: 'Ruas Jalan A',
+    kontraktorName: 'CV. Divan Insan Cemerlang',
+    dinasName: dinas,
+    title: 'Buku Harian Standar #08: Ruas Jalan A',
+    description: 'Pekerjaan galian dan perkerasan bahu jalan.',
+    customTimestamp: DateTime(2026, 5, 11, 16, 30),
+  );
+
+  await prov.logEvent(
+    actorName: 'CV. Tata Saka Consultant & PPK DPU-PR',
+    actorRole: 'Konsultan',
+    actionType: 'UPDATE',
+    entityType: 'ADDENDUM',
+    contractId: cId,
+    contractName: cName,
+    kegiatanId: 'keg_ruas_a',
+    kegiatanName: 'Ruas Jalan A',
+    kontraktorName: 'CV. Divan Insan Cemerlang',
+    dinasName: dinas,
+    title: 'Penerbitan Addendum 01 (CCO Rekayasa Lapangan)',
+    description: 'Penyesuaian volume pekerjaan.',
+    changes: const [
+      {
+        'parameter': 'Divisi 3.1 Galian Biasa',
+        'oldValue': '210.00 m3',
+        'newValue': '245.00 m3 (+35.00 m3)',
+      },
+      {
+        'parameter': 'Divisi 6.3 Campuran Aspal Panas (AC-WC)',
+        'oldValue': '95.50 Ton',
+        'newValue': '102.30 Ton (+6.80 Ton)',
+      },
+    ],
+    metadata: const {'nomorAddendum': '01'},
+    customTimestamp: DateTime(2026, 5, 12, 14, 00),
+  );
+
+  await prov.logEvent(
+    actorName: 'Site Engineer',
+    actorRole: 'Konsultan',
+    actionType: 'CREATE',
+    entityType: 'LAPORAN_MINGGUAN',
+    contractId: cId,
+    contractName: cName,
+    kegiatanId: 'keg_ruas_a',
+    kegiatanName: 'Ruas Jalan A',
+    kontraktorName: 'CV. Divan Insan Cemerlang',
+    dinasName: dinas,
+    title: 'Penerbitan Laporan Mingguan ke-4',
+    description: 'Realisasi kumulatif Ruas Jalan A minggu ke-4.',
+    customTimestamp: DateTime(2026, 5, 17, 17, 00),
+  );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -112,13 +224,14 @@ void main() {
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
-      timelineProv = TimelineProvider(seedDefaultIfEmpty: true);
-      await timelineProv.loadEvents(seedDefaultIfEmpty: true);
+      timelineProv = TimelineProvider();
+      await timelineProv.loadEvents();
+      await _seedProjectAuditEvents(timelineProv);
       userProfileProv = UserProfileProvider();
     });
 
-    test('Initial seeding loads realistic construction project history sorted newest-first', () {
-      expect(timelineProv.allEvents.isNotEmpty, true);
+    test('Empty initial TimelineProvider does not auto-seed dummy MT Haryono and logged events stay newest-first across reload', () async {
+      expect(timelineProv.allEvents.length, 6);
       // Verify descending order
       for (int i = 0; i < timelineProv.allEvents.length - 1; i++) {
         expect(
@@ -127,6 +240,15 @@ void main() {
           true,
         );
       }
+
+      // Reload pada instance provider baru: histori tetap ada dan tidak hilang
+      final reloadedProv = TimelineProvider();
+      await reloadedProv.loadEvents();
+      expect(reloadedProv.allEvents.length, 6);
+      expect(
+        reloadedProv.allEvents.any((e) => e.title.contains('Addendum 01')),
+        isTrue,
+      );
     });
 
     test('1. Konsultan has full visibility across all project events', () {
@@ -149,7 +271,6 @@ void main() {
     });
 
     test('2. Kontraktor ONLY sees events related to their assigned activity, isolating other contractors', () {
-      // Login as Kontraktor 1 (CV. Divan Insan Cemerlang - Ruas Jalan A)
       userProfileProv.loginAs(const RegisteredUser(
         username: 'kontraktor1',
         password: 'password123',
@@ -176,7 +297,7 @@ void main() {
       expect(contractorEvents.any((e) => (e.kontraktorName ?? '').contains('Langgeng')), false);
       expect(contractorEvents.any((e) => (e.kegiatanName ?? '') == 'Ruas Jalan B'), false);
 
-      // Confirmed user request: Contractor CAN see summary events of daily/weekly reports for their activity
+      // Contractor CAN see summary events of daily/weekly reports for their activity
       expect(contractorEvents.any((e) => e.entityType == 'LAPORAN_HARIAN' || e.entityType == 'LAPORAN_MINGGUAN'), true);
     });
 
@@ -268,8 +389,8 @@ void main() {
         actorName: 'CV. Tata Saka Consultant',
         actionType: 'CREATE',
         entityType: 'LAPORAN_HARIAN',
-        contractId: 'kontrak-mt-haryono-demo',
-        contractName: 'PEMELIHARAAN BERKALA JL. MT HARYONO',
+        contractId: 'kontrak-ruas-uji-01',
+        contractName: 'PENGAWASAN JALAN PAKET UJI',
         kegiatanName: 'Ruas Jalan A',
         kontraktorName: 'CV. Divan Insan Cemerlang',
         title: 'Buku Harian Standar #25: Ruas Jalan A',
@@ -282,18 +403,36 @@ void main() {
   });
 
   group('TimelineScreen UI & Opsi A Widget Tests', () {
-    Widget createWidgetUnderTest({
+    Future<Widget> createWidgetUnderTest({
       String role = 'konsultan',
       bool isDark = false,
-    }) {
+    }) async {
       final contractProv = ContractProvider();
       final userProfileProv = UserProfileProvider();
-      userProfileProv.login(role, 'password123');
+      if (role == 'kontraktor1') {
+        userProfileProv.loginAs(const RegisteredUser(
+          username: 'kontraktor1',
+          password: 'password123',
+          role: 'Kontraktor',
+          namaLengkap: 'CV. Divan Insan Cemerlang',
+          companyOrAgency: 'CV. Divan Insan Cemerlang',
+        ));
+      } else {
+        userProfileProv.loginAs(const RegisteredUser(
+          username: 'konsultan',
+          password: 'password123',
+          role: 'Konsultan',
+          namaLengkap: 'CV. Tata Saka Consultant',
+          companyOrAgency: 'CV. Tata Saka Consultant',
+        ));
+      }
       if (isDark) {
         userProfileProv.setThemeMode('Gelap');
       }
 
-      final timelineProv = TimelineProvider(seedDefaultIfEmpty: true);
+      final timelineProv = TimelineProvider();
+      await timelineProv.loadEvents();
+      await _seedProjectAuditEvents(timelineProv);
 
       return MultiProvider(
         providers: [
@@ -310,7 +449,7 @@ void main() {
 
     testWidgets('TimelineScreen renders header, fast filter chips, and timeline items', (tester) async {
       await tester.binding.setSurfaceSize(const Size(600, 900));
-      await tester.pumpWidget(createWidgetUnderTest());
+      await tester.pumpWidget(await createWidgetUnderTest());
       await tester.pumpAndSettle();
 
       // Verify Header
@@ -327,7 +466,7 @@ void main() {
 
     testWidgets('Tapping category filter chip filters the visible timeline cards', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 1200));
-      await tester.pumpWidget(createWidgetUnderTest());
+      await tester.pumpWidget(await createWidgetUnderTest());
       await tester.pumpAndSettle();
 
       // Tap 'Addendum (CCO)' category chip (using .first to pick the filter chip)
@@ -345,7 +484,7 @@ void main() {
 
     testWidgets('Opsi A: Tapping "Lihat Detail Perubahan" opens before vs after comparison modal', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 1200));
-      await tester.pumpWidget(createWidgetUnderTest());
+      await tester.pumpWidget(await createWidgetUnderTest());
       await tester.pumpAndSettle();
 
       // Filter to Addendum
@@ -381,7 +520,7 @@ void main() {
 
     testWidgets('Dark Mode renders cleanly without any overflow or unhandled exceptions', (tester) async {
       await tester.binding.setSurfaceSize(const Size(360, 720)); // Narrow screen test
-      await tester.pumpWidget(createWidgetUnderTest(isDark: true));
+      await tester.pumpWidget(await createWidgetUnderTest(isDark: true));
       await tester.pumpAndSettle();
 
       expect(find.text('Kronologi Proyek'), findsOneWidget);
@@ -390,7 +529,7 @@ void main() {
 
     testWidgets('Kontraktor role only sees their own activities in Timeline', (tester) async {
       await tester.binding.setSurfaceSize(const Size(400, 850));
-      await tester.pumpWidget(createWidgetUnderTest(role: 'kontraktor1'));
+      await tester.pumpWidget(await createWidgetUnderTest(role: 'kontraktor1'));
       await tester.pumpAndSettle();
 
       // Ruas Jalan A should be present
