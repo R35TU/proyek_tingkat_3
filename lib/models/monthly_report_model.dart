@@ -164,7 +164,7 @@ class MonthlyReportModel {
     }
     return {
       'nama': ttdKontraktorNama ?? '',
-      'jabatan': ttdKontraktorJabatan ?? 'Kontraktor Pelaksana',
+      'jabatan': ttdKontraktorJabatan ?? '',
       'signature': ttdKontraktorSignature,
       'tanggal': ttdKontraktorTanggal ?? '',
     };
@@ -182,7 +182,7 @@ class MonthlyReportModel {
     }
     return {
       'nama': ttdKonsultanNama ?? '',
-      'jabatan': ttdKonsultanJabatan ?? 'Konsultan Supervisi',
+      'jabatan': ttdKonsultanJabatan ?? '',
       'signature': ttdKonsultanSignature,
       'tanggal': ttdKonsultanTanggal ?? '',
     };
@@ -200,7 +200,7 @@ class MonthlyReportModel {
     }
     return {
       'nama': ttdPpkNama ?? '',
-      'jabatan': ttdPpkJabatan ?? 'Pejabat Pembuat Komitmen (PPK)',
+      'jabatan': ttdPpkJabatan ?? '',
       'signature': ttdPpkSignature,
       'tanggal': ttdPpkTanggal ?? '',
     };
@@ -726,25 +726,13 @@ class MonthlyReportModel {
         ttdPpkSignature = bMap['ttdPpkSignature']?.toString();
         ttdPpkTanggal = bMap['ttdPpkTanggal']?.toString();
       } else {
-        ttdKontraktorNama = pelaksanaKontraktor;
-        ttdKontraktorJabatan = 'Kontraktor Pelaksana';
-        final konsultanName = kegModel.konsultanPengawas.isNotEmpty
-            ? kegModel.konsultanPengawas
-            : (kegMap['konsultanPengawas']?.toString() ?? '');
-        final dinasName = contract.instansiDinas.isNotEmpty
-            ? contract.instansiDinas.first
-            : '';
-        ttdKonsultanNama = contract.siteEngineer;
-        ttdKonsultanJabatan = konsultanName.isNotEmpty
-            ? 'Konsultan Supervisi\n$konsultanName'
-            : 'Konsultan Supervisi';
-        ttdPpkNama = kegModel.penggunaAnggaran.isNotEmpty
-            ? kegModel.penggunaAnggaran
-            : (kegMap['penggunaAnggaran']?.toString() ?? '');
-        ttdPpkJabatan = dinasName.isNotEmpty
-            ? 'Pejabat Pembuat Komitmen (PPK)\n$dinasName'
-            : 'Pejabat Pembuat Komitmen (PPK)';
-        ttdPpkTanggal = periodeFormatted.split('-').last.trim();
+        ttdKontraktorNama = null;
+        ttdKontraktorJabatan = null;
+        ttdKonsultanNama = null;
+        ttdKonsultanJabatan = null;
+        ttdPpkNama = null;
+        ttdPpkJabatan = null;
+        ttdPpkTanggal = null;
       }
 
       monthlyReports.add(

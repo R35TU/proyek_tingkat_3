@@ -320,7 +320,8 @@ void main() {
 
         // 5. Verifikasi ikon Menu Sidebar menggunakan standard Material Icons
         expect(find.byIcon(Icons.dashboard), findsOneWidget);
-        expect(find.byIcon(Icons.folder_open), findsOneWidget);
+        expect(find.byIcon(Icons.folder_open), findsNothing);
+        expect(find.byIcon(Icons.today_outlined), findsOneWidget);
         expect(find.byIcon(Icons.timeline), findsOneWidget);
         await tester.scrollUntilVisible(
           find.byIcon(Icons.help_outline),
@@ -364,7 +365,8 @@ void main() {
         expect(find.byIcon(Icons.dashboard), findsWidgets);
         expect(find.byIcon(Icons.folder_outlined), findsWidgets);
         expect(find.byIcon(Icons.description_outlined), findsWidgets);
-        expect(find.byIcon(Icons.folder_open), findsWidgets);
+        expect(find.byIcon(Icons.edit_note_outlined), findsWidgets);
+        expect(find.byIcon(Icons.folder_open), findsNothing);
         expect(find.byIcon(Icons.today_outlined), findsWidgets);
         expect(find.byIcon(Icons.date_range_outlined), findsWidgets);
         expect(find.byIcon(Icons.calendar_month_outlined), findsWidgets);

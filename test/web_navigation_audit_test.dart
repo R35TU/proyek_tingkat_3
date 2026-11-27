@@ -93,7 +93,8 @@ void main() {
 
       // Assert Back Button is rendered in Web Heading
       expect(find.byTooltip('Kembali'), findsOneWidget);
-      expect(find.textContaining('Data Laporan'), findsWidgets);
+      expect(find.textContaining('Laporan Harian'), findsWidgets);
+      expect(find.text('Mingguan'), findsNothing);
     });
 
     testWidgets('2. DetailKegiatanScreen in Web mode renders inside WebDashboardLayout without going fullscreen', (tester) async {

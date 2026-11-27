@@ -161,10 +161,16 @@ class PdfReportService {
     if (signersRaw.isEmpty) {
       final rawNama = report['ttdNama']?.toString().trim() ?? '';
       final rawJabatan = report['ttdJabatan']?.toString().trim() ?? '';
-      final ttdNama = rawNama.isNotEmpty ? rawNama : 'MISWANTO';
-      final ttdJabatan = rawJabatan.isNotEmpty ? rawJabatan : 'Inspector';
-      final ttdSig = report['ttdSignature']?.toString();
-      signersRaw.add({'nama': ttdNama, 'jabatan': ttdJabatan, 'signature': ttdSig});
+      final ttdSig = report['ttdSignature']?.toString().trim();
+      if (rawNama.isNotEmpty ||
+          rawJabatan.isNotEmpty ||
+          (ttdSig != null && ttdSig.isNotEmpty)) {
+        signersRaw.add({
+          'nama': rawNama,
+          'jabatan': rawJabatan,
+          'signature': ttdSig,
+        });
+      }
     }
 
     // Resolve signatures asynchronously
@@ -1901,43 +1907,64 @@ class PdfReportService {
         if (sigStr != null && sigStr.isNotEmpty) {
           sigBytes = await _resolveImageBytes(sigStr);
         }
-        resolvedSigners.add({
-          'peran': s['peran'] ?? s['jabatan'] ?? '',
-          'instansi': s['instansi'] ?? '',
-          'nama': s['nama'] ?? '',
-          'tanggal': s['tanggal'] ?? '',
-          'bytes': sigBytes,
-        });
+        final peran = (s['peran'] ?? s['jabatan'] ?? '').toString().trim();
+        final instansi = (s['instansi'] ?? '').toString().trim();
+        final nama = (s['nama'] ?? '').toString().trim();
+        final tanggal = (s['tanggal'] ?? '').toString().trim();
+        if (peran.isNotEmpty ||
+            instansi.isNotEmpty ||
+            nama.isNotEmpty ||
+            tanggal.isNotEmpty ||
+            sigBytes != null) {
+          resolvedSigners.add({
+            'peran': peran,
+            'instansi': instansi,
+            'nama': nama,
+            'tanggal': tanggal,
+            'bytes': sigBytes,
+          });
+        }
       }
     } else {
       final kontraktorSig = await _resolveImageBytes(report.ttdKontraktorSignature);
       final konsultanSig = await _resolveImageBytes(report.ttdKonsultanSignature);
       final ppkSig = await _resolveImageBytes(report.ttdPpkSignature);
 
-      final dateStr = report.periodeFormatted.split('-').last.trim();
-      resolvedSigners.addAll([
+      final legacyGroups = [
         {
-          'peran': 'Kontraktor Pelaksana',
-          'instansi': report.pelaksanaKontraktor,
-          'nama': report.ttdKontraktorNama ?? '',
-          'tanggal': report.ttdKontraktorTanggal ?? dateStr,
+          'peran': (report.ttdKontraktorJabatan ?? '').trim(),
+          'instansi': '',
+          'nama': (report.ttdKontraktorNama ?? '').trim(),
+          'tanggal': (report.ttdKontraktorTanggal ?? '').trim(),
           'bytes': kontraktorSig,
         },
         {
-          'peran': 'Konsultan Supervisi',
-          'instansi': report.konsultanPengawas,
-          'nama': report.ttdKonsultanNama ?? '',
-          'tanggal': report.ttdKonsultanTanggal ?? dateStr,
+          'peran': (report.ttdKonsultanJabatan ?? '').trim(),
+          'instansi': '',
+          'nama': (report.ttdKonsultanNama ?? '').trim(),
+          'tanggal': (report.ttdKonsultanTanggal ?? '').trim(),
           'bytes': konsultanSig,
         },
         {
-          'peran': 'Pejabat Pembuat Komitmen (PPK)',
-          'instansi': contract.instansiDinas.isNotEmpty ? contract.instansiDinas.first : '',
-          'nama': report.ttdPpkNama ?? '',
-          'tanggal': report.ttdPpkTanggal ?? dateStr,
+          'peran': (report.ttdPpkJabatan ?? '').trim(),
+          'instansi': '',
+          'nama': (report.ttdPpkNama ?? '').trim(),
+          'tanggal': (report.ttdPpkTanggal ?? '').trim(),
           'bytes': ppkSig,
         },
-      ]);
+      ];
+      for (final item in legacyGroups) {
+        final peran = (item['peran'] ?? '').toString().trim();
+        final nama = (item['nama'] ?? '').toString().trim();
+        final tanggal = (item['tanggal'] ?? '').toString().trim();
+        final bytes = item['bytes'] as Uint8List?;
+        if (peran.isNotEmpty ||
+            nama.isNotEmpty ||
+            tanggal.isNotEmpty ||
+            bytes != null) {
+          resolvedSigners.add(item);
+        }
+      }
     }
 
     pdf.addPage(
@@ -2928,18 +2955,31 @@ class PdfReportService {
   static pw.Widget _buildDynamicSignatures({
     required List<Map<String, dynamic>> signers,
   }) {
-    if (signers.isEmpty) {
-      return pw.SizedBox();
+    final activeSigners = signers.where((s) {
+      final peran = (s['peran'] ?? s['jabatan'] ?? '').toString().trim();
+      final instansi = (s['instansi'] ?? '').toString().trim();
+      final nama = (s['nama'] ?? '').toString().trim();
+      final tanggal = (s['tanggal'] ?? '').toString().trim();
+      final bytes = s['bytes'] as Uint8List?;
+      return peran.isNotEmpty ||
+          instansi.isNotEmpty ||
+          nama.isNotEmpty ||
+          tanggal.isNotEmpty ||
+          bytes != null;
+    }).toList();
+
+    if (activeSigners.isEmpty) {
+      return pw.SizedBox(height: 16);
     }
 
     return pw.Container(
       margin: const pw.EdgeInsets.only(top: 10),
       child: pw.Row(
-        mainAxisAlignment: signers.length == 1
+        mainAxisAlignment: activeSigners.length == 1
             ? pw.MainAxisAlignment.center
             : pw.MainAxisAlignment.spaceBetween,
         crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: signers.map((s) {
+        children: activeSigners.map((s) {
           final peran = (s['peran'] ?? s['jabatan'] ?? '').toString().trim();
           final instansi = (s['instansi'] ?? '').toString().trim();
           final nama = (s['nama'] ?? '').toString().trim();
@@ -2957,12 +2997,13 @@ class PdfReportService {
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
-                  pw.Text(
-                    headerLines.isNotEmpty ? headerLines.join('\n') : 'Penandatangan',
-                    textAlign: pw.TextAlign.center,
-                    style: const pw.TextStyle(fontSize: 7.5),
-                  ),
-                  pw.SizedBox(height: 4),
+                  if (headerLines.isNotEmpty)
+                    pw.Text(
+                      headerLines.join('\n'),
+                      textAlign: pw.TextAlign.center,
+                      style: const pw.TextStyle(fontSize: 7.5),
+                    ),
+                  if (headerLines.isNotEmpty) pw.SizedBox(height: 4),
                   if (bytes != null)
                     pw.Container(
                       height: 34,
@@ -2974,19 +3015,22 @@ class PdfReportService {
                     )
                   else
                     pw.SizedBox(height: 34),
-                  pw.Text(
-                    '_______________________',
-                    style: const pw.TextStyle(fontSize: 7.5),
-                  ),
-                  pw.SizedBox(height: 2),
-                  pw.Text(
-                    nama.isNotEmpty ? nama : '( .................................... )',
-                    textAlign: pw.TextAlign.center,
-                    style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: 7.5,
+                  if (bytes != null || nama.isNotEmpty)
+                    pw.Text(
+                      '_______________________',
+                      style: const pw.TextStyle(fontSize: 7.5),
                     ),
-                  ),
+                  if (nama.isNotEmpty) ...[
+                    pw.SizedBox(height: 2),
+                    pw.Text(
+                      nama,
+                      textAlign: pw.TextAlign.center,
+                      style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold,
+                        fontSize: 7.5,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

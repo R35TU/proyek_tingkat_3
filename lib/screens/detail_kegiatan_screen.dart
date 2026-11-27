@@ -19,6 +19,7 @@ import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/services/storage_service.dart';
 import 'package:tata_saka_app/services/file_downloader.dart';
 import 'package:tata_saka_app/screens/detail_data_laporan_screen.dart';
+import 'package:tata_saka_app/screens/laporan_mingguan_screen.dart';
 import 'package:tata_saka_app/screens/form_kegiatan_screen.dart';
 import 'package:tata_saka_app/screens/kelola_rkk_screen.dart';
 import 'package:tata_saka_app/screens/kelola_addendum_screen.dart';
@@ -1562,20 +1563,23 @@ class _DetailKegiatanScreenState extends State<DetailKegiatanScreen> {
                     if (folder.name.toLowerCase().contains('mingguan')) ...[
                       ElevatedButton.icon(
                         onPressed: () {
+                          final liveContract = _resolveLiveContract(listen: false);
                           final router = GoRouter.maybeOf(context);
                           if (router != null) {
                             router.go(
-                              '${_kegiatanBaseRoute(context)}/laporan?tab=1',
-                              extra: _resolveLiveContract(listen: false),
+                              '/laporan/mingguan',
+                              extra: {
+                                'contract': liveContract,
+                                'kegiatanIndex': widget.kegiatanIndex,
+                              },
                             );
                           } else {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => DetailDataLaporanScreen(
-                                  contract: _resolveLiveContract(listen: false),
-                                  kegiatanIndex: widget.kegiatanIndex,
-                                  initialTab: 1,
+                                builder: (context) => LaporanMingguanScreen(
+                                  initialContract: liveContract,
+                                  initialKegiatanIndex: widget.kegiatanIndex,
                                 ),
                               ),
                             );

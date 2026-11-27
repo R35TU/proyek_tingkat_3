@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tata_saka_app/models/weekly_report_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
+import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/widgets/lembar_laporan_mingguan_widget.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/screens/buat_laporan_mingguan_screen.dart';
 import 'package:tata_saka_app/screens/detail_data_laporan_screen.dart';
+import 'package:tata_saka_app/screens/laporan_mingguan_screen.dart';
 import 'package:tata_saka_app/utils/rupiah_input_formatter.dart';
 
 void main() {
@@ -182,8 +185,8 @@ void main() {
     });
   });
 
-  group('DetailDataLaporanScreen Mingguan UI Tests', () {
-    testWidgets('Renders weekly reports tab without overflow on 360px screen', (tester) async {
+  group('LaporanMingguanScreen & Daily UI Tests', () {
+    testWidgets('Renders weekly report list and detail without overflow on 360px screen', (tester) async {
       tester.view.physicalSize = const Size(360, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -194,10 +197,10 @@ void main() {
         jenisKegiatan: 'Pengawasan Teknis',
         namaKontrak: 'PEMELIHARAAN BERKALA JALAN LETJEND MT. HARYONO',
         nomorSpk: '000.3.3/ 1128 /KONST/BM/IV/2026',
-        tglMulaiSpk: '20 April 2026',
+        tglMulaiSpk: '19 April 2026',
         nomorSpmk: '000.3.3/ 1128 /KONST/BM/IV/2026',
-        tglMulaiSpmk: '20 April 2026',
-        tglSelesaiSpmk: '18 Juli 2026',
+        tglMulaiSpmk: '19 April 2026',
+        tglSelesaiSpmk: '17 Juli 2026',
         hariKalender: 90,
         nilaiKontrak: 'Rp 3.000.000.000,00',
         instansiDinas: ['DPUPR Purbalingga'],
@@ -215,28 +218,42 @@ void main() {
         ],
       );
 
+      SharedPreferences.setMockInitialValues({});
       final provider = ContractProvider();
+      await provider.addContract(contract);
+      final userProf = UserProfileProvider();
 
       await tester.pumpWidget(
-        ChangeNotifierProvider.value(
-          value: provider,
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: provider),
+            ChangeNotifierProvider.value(value: userProf),
+          ],
           child: MaterialApp(
-            home: DetailDataLaporanScreen(
-              contract: contract,
-              kegiatanIndex: 0,
-              initialTab: 1, // Mingguan
+            home: LaporanMingguanScreen(
+              initialContract: contract,
+              initialKegiatanIndex: 0,
             ),
           ),
         ),
       );
 
       await tester.pumpAndSettle();
-      expect(find.text('Ringkasan Kegiatan Mingguan'), findsWidgets);
-      expect(find.text('Buka Dokumen'), findsWidgets);
+      await tester.scrollUntilVisible(
+        find.text('Minggu 6'),
+        220,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Minggu 6'), findsOneWidget);
+      expect(find.text('Buka'), findsWidgets);
+      await tester.tap(find.text('Minggu 6'));
+      await tester.pumpAndSettle();
+      expect(find.text('RINGKASAN KEGIATAN MINGGUAN'), findsWidgets);
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('Renders weekly reports tab without overflow on ultra-narrow 320px screen', (tester) async {
+    testWidgets('Renders LaporanMingguanScreen and daily DetailDataLaporanScreen without overflow on 320px screen', (tester) async {
       tester.view.physicalSize = const Size(320, 700);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -247,10 +264,10 @@ void main() {
         jenisKegiatan: 'Pengawasan Teknis',
         namaKontrak: 'PEMELIHARAAN BERKALA JALAN LETJEND MT. HARYONO',
         nomorSpk: '000.3.3/ 1128 /KONST/BM/IV/2026',
-        tglMulaiSpk: '20 April 2026',
+        tglMulaiSpk: '19 April 2026',
         nomorSpmk: '000.3.3/ 1128 /KONST/BM/IV/2026',
-        tglMulaiSpmk: '20 April 2026',
-        tglSelesaiSpmk: '18 Juli 2026',
+        tglMulaiSpmk: '19 April 2026',
+        tglSelesaiSpmk: '17 Juli 2026',
         hariKalender: 90,
         nilaiKontrak: 'Rp 3.000.000.000,00',
         instansiDinas: ['DPUPR Purbalingga'],
@@ -268,22 +285,44 @@ void main() {
         ],
       );
 
+      SharedPreferences.setMockInitialValues({});
       final provider = ContractProvider();
+      await provider.addContract(contract);
+      final userProf = UserProfileProvider();
 
       await tester.pumpWidget(
-        ChangeNotifierProvider.value(
-          value: provider,
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: provider),
+            ChangeNotifierProvider.value(value: userProf),
+          ],
           child: MaterialApp(
-            home: DetailDataLaporanScreen(
-              contract: contract,
-              kegiatanIndex: 0,
-              initialTab: 1, // Mingguan
+            home: LaporanMingguanScreen(
+              initialContract: contract,
+              initialKegiatanIndex: 0,
             ),
           ),
         ),
       );
-
       await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: provider),
+            ChangeNotifierProvider.value(value: userProf),
+          ],
+          child: MaterialApp(
+            home: DetailDataLaporanScreen(
+              contract: contract,
+              kegiatanIndex: 0,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Mingguan'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   });

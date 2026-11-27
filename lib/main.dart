@@ -63,7 +63,7 @@ class _TataSakaAppState extends State<TataSakaApp> {
     return Consumer<UserProfileProvider>(
       builder: (context, userProf, _) {
         return MaterialApp.router(
-          title: 'Tata Saka Consultant',
+          title: 'SAKA-REP',
           debugShowCheckedModeBanner: false,
           routerConfig: _router,
           builder: (context, child) => child == null

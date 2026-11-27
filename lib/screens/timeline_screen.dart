@@ -5,6 +5,7 @@ import 'package:tata_saka_app/models/timeline_event_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 
 class TimelineScreen extends StatefulWidget {
@@ -101,6 +102,10 @@ class _TimelineScreenState extends State<TimelineScreen> {
               backgroundColor: cardColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: textDark),
+          onPressed: () => goBackWithShellHistory(context),
+        ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Divider(height: 1, color: borderColor),

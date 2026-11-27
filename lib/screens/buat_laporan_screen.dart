@@ -2216,7 +2216,7 @@ class _BuatLaporanScreenState extends State<BuatLaporanScreen> {
     if (isDesktop) {
       return WebDashboardLayout(
         title: pageTitle,
-        activeMenu: 'laporan',
+        activeMenu: 'buat_laporan',
         showBackButton: true,
         actions: [saveButton],
         child: mainBody,

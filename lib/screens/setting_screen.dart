@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/screens/detail_kontrak_screen.dart';
 import 'package:tata_saka_app/screens/edit_profil_screen.dart';
 import 'package:tata_saka_app/screens/keamanan_screen.dart';
@@ -537,6 +538,10 @@ class _SettingScreenState extends State<SettingScreen> {
             backgroundColor: AppColors.getCardBackground(context),
             elevation: 0,
             surfaceTintColor: Colors.transparent,
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back, color: AppColors.getTextDark(context)),
+              onPressed: () => goBackWithShellHistory(context),
+            ),
             title: Text(
               userProf.tr('nav_account'),
               style: TextStyle(
@@ -635,13 +640,18 @@ class _SettingScreenState extends State<SettingScreen> {
               fontSize: 13.5,
             ),
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              color: AppColors.getTextLight(context),
-              fontWeight: FontWeight.w500,
-              fontSize: 13.5,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppColors.getTextLight(context),
+                fontWeight: FontWeight.w500,
+                fontSize: 13.5,
+              ),
             ),
           ),
         ],

@@ -237,6 +237,7 @@ void main() {
 
         // Pelaporan category is hidden for Kontraktor
         expect(find.text('PELAPORAN'), findsNothing);
+        expect(find.text('Buat Laporan'), findsNothing);
         expect(find.text('Laporan Harian'), findsNothing);
         expect(find.text('Kegiatan Saya'), findsWidgets);
 

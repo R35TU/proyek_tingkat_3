@@ -10,7 +10,7 @@ class LandingScreen extends StatelessWidget {
   const LandingScreen({super.key});
 
   static const String _apkDownloadUrl =
-      'https://kencana.basic.box.cloudeka.id/tatasaka-media-rw4mpj/app-release.apk';
+      'https://kencana.basic.box.cloudeka.id/tatasaka-media-rw4mpj/SAKA-REP.apk';
   static const double _maxContentWidth = 1280;
 
   void _navigateTo(BuildContext context, String route) {
@@ -27,7 +27,7 @@ class LandingScreen extends StatelessWidget {
       if (kIsWeb) {
         await openRemoteInNewTab(_apkDownloadUrl);
       } else {
-        await downloadAndOpenRemote(_apkDownloadUrl, 'app-release.apk');
+        await downloadAndOpenRemote(_apkDownloadUrl, 'SAKA-REP.apk');
       }
     } catch (_) {
       if (!context.mounted) return;

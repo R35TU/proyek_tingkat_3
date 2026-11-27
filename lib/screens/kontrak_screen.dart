@@ -7,6 +7,7 @@ import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/providers/contract_provider.dart';
 import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
+import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/screens/detail_kegiatan_screen.dart';
 import 'package:tata_saka_app/screens/detail_kontrak_screen.dart';
 import 'package:tata_saka_app/screens/tambah_kontrak_screen.dart';
@@ -64,6 +65,10 @@ class _KontrakScreenState extends State<KontrakScreen> {
               backgroundColor: Colors.white,
               elevation: 0,
               surfaceTintColor: Colors.transparent,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+                onPressed: () => goBackWithShellHistory(context),
+              ),
               title: Text(
                 titleText,
                 style: const TextStyle(
@@ -158,7 +163,10 @@ class _KontrakScreenState extends State<KontrakScreen> {
     List<ContractModel> allContracts,
   ) {
     final contractorName = userProf.namaLengkap.toLowerCase();
-    final currentUserUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    String currentUserUid = '';
+    try {
+      currentUserUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    } catch (_) {}
     final searchQuery = _searchController.text.trim().toLowerCase();
 
     final List<Map<String, dynamic>> myKegiatans = [];

@@ -629,36 +629,53 @@ class _LembarLaporanBulananWidgetState extends State<LembarLaporanBulananWidget>
     );
   }
 
+  bool _hasSignerContent(Map<String, dynamic> s) {
+    final peran = (s['peran'] ?? s['jabatan'] ?? '').toString().trim();
+    final instansi = (s['instansi'] ?? '').toString().trim();
+    final nama = (s['nama'] ?? '').toString().trim();
+    final tanggal = (s['tanggal'] ?? '').toString().trim();
+    final sigStr = s['signature']?.toString().trim() ?? '';
+    return peran.isNotEmpty ||
+        instansi.isNotEmpty ||
+        nama.isNotEmpty ||
+        tanggal.isNotEmpty ||
+        sigStr.isNotEmpty;
+  }
+
   Widget _buildSignaturesPreview(MonthlyReportModel report) {
     final rawSigners = report.ttdList ?? [];
     final List<Map<String, dynamic>> signers = [];
     if (rawSigners.isNotEmpty) {
-      signers.addAll(rawSigners);
+      signers.addAll(rawSigners.where(_hasSignerContent));
     } else {
-      final dateStr = report.periodeFormatted.split('-').last.trim();
-      signers.addAll([
+      final legacySigners = [
         {
-          'peran': 'Kontraktor Pelaksana',
-          'instansi': report.pelaksanaKontraktor,
-          'nama': report.ttdKontraktorNama ?? '',
-          'tanggal': report.ttdKontraktorTanggal ?? dateStr,
+          'peran': (report.ttdKontraktorJabatan ?? '').trim(),
+          'instansi': '',
+          'nama': (report.ttdKontraktorNama ?? '').trim(),
+          'tanggal': (report.ttdKontraktorTanggal ?? '').trim(),
           'signature': report.ttdKontraktorSignature,
         },
         {
-          'peran': 'Konsultan Supervisi',
-          'instansi': report.konsultanPengawas.isNotEmpty ? report.konsultanPengawas : (report.ttdKonsultanJabatan ?? ''),
-          'nama': report.ttdKonsultanNama ?? '',
-          'tanggal': report.ttdKonsultanTanggal ?? dateStr,
+          'peran': (report.ttdKonsultanJabatan ?? '').trim(),
+          'instansi': '',
+          'nama': (report.ttdKonsultanNama ?? '').trim(),
+          'tanggal': (report.ttdKonsultanTanggal ?? '').trim(),
           'signature': report.ttdKonsultanSignature,
         },
         {
-          'peran': 'Pejabat Pembuat Komitmen (PPK)',
-          'instansi': report.ttdPpkJabatan ?? '',
-          'nama': report.ttdPpkNama ?? '',
-          'tanggal': report.ttdPpkTanggal ?? dateStr,
+          'peran': (report.ttdPpkJabatan ?? '').trim(),
+          'instansi': '',
+          'nama': (report.ttdPpkNama ?? '').trim(),
+          'tanggal': (report.ttdPpkTanggal ?? '').trim(),
           'signature': report.ttdPpkSignature,
         },
-      ]);
+      ];
+      signers.addAll(legacySigners.where(_hasSignerContent));
+    }
+
+    if (signers.isEmpty) {
+      return const SizedBox(height: 16);
     }
 
     return Container(
@@ -699,27 +716,31 @@ class _LembarLaporanBulananWidgetState extends State<LembarLaporanBulananWidget>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text(
-                    headerLines.isNotEmpty ? headerLines.join('\n') : 'Penandatangan',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 8.5, color: Color(0xFF1E293B)),
-                  ),
-                  const SizedBox(height: 4),
-                  sigWidget ?? const SizedBox(height: 36),
-                  const Text(
-                    '_______________________',
-                    style: TextStyle(fontSize: 8.5, color: Color(0xFF1E293B)),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    nama.isNotEmpty ? nama : '( .................................... )',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 8.5,
-                      color: Color(0xFF0F172A),
+                  if (headerLines.isNotEmpty)
+                    Text(
+                      headerLines.join('\n'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 8.5, color: Color(0xFF1E293B)),
                     ),
-                  ),
+                  if (headerLines.isNotEmpty) const SizedBox(height: 4),
+                  sigWidget ?? const SizedBox(height: 36),
+                  if (sigWidget != null || nama.isNotEmpty)
+                    const Text(
+                      '_______________________',
+                      style: TextStyle(fontSize: 8.5, color: Color(0xFF1E293B)),
+                    ),
+                  if (nama.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      nama,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 8.5,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
