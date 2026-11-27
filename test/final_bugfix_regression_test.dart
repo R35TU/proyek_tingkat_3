@@ -919,7 +919,12 @@ void main() {
 
         expect(find.text('Buat Laporan Harian'), findsNothing);
         expect(find.text('Laporan Harian'), findsOneWidget);
-        expect(find.textContaining('menu Laporan Harian'), findsOneWidget);
+        expect(find.text('Laporan Mingguan'), findsOneWidget);
+        expect(find.text('Laporan Bulanan'), findsOneWidget);
+        expect(
+          find.textContaining('laporan harian, mingguan, dan bulanan'),
+          findsOneWidget,
+        );
       },
     );
 
@@ -1040,7 +1045,8 @@ void main() {
         expect(find.byType(DataLaporanScreen), findsOneWidget);
         expect(find.byType(BuatLaporanScreen), findsNothing);
 
-        // Dinas mobile dark drawer: punya Laporan Harian -> /laporan/data, tanpa Mingguan/Bulanan/Data Laporan
+        // Dinas mobile dark drawer: punya Laporan Harian -> /laporan/data,
+        // serta Laporan Mingguan & Bulanan (view-only), tanpa Data Laporan.
         tester.view.physicalSize = const Size(412, 915);
         tester.view.devicePixelRatio = 1.0;
         userProf.loginAs(const RegisteredUser(
@@ -1058,8 +1064,8 @@ void main() {
 
         expect(find.text('Data Laporan'), findsNothing);
         expect(find.text('Buat Laporan'), findsNothing);
-        expect(find.text('Laporan Mingguan'), findsNothing);
-        expect(find.text('Laporan Bulanan'), findsNothing);
+        expect(find.text('Laporan Mingguan'), findsWidgets);
+        expect(find.text('Laporan Bulanan'), findsWidgets);
         final harianDrawerItem = find.text('Laporan Harian').last;
         await tester.tap(harianDrawerItem);
         await tester.pumpAndSettle();

@@ -199,20 +199,20 @@ class WebDashboardLayout extends StatefulWidget {
               webIcon: Icons.today_outlined,
               mobileIcon: Icons.today_rounded,
             ),
-            if (!isDinas) ...const [
-              SidebarMenuEntry(
-                key: 'laporan_mingguan',
-                label: 'Laporan Mingguan',
-                webIcon: Icons.date_range_outlined,
-                mobileIcon: Icons.date_range_rounded,
-              ),
-              SidebarMenuEntry(
-                key: 'laporan_bulanan',
-                label: 'Laporan Bulanan',
-                webIcon: Icons.calendar_month_outlined,
-                mobileIcon: Icons.calendar_month_rounded,
-              ),
-            ],
+            // Laporan mingguan & bulanan tetap tampil untuk Dinas, tetapi
+            // hanya bersifat lihat (tanpa tombol buat/edit/tanda tangan).
+            const SidebarMenuEntry(
+              key: 'laporan_mingguan',
+              label: 'Laporan Mingguan',
+              webIcon: Icons.date_range_outlined,
+              mobileIcon: Icons.date_range_rounded,
+            ),
+            const SidebarMenuEntry(
+              key: 'laporan_bulanan',
+              label: 'Laporan Bulanan',
+              webIcon: Icons.calendar_month_outlined,
+              mobileIcon: Icons.calendar_month_rounded,
+            ),
           ],
         ),
       const SidebarMenuSection(

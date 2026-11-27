@@ -150,6 +150,9 @@ void main() {
           'kontrak',
           'laporan',
           'laporan_harian',
+          // Dinas boleh memantau laporan mingguan & bulanan (view-only).
+          'laporan_mingguan',
+          'laporan_bulanan',
           'timeline',
           'pengaturan',
           'keamanan',

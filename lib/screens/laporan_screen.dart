@@ -71,52 +71,53 @@ class LaporanScreen extends StatelessWidget {
               }
             },
           ),
-          if (!isDinas) ...[
-            const SizedBox(height: 16),
-            _buildMenuCard(
-              title: 'Laporan Mingguan',
-              description:
-                  'Daftar Periode Mingguan (status berjalan, realisasi\nharian otomatis, bobot BoQ 14 kolom & tanda tangan)',
-              icon: Icons.analytics_outlined,
-              iconBgColor: const Color(0xFFFEF3C7),
-              iconColor: const Color(0xFFD97706),
-              onTap: () {
-                final router = GoRouter.maybeOf(context);
-                if (router != null) {
-                  router.go('/laporan/mingguan');
-                } else {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LaporanMingguanScreen(),
-                    ),
-                  );
-                }
-              },
-            ),
-            const SizedBox(height: 16),
-            _buildMenuCard(
-              title: 'Laporan Bulanan',
-              description:
-                  'Rekapitulasi Fisik Bulanan (Otomatis per 4 minggu,\nkemajuan fisik CCO, bulan lalu, bulan ini & sisa)',
-              icon: Icons.calendar_month_outlined,
-              iconBgColor: const Color(0xFFEDE9FE),
-              iconColor: const Color(0xFF7C3AED),
-              onTap: () {
-                final router = GoRouter.maybeOf(context);
-                if (router != null) {
-                  router.go('/laporan/bulanan');
-                } else {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LaporanBulananScreen(),
-                    ),
-                  );
-                }
-              },
-            ),
-          ] else ...[
+          const SizedBox(height: 16),
+          _buildMenuCard(
+            title: 'Laporan Mingguan',
+            description: isDinas
+                ? 'Lihat periode mingguan proyek instansi Anda\n(hanya lihat, tanpa isi/edit)'
+                : 'Daftar Periode Mingguan (status berjalan, realisasi\nharian otomatis, bobot BoQ 14 kolom & tanda tangan)',
+            icon: Icons.analytics_outlined,
+            iconBgColor: const Color(0xFFFEF3C7),
+            iconColor: const Color(0xFFD97706),
+            onTap: () {
+              final router = GoRouter.maybeOf(context);
+              if (router != null) {
+                router.go('/laporan/mingguan');
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const LaporanMingguanScreen(),
+                  ),
+                );
+              }
+            },
+          ),
+          const SizedBox(height: 16),
+          _buildMenuCard(
+            title: 'Laporan Bulanan',
+            description: isDinas
+                ? 'Lihat rekapitulasi fisik bulanan proyek instansi\nAnda (hanya lihat, tanpa isi/edit)'
+                : 'Rekapitulasi Fisik Bulanan (Otomatis per 4 minggu,\nkemajuan fisik CCO, bulan lalu, bulan ini & sisa)',
+            icon: Icons.calendar_month_outlined,
+            iconBgColor: const Color(0xFFEDE9FE),
+            iconColor: const Color(0xFF7C3AED),
+            onTap: () {
+              final router = GoRouter.maybeOf(context);
+              if (router != null) {
+                router.go('/laporan/bulanan');
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const LaporanBulananScreen(),
+                  ),
+                );
+              }
+            },
+          ),
+          if (isDinas) ...[
             const SizedBox(height: 16),
             _buildInfoCardDinas(),
           ],
@@ -249,8 +250,8 @@ class LaporanScreen extends StatelessWidget {
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
-              'Role Dinas bersifat pemantau: Anda dapat melihat semua laporan '
-              '(harian, mingguan, bulanan) melalui menu Laporan Harian.',
+              'Role Dinas bersifat pemantau: Anda dapat melihat laporan harian, '
+              'mingguan, dan bulanan dari kontrak yang melibatkan instansi Anda.',
               style: TextStyle(fontSize: 12.5, color: AppColors.textLight),
             ),
           ),

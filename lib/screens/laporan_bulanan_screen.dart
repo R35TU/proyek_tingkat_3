@@ -270,18 +270,20 @@ class _LaporanBulananScreenState extends State<LaporanBulananScreen> {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              _openTandaTanganBulananModal(context, report);
-                            },
-                            icon: const Icon(Icons.draw_outlined, size: 14, color: AppColors.primaryBlue),
-                            label: const Text('Tanda Tangan', style: TextStyle(fontSize: 12, color: AppColors.primaryBlue)),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: AppColors.primaryBlue),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          // Dinas hanya memantau: tanpa tombol tanda tangan.
+                          if (!(_tryReadUserProfile(context)?.isDinas ?? false))
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                _openTandaTanganBulananModal(context, report);
+                              },
+                              icon: const Icon(Icons.draw_outlined, size: 14, color: AppColors.primaryBlue),
+                              label: const Text('Tanda Tangan', style: TextStyle(fontSize: 12, color: AppColors.primaryBlue)),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.primaryBlue),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              ),
                             ),
-                          ),
                           ElevatedButton.icon(
                             onPressed: () {
                               Navigator.push(
