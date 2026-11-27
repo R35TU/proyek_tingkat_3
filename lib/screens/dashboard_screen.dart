@@ -23,6 +23,7 @@ import 'laporan_mingguan_screen.dart';
 import 'package:tata_saka_app/screens/laporan_bulanan_screen.dart';
 import 'package:tata_saka_app/screens/timeline_screen.dart';
 import 'package:tata_saka_app/screens/pengaturan_screen.dart';
+import 'package:tata_saka_app/screens/setting_screen.dart';
 import 'package:tata_saka_app/screens/keamanan_screen.dart';
 import 'package:tata_saka_app/screens/edit_profil_screen.dart';
 import 'package:tata_saka_app/screens/panduan_faq_screen.dart';
@@ -75,6 +76,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'laporan_bulanan',
       'laporan-bulanan',
       'timeline',
+      'akun',
       'pengaturan',
       'keamanan',
       'edit_profil',
@@ -144,6 +146,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return const LaporanBulananScreen();
       case 'timeline':
         return const TimelineScreen();
+      case 'akun':
+        return const SettingScreen();
       case 'pengaturan':
         return const PengaturanScreen();
       case 'keamanan':
@@ -214,6 +218,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return 'Laporan Bulanan Supervisi';
       case 'timeline':
         return 'Timeline & Histori Proyek';
+      case 'akun':
+        return userProf.tr('nav_account');
       case 'pengaturan':
         return 'Pengaturan Akun';
       case 'keamanan':
@@ -272,6 +278,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return const LaporanBulananScreen(isEmbedded: true);
       case 'timeline':
         return const TimelineScreen(isEmbedded: true);
+      case 'akun':
+        return const SettingScreen(isEmbedded: true);
       case 'pengaturan':
         return const PengaturanScreen(isEmbedded: true);
       case 'keamanan':

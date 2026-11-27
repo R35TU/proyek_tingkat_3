@@ -17,7 +17,8 @@ import 'package:tata_saka_app/widgets/responsive_layout.dart';
 import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 
 class SettingScreen extends StatefulWidget {
-  const SettingScreen({super.key});
+  final bool isEmbedded;
+  const SettingScreen({super.key, this.isEmbedded = false});
 
   @override
   State<SettingScreen> createState() => _SettingScreenState();
@@ -538,10 +539,14 @@ class _SettingScreenState extends State<SettingScreen> {
             ),
           );
 
+        if (widget.isEmbedded) {
+          return mainBody;
+        }
+
         if (isDesktop) {
           return WebDashboardLayout(
             title: userProf.tr('nav_account'),
-            activeMenu: 'pengaturan',
+            activeMenu: 'akun',
             actions: headerActions,
             child: mainBody,
           );

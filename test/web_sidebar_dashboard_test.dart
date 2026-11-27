@@ -370,6 +370,7 @@ void main() {
         expect(find.byIcon(Icons.today_outlined), findsWidgets);
         expect(find.byIcon(Icons.date_range_outlined), findsWidgets);
         expect(find.byIcon(Icons.calendar_month_outlined), findsWidgets);
+        expect(find.byIcon(Icons.account_circle_outlined), findsWidgets);
 
         // 2. Switch to Timeline & Histori
         final timelineFinder = find.widgetWithText(InkWell, 'Timeline & Histori');

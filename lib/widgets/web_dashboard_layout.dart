@@ -88,7 +88,8 @@ class WebDashboardLayout extends StatefulWidget {
     if (clean.startsWith('/timeline')) return 'timeline';
     if (clean.startsWith('/akun/keamanan')) return 'keamanan';
     if (clean.startsWith('/akun/profil')) return 'edit_profil';
-    if (clean.startsWith('/akun')) return 'pengaturan';
+    if (clean.startsWith('/akun/pengaturan')) return 'pengaturan';
+    if (clean.startsWith('/akun')) return 'akun';
     if (clean.startsWith('/panduan')) return 'panduan_faq';
     return 'dashboard';
   }
@@ -113,6 +114,8 @@ class WebDashboardLayout extends StatefulWidget {
         return '/laporan/bulanan';
       case 'timeline':
         return '/timeline';
+      case 'akun':
+        return '/akun';
       case 'pengaturan':
         return '/akun/pengaturan';
       case 'keamanan':
@@ -230,6 +233,12 @@ class WebDashboardLayout extends StatefulWidget {
         title: 'AKUN & PENGATURAN',
         items: [
           SidebarMenuEntry(
+            key: 'akun',
+            label: 'Akun',
+            webIcon: Icons.account_circle_outlined,
+            mobileIcon: Icons.account_circle_rounded,
+          ),
+          SidebarMenuEntry(
             key: 'pengaturan',
             label: 'Pengaturan Akun',
             webIcon: Icons.settings_outlined,
@@ -280,6 +289,8 @@ class WebDashboardLayout extends StatefulWidget {
     Icon(Icons.date_range_outlined),
     Icon(Icons.calendar_month_outlined),
     Icon(Icons.timeline),
+    Icon(Icons.account_circle_outlined),
+    Icon(Icons.account_circle_rounded),
     Icon(Icons.settings_outlined),
     Icon(Icons.security_outlined),
     Icon(Icons.person_outline_rounded),
@@ -1134,6 +1145,8 @@ class _SidebarItemWidgetState extends State<_SidebarItemWidget> {
         return Icon(Icons.calendar_month_outlined, size: size, color: color);
       case 'timeline':
         return Icon(Icons.timeline, size: size, color: color);
+      case 'akun':
+        return Icon(Icons.account_circle_outlined, size: size, color: color);
       case 'pengaturan':
         return Icon(Icons.settings_outlined, size: size, color: color);
       case 'keamanan':
