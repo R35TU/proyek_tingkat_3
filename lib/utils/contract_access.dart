@@ -98,6 +98,31 @@ class ContractAccess {
     );
   }
 
+  /// Kegiatan pada satu kontrak yang boleh tampil untuk profil ini.
+  ///
+  /// Kontraktor hanya melihat kegiatan yang ditugaskan kepadanya, walau
+  /// kontraknya juga berisi kegiatan milik kontraktor lain. Peran lain
+  /// (konsultan, dinas, admin) melihat seluruh kegiatan kontrak.
+  /// Indeks asli dipertahankan agar navigasi ke detail kegiatan tetap benar.
+  static List<MapEntry<int, Map<String, dynamic>>> visibleKegiatanEntries(
+    ContractModel contract,
+    UserProfileProvider user,
+  ) {
+    final entries = contract.kegiatans.asMap().entries.toList();
+    if (!user.isKontraktor) return entries;
+    return entries
+        .where(
+          (entry) => kegiatanOwnedByKontraktor(
+            entry.value,
+            contractorUid: user.uid,
+            fullName: user.namaLengkap,
+            companyOrAgency: user.companyOrAgency,
+            username: user.username,
+          ),
+        )
+        .toList();
+  }
+
   /// Kontrak yang boleh tampil untuk profil yang sedang login.
   static List<ContractModel> visibleContracts(
     List<ContractModel> allContracts,
