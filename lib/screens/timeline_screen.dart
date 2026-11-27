@@ -7,6 +7,7 @@ import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
 import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
+import 'package:tata_saka_app/utils/contract_access.dart';
 
 class TimelineScreen extends StatefulWidget {
   final bool isEmbedded;
@@ -73,24 +74,15 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
     // Kumpulkan opsi kegiatan yang relevan untuk role pengguna
     final availableKegiatans = <String>{};
-    for (final c in contractProv.contracts) {
+    // Opsi kegiatan mengikuti kontrak yang boleh dilihat peran ini (aturan
+    // sama dengan halaman Akun/Kontrak), bukan pencocokan nama mentah.
+    for (final c in ContractAccess.visibleContracts(
+      contractProv.contracts,
+      userProf,
+    )) {
       for (final k in c.kegiatans) {
         final kName = k['namaKegiatan']?.toString() ?? '';
-        final kontraktor = k['kontraktor']?.toString().toLowerCase() ?? '';
-        if (kName.isEmpty) continue;
-
-        if (userProf.isKontraktor) {
-          final userComp = userProf.companyOrAgency.toLowerCase();
-          final userFull = userProf.namaLengkap.toLowerCase();
-          if (kontraktor.contains(userComp) ||
-              userComp.contains(kontraktor) ||
-              kontraktor.contains(userFull) ||
-              userFull.contains(kontraktor)) {
-            availableKegiatans.add(kName);
-          }
-        } else {
-          availableKegiatans.add(kName);
-        }
+        if (kName.isNotEmpty) availableKegiatans.add(kName);
       }
     }
 

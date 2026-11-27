@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tata_saka_app/models/contract_model.dart';
 import 'package:tata_saka_app/models/timeline_event_model.dart';
 import 'package:tata_saka_app/providers/user_profile_provider.dart';
+import 'package:tata_saka_app/utils/contract_access.dart';
 
 class TimelineProvider with ChangeNotifier {
   static const String _storageKey = 'tata_saka_timeline_events_v1';
@@ -26,6 +27,10 @@ class TimelineProvider with ChangeNotifier {
   }
 
   List<TimelineEventModel> _events = [];
+
+  /// Kontrak terakhir yang dimuat, dipakai menentukan hak akses timeline
+  /// lewat `dinasUid` (kontrak) dan `kontraktorUid` (kegiatan).
+  final Map<String, ContractModel> _contractsById = {};
   bool _isLoading = true;
 
   /// Future pemuatan yang sedang berjalan (dipakai `ensureLoaded`).
@@ -364,7 +369,7 @@ class TimelineProvider with ChangeNotifier {
       kegiatanId: kegiatanId,
       kegiatanName: kegiatanName,
       kontraktorName: kontraktorName,
-      dinasName: dinasName ?? 'DPU-PR Kab. Purbalingga',
+      dinasName: dinasName,
       title: title,
       description: description,
       changes: changes,
@@ -408,6 +413,9 @@ class TimelineProvider with ChangeNotifier {
   /// Memastikan seluruh laporan harian (misal tanggal 21, 22, 23), mingguan, addendum, dan dokumen
   /// terdaftar lengkap di Timeline dengan tanggal & waktu yang akurat.
   Future<void> syncWithContracts(List<ContractModel> contracts) async {
+    _contractsById
+      ..clear()
+      ..addEntries(contracts.map((c) => MapEntry(c.id, c)));
     var totalLaporan = 0;
     for (final c in contracts) {
       for (final keg in c.kegiatans) {
@@ -431,9 +439,7 @@ class TimelineProvider with ChangeNotifier {
     for (final c in contracts) {
       final cId = c.id;
       final cName = c.namaKontrak;
-      final dinas = c.instansiDinas.isNotEmpty
-          ? c.instansiDinas.first
-          : 'DPU-PR Kab. Purbalingga';
+      final dinas = c.instansiDinas.isNotEmpty ? c.instansiDinas.first : '';
 
       // 1. Aktivitas Pembuatan Kontrak
       final contractEventId = 'timeline_contract_create_$cId';
@@ -779,36 +785,15 @@ class TimelineProvider with ChangeNotifier {
   }) {
     return _events.where((event) {
       // 1. FILTER BERDASARKAN ROLE & HAK AKSES PENGGUNA
-      if (userProfile.isKontraktor) {
-        final userCompany = userProfile.companyOrAgency.trim().toLowerCase();
-        final userFullName = userProfile.namaLengkap.trim().toLowerCase();
-        final eventKontraktor = (event.kontraktorName ?? '').trim().toLowerCase();
-
-        // Kontraktor HANYA melihat histori dari kegiatan miliknya sendiri
-        final isMatchingContractor = eventKontraktor.isNotEmpty &&
-            (eventKontraktor.contains(userCompany) ||
-                userCompany.contains(eventKontraktor) ||
-                eventKontraktor.contains(userFullName) ||
-                userFullName.contains(eventKontraktor));
-
-        if (!isMatchingContractor) {
-          return false;
-        }
-      } else if (userProfile.isDinas) {
-        final agency = userProfile.companyOrAgency.trim().toLowerCase();
-        final agencyFullName = userProfile.namaLengkap.trim().toLowerCase();
-        final eventDinas = (event.dinasName ?? '').trim().toLowerCase();
-
-        // Dinas melihat kontrak & kegiatan di bawah naungan instansi dinas terkait
-        final isMatchingAgency = eventDinas.isNotEmpty &&
-            (eventDinas.contains(agency) ||
-                agency.contains(eventDinas) ||
-                eventDinas.contains('dpu-pr') ||
-                agencyFullName.contains(eventDinas));
-
-        if (!isMatchingAgency) {
-          return false;
-        }
+      // Penentu utama: `dinasUid` pada kontrak dan `kontraktorUid` pada
+      // kegiatan. Nama hanya dipakai sebagai cadangan untuk event lama yang
+      // kontraknya sudah tidak ada di memori.
+      if (userProfile.isKontraktor &&
+          !_visibleToKontraktor(event, userProfile)) {
+        return false;
+      }
+      if (userProfile.isDinas && !_visibleToDinas(event, userProfile)) {
+        return false;
       }
       // Role Konsultan memiliki akses penuh untuk melihat semua kronologi
 
@@ -867,6 +852,86 @@ class TimelineProvider with ChangeNotifier {
 
       return true;
     }).toList();
+  }
+
+  /// Kontrak sumber event, bila masih termuat di memori.
+  ContractModel? _contractOf(TimelineEventModel event) =>
+      _contractsById[event.contractId];
+
+  /// Kegiatan yang dirujuk event: cocokkan nama dulu, lalu id `keg_<kontrak>_<idx>`.
+  Map<String, dynamic>? _kegiatanOf(
+    ContractModel contract,
+    TimelineEventModel event,
+  ) {
+    final nama = (event.kegiatanName ?? '').trim();
+    if (nama.isNotEmpty) {
+      for (final keg in contract.kegiatans) {
+        if ((keg['namaKegiatan'] ?? '').toString().trim() == nama) return keg;
+      }
+    }
+    final id = (event.kegiatanId ?? '').trim();
+    if (id.startsWith('keg_')) {
+      final idx = int.tryParse(id.split('_').last);
+      if (idx != null && idx >= 0 && idx < contract.kegiatans.length) {
+        return contract.kegiatans[idx];
+      }
+    }
+    return null;
+  }
+
+  /// Event hanya terlihat oleh kontraktor yang ditugaskan pada kegiatannya.
+  bool _visibleToKontraktor(
+    TimelineEventModel event,
+    UserProfileProvider user,
+  ) {
+    final contract = _contractOf(event);
+    if (contract != null) {
+      final keg = _kegiatanOf(contract, event);
+      // Event tingkat kontrak (tanpa kegiatan) tidak dimiliki kontraktor.
+      if (keg == null) return false;
+      return ContractAccess.kegiatanOwnedByKontraktor(
+        keg,
+        contractorUid: user.uid,
+        fullName: user.namaLengkap,
+        companyOrAgency: user.companyOrAgency,
+        username: user.username,
+      );
+    }
+    // Event lama/asing: cocokkan nama dengan aturan token yang sama, sehingga
+    // nama kosong tidak lagi dianggap cocok dengan semua event.
+    final kontraktor = (event.kontraktorName ?? '').trim();
+    if (kontraktor.isEmpty) return false;
+    return ContractAccess.kegiatanOwnedByKontraktor(
+      {'kontraktor': kontraktor},
+      contractorUid: user.uid,
+      fullName: user.namaLengkap,
+      companyOrAgency: user.companyOrAgency,
+      username: user.username,
+    );
+  }
+
+  /// Event hanya terlihat oleh dinas pemilik kontrak (`dinasUid`).
+  bool _visibleToDinas(TimelineEventModel event, UserProfileProvider user) {
+    final contract = _contractOf(event);
+    if (contract != null) {
+      return contract.isOwnedByDinas(
+        dinasUserUid: user.uid,
+        companyOrAgency: user.companyOrAgency,
+        userFullName: user.namaLengkap,
+      );
+    }
+    // Fallback data lama: nama instansi, tanpa pengecualian 'dpu-pr' lagi.
+    final eventDinas = (event.dinasName ?? '').trim().toLowerCase();
+    final agency = user.companyOrAgency.trim().toLowerCase();
+    final fullName = user.namaLengkap.trim().toLowerCase();
+    if (eventDinas.isEmpty || (agency.isEmpty && fullName.isEmpty)) {
+      return false;
+    }
+    final matchAgency = agency.isNotEmpty &&
+        (eventDinas.contains(agency) || agency.contains(eventDinas));
+    final matchFullName = fullName.isNotEmpty &&
+        (eventDinas.contains(fullName) || fullName.contains(eventDinas));
+    return matchAgency || matchFullName;
   }
 
   /// Data bawaan kronologi proyek (MT Haryono dinonaktifkan permanen)

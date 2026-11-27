@@ -34,6 +34,7 @@ import 'package:tata_saka_app/providers/timeline_provider.dart';
 import 'package:tata_saka_app/theme/app_colors.dart';
 import 'package:tata_saka_app/widgets/responsive_layout.dart';
 import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
+import 'package:tata_saka_app/utils/contract_access.dart';
 import 'package:tata_saka_app/utils/progress_calculator.dart';
 import 'package:tata_saka_app/utils/web_navigation.dart';
 
@@ -740,11 +741,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   List<Map<String, String>> _extractRecentActivities(
-    List<ContractModel> contracts,
-  ) {
+    List<ContractModel> contracts, {
+    UserProfileProvider? userProfile,
+  }) {
     final List<Map<String, dynamic>> list = [];
-    for (final c in contracts) {
+    // Jalur cadangan ini dipakai saat timeline kosong; tetap harus mengikuti
+    // aturan akses supaya proyek yang tidak ditugaskan tidak bocor.
+    final visibleContracts = userProfile == null
+        ? contracts
+        : ContractAccess.visibleContracts(contracts, userProfile);
+    for (final c in visibleContracts) {
       for (final keg in c.kegiatans) {
+        if (userProfile != null &&
+            userProfile.isKontraktor &&
+            !ContractAccess.kegiatanOwnedByKontraktor(
+              keg,
+              contractorUid: userProfile.uid,
+              fullName: userProfile.namaLengkap,
+              companyOrAgency: userProfile.companyOrAgency,
+              username: userProfile.username,
+            )) {
+          continue;
+        }
         final laporans = keg['laporans'] as List? ?? [];
         for (final rep in laporans) {
           if (rep is Map) {
@@ -1170,7 +1188,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final hasTimelineEvents = timelineEvents.isNotEmpty;
     final fallbackActivities = !hasTimelineEvents
-        ? _extractRecentActivities(contracts)
+        ? _extractRecentActivities(contracts, userProfile: userProf)
         : <Map<String, String>>[];
 
     final hasActivities = hasTimelineEvents || fallbackActivities.isNotEmpty;
@@ -1372,7 +1390,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     List<ContractModel> contracts, [
     TimelineProvider? timelineProv,
   ]) {
-    final contractorName = userProf.namaLengkap.toLowerCase();
     final currentUserUid = AuthService.currentUser?.uid ?? '';
     final List<Map<String, dynamic>> myKegiatans = [];
     final List<int> kegIndices = [];
@@ -1381,36 +1398,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     for (final c in contracts) {
       for (int i = 0; i < c.kegiatans.length; i++) {
         final k = c.kegiatans[i];
-        final kKontraktor = (k['kontraktor'] ?? '').toString().toLowerCase();
-        final kKontraktorUid = (k['kontraktorUid'] ?? '').toString();
-
-        bool isMine = false;
-
-        // FIRST: try matching by kontraktorUid (Firebase Auth UID)
-        if (currentUserUid.isNotEmpty &&
-            kKontraktorUid.isNotEmpty &&
-            kKontraktorUid == currentUserUid) {
-          isMine = true;
+        if (!ContractAccess.kegiatanOwnedByKontraktor(
+          k,
+          contractorUid: currentUserUid,
+          fullName: userProf.namaLengkap,
+          companyOrAgency: userProf.companyOrAgency,
+          username: userProf.username,
+        )) {
+          continue;
         }
-
-        // FALLBACK: name-based matching for backward compatibility
-        if (!isMine && kKontraktor.isNotEmpty) {
-          if (kKontraktor.contains(contractorName) ||
-              contractorName.contains(kKontraktor)) {
-            isMine = true;
-          } else if (contractorName.contains('divan') &&
-              kKontraktor.contains('divan')) {
-            isMine = true;
-          } else if (contractorName.contains('langgeng') &&
-              kKontraktor.contains('langgeng')) {
-            isMine = true;
-          }
-        }
-        if (isMine) {
-          myKegiatans.add(k);
-          kegIndices.add(i);
-          parentContracts.add(c);
-        }
+        myKegiatans.add(k);
+        kegIndices.add(i);
+        parentContracts.add(c);
       }
     }
 
