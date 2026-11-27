@@ -455,7 +455,9 @@ class _SettingScreenState extends State<SettingScreen> {
                       );
                     }
                     return Column(
-                      children: contracts.map((c) => _buildContractCard(c)).toList(),
+                      children: contracts
+                          .map((c) => _buildContractCard(c, userProf))
+                          .toList(),
                     );
                   },
                 ),
@@ -572,7 +574,11 @@ class _SettingScreenState extends State<SettingScreen> {
     );
   }
 
-  Widget _buildContractCard(ContractModel c) {
+  Widget _buildContractCard(ContractModel c, UserProfileProvider userProf) {
+    // Kontraktor hanya menghitung kegiatan yang ditugaskan kepadanya, bukan
+    // seluruh kegiatan pada kontrak yang sama.
+    final kegiatanCount =
+        ContractAccess.visibleKegiatanEntries(c, userProf).length;
     return InkWell(
       onTap: () {
         final router = GoRouter.maybeOf(context);
@@ -625,7 +631,7 @@ class _SettingScreenState extends State<SettingScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${c.kegiatans.length} Kegiatan • ${c.jenisKegiatan}',
+                    '$kegiatanCount Kegiatan • ${c.jenisKegiatan}',
                     style: TextStyle(color: AppColors.getTextLight(context), fontSize: 12),
                   ),
                 ],

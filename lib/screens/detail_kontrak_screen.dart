@@ -23,6 +23,7 @@ import 'package:tata_saka_app/widgets/responsive_layout.dart';
 import 'package:tata_saka_app/widgets/web_dashboard_layout.dart';
 import 'package:tata_saka_app/router/app_router.dart';
 import 'package:tata_saka_app/utils/progress_calculator.dart';
+import 'package:tata_saka_app/utils/contract_access.dart';
 import 'package:tata_saka_app/utils/web_navigation.dart';
 
 class _DocumentData {
@@ -1528,6 +1529,24 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
     if (!identical(contract, _syncedContractRef)) {
       _reloadFromContract(contract);
     }
+    // Kontraktor hanya melihat kegiatan yang ditugaskan kepadanya. Indeks asli
+    // tetap dipakai supaya navigasi ke detail kegiatan tidak salah sasaran.
+    final profile = userProf;
+    final List<MapEntry<int, _KegiatanData>> kegiatanEntries = [];
+    for (final entry in _kegiatans.asMap().entries) {
+      if (profile != null &&
+          profile.isKontraktor &&
+          !ContractAccess.kegiatanOwnedByKontraktor(
+            entry.value.data,
+            contractorUid: profile.uid,
+            fullName: profile.namaLengkap,
+            companyOrAgency: profile.companyOrAgency,
+            username: profile.username,
+          )) {
+        continue;
+      }
+      kegiatanEntries.add(entry);
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
@@ -1745,7 +1764,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      '${_kegiatans.length}',
+                      '${kegiatanEntries.length}',
                       style: const TextStyle(
                         color: AppColors.primaryBlue,
                         fontWeight: FontWeight.bold,
@@ -1791,7 +1810,7 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
             ],
           ),
           const SizedBox(height: 16),
-          if (_kegiatans.isEmpty)
+          if (kegiatanEntries.isEmpty)
             Container(
               padding: const EdgeInsets.all(24),
               width: double.infinity,
@@ -1803,13 +1822,15 @@ class _DetailKontrakScreenState extends State<DetailKontrakScreen> with SingleTi
               child: Text(
                 isKonsultan
                     ? 'Belum ada kegiatan yang didaftarkan pada kontrak ini.\nTekan "+ Tambah" untuk menambahkan kegiatan.'
-                    : 'Belum ada kegiatan yang didaftarkan pada kontrak ini.',
+                    : (profile?.isKontraktor ?? false)
+                        ? 'Belum ada kegiatan yang ditugaskan kepada akun Anda pada kontrak ini.'
+                        : 'Belum ada kegiatan yang didaftarkan pada kontrak ini.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.textLight, height: 1.4),
               ),
             )
           else
-            ..._kegiatans.asMap().entries.map((entry) => _buildKegiatanItem(entry.value, entry.key, isKonsultan: isKonsultan)),
+            ...kegiatanEntries.map((entry) => _buildKegiatanItem(entry.value, entry.key, isKonsultan: isKonsultan)),
             
           const SizedBox(height: 40),
         ],
